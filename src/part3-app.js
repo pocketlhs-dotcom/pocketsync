@@ -433,7 +433,7 @@ function Board() {
    {value: 'all', content: html`<${Fragment}>${TOPIC_ALL} <span>${topicCountItems.length}</span><//>`},
    ...topics.map(t => ({value: t.id, title: t.name, content: html`<${Fragment}>${t.name}<span>${topicCountItems.filter(i => i.topic_id === t.id).length}</span><//>`})),
    {value: 'unassigned', content: html`<${Fragment}>${TOPIC_NONE}<span>${topicCountItems.filter(i => !i.topic_id).length}</span><//>`}
-  ]} /><button type="button" class="add-topic-button" disabled=${loading || !writable} onClick=${() => setTopicOpen(true)}>${I('Plus', 15)}주제 추가</button><button type="button" class="icon-button manage-topics" title="주제 관리 (이름 바꾸기 · 순서 · 삭제)" aria-label="주제 관리" disabled=${loading || !writable} onClick=${() => setTopicManagerOpen(true)}>${I('Settings2', 16)}</button></div>`;
+  ]} /><button type="button" class="add-topic-button" disabled=${loading || !writable} onClick=${() => setTopicOpen(true)}>${I('Plus', 15)}카테고리 추가</button><button type="button" class="icon-button manage-topics" title="주제 관리 (이름 바꾸기 · 순서 · 삭제)" aria-label="주제 관리" disabled=${loading || !writable} onClick=${() => setTopicManagerOpen(true)}>${I('Settings2', 16)}</button></div>`;
  const pageTitle = view === 'today' ? (date === today() ? '오늘의 공유' : date === 'all' ? '전체 공유' : `${shortDate(date)}의 공유`) : VIEW_TITLES[view];
  const composeLabel = view === 'tasks' ? '업무 추가' : view === 'notices' ? '확인 요청 남기기' : '공유 남기기';
 
