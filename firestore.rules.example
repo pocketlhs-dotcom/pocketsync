@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 두 사람의 구글 이메일만 읽고 쓸 수 있습니다. 실제 이메일은 Firebase 콘솔에만 넣습니다.
+    function allowed() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in ['EMAIL_1', 'EMAIL_2'];
+    }
+    match /{document=**} {
+      allow read, write: if allowed();
+    }
+  }
+}
