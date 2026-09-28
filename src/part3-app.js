@@ -156,7 +156,7 @@ async function claimSeat(db, uid, seat) {
 async function releaseSeat(db, seat) { await db.doc('members/' + seat.key).set({name: seat.name, user_id: '', claimed_at: ''}); }
 
 /* ---------- Board ---------- */
-const VIEW_TITLES = {schedule: '스케줄', tasks: '함께하는 일', notices: '확인 요청', weekly: '주간 회의'};
+const VIEW_TITLES = {schedule: '서로의 스케줄', tasks: '함께하는 일', notices: '확인 요청', weekly: '주간 회의'};
 const KIND_LABELS = {all: '이야기', daily: '전할 말', task: '업무', event: '일정'};
 const TOPIC_ALL = '전체 카테고리', TOPIC_NONE = '미분류';
 
@@ -646,9 +646,9 @@ function Board() {
   <div class="page-heading"><div><p class="eyebrow">${dayLabel(today())}</p><h1>${pageTitle}</h1></div><button type="button" class="primary-button" disabled=${loading || !writable} onClick=${() => setCompose(view === 'schedule' ? {kind: 'event', assignee: myName || '함께'} : {kind: view === 'tasks' ? 'task' : 'daily', ackMode: view === 'notices' ? 'share' : 'none'})}>${I('Plus', 18)}${composeLabel}</button></div>
   <div class="board-tabs"><${TabsList} class="top-tabs" label="공유 보드 보기" value=${view} onChange=${v => { setView(v); if (v === 'weekly' && date === 'all') setDate(today()); }} tabs=${[
    {value: 'today', content: '오늘의 공유'},
-   {value: 'schedule', content: html`<${Fragment}>스케줄${collabForMe.length > 0 && html`<span class="tab-count notification">${collabForMe.length}</span>`}<//>`},
-   {value: 'tasks', content: html`<${Fragment}>함께하는 일<span class="tab-count">${tasks.filter(i => i.status !== 'done').length}</span><//>`},
    {value: 'notices', content: html`<${Fragment}>확인 요청${unread.length > 0 && html`<span class="tab-count notification">${unread.length}</span>`}<//>`},
+   {value: 'schedule', content: html`<${Fragment}>서로의 스케줄${collabForMe.length > 0 && html`<span class="tab-count notification">${collabForMe.length}</span>`}<//>`},
+   {value: 'tasks', content: html`<${Fragment}>함께하는 일<span class="tab-count">${tasks.filter(i => i.status !== 'done').length}</span><//>`},
    {value: 'weekly', content: '주간 회의'}
   ]} />
   ${view !== 'schedule' && html`<div class=${cx('board-filters', boardMode && 'no-date')}>${!boardMode && html`<${DateBar} date=${date} weekly=${view === 'weekly'} onChange=${setDate} count=${day => dateCountItems.filter(i => matchesDate(i, comments, day)).length} />`}${view !== 'today' && topicRow}<p class="date-rule">${boardMode ? '보드는 날짜와 관계없이 현재 상태 기준 · 카테고리 필터 적용' : view === 'weekly' ? '선택 날짜가 포함된 월요일~일요일의 기록 · 업무 상태는 현재 기준' : view === 'today' ? '일정은 날짜 기준, 이야기는 기록일 · 업데이트일 · 마감일 기준' : '기록일 · 업데이트일 · 업무 마감일 기준'} · 한국 시간</p></div>`}
