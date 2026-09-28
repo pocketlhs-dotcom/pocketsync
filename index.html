@@ -827,6 +827,12 @@ button.field-chip:hover{background:#eef3ff;color:#3b63b8}
 .body-wrap.empty>svg{color:#6f8fcf}
 .body-wrap .body-edit{flex:1;min-width:0;margin:0!important;width:auto!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important}
 .body-wrap .body-edit::placeholder{color:#6f84a6;opacity:1}
+.pl-main{display:flex;flex-direction:column;gap:3px;min-width:0}
+.pl-main>.pl-title{gap:0}
+.pl-main .pl-meta>span:only-child:empty{display:none}
+.pl-tags{margin-top:1px}
+.pl-tags>.topic-badge{font-size:11.5px;padding:0 6px;line-height:1.7}
+@media(max-width:640px){.pl-row>.pl-main{grid-area:t}}
 </style>
 </head><body>
 <div id="app"></div>
@@ -836,6 +842,6 @@ button.field-chip:hover{background:#eef3ff;color:#3b63b8}
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1790584861"></script>
-<script src="app.js?v=1790584861"></script>
+<script src="platform.js?v=1790584920"></script>
+<script src="app.js?v=1790584920"></script>
 </body></html>
