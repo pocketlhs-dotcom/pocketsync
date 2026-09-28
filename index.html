@@ -871,6 +871,26 @@ button.field-chip:hover{background:#eef3ff;color:#3b63b8}
 @media(max-width:640px){.pl-row{grid-template-columns:24px 50px minmax(0,1fr) 70px;grid-template-areas:'r d t p' 'r d m s'}.pl-row>.pl-rank{grid-area:r}.pl-group-head>small{display:none}}
 .pl-meta,.pl-tags{gap:5px}
 .pl-tags{row-gap:5px}
+.pl-rank{width:26px;height:26px;border-radius:13px;font-size:12.5px;font-weight:700;border:1px solid transparent;display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.pl-rank.set{background:#2f4468;color:#fff;border-color:#2f4468}
+.pl-rank.unset{background:#fff;color:#a4b2c7;border:1px dashed #c9d5e7;font-weight:500}
+button.pl-rank:hover:not(:disabled){box-shadow:0 0 0 3px #e5edff}
+button.pl-rank.unset:hover:not(:disabled){color:#3865e8;border-color:#a3bbf5}
+.pl-rank.top{background:inherit}
+.pl-rank.none{visibility:hidden}
+.pl-tab-req{font-size:11px;font-weight:600;padding:1px 7px;border-radius:9px;background:#fff1de;color:#a8702c}
+.pl-group-head.req{background:#fffaf2;color:#a8702c}
+.pl-group-head.toggle{width:100%;text-align:left;cursor:pointer;border-bottom:0}
+.joint-group.open>.pl-group-head.toggle{border-bottom:1px solid #eef2f8}
+.req-row{grid-template-columns:26px 62px minmax(0,1fr) auto auto}
+.req-actions{display:flex;gap:6px;justify-self:end}
+.req-wait{justify-self:end;font-size:12px;color:#b0875a}
+.req-decline{display:flex;gap:6px;align-items:center;justify-self:end}
+.req-decline>input{width:180px;height:32px;border:1px solid #d6dfec;border-radius:7px;padding:0 9px;font-size:13px;background:#fff}
+.tag.req-tag{font-size:11px;padding:1px 7px;font-weight:600}
+.tag.req-tag.pending{background:#fff1de;color:#a8702c}
+.tag.req-tag.declined{background:#f1f4f9;color:#8c9ab1}
+@media(max-width:640px){.req-row{grid-template-columns:24px 50px minmax(0,1fr);grid-template-areas:'r d t' 'r d a'}.req-row>.req-actions,.req-row>.req-wait,.req-row>.req-decline{grid-area:a;justify-self:start}.req-row>.priority-tag,.req-row>.tag:not(.dday){display:none}.req-decline>input{width:140px}}
 </style>
 </head><body>
 <div id="app"></div>
@@ -880,6 +900,6 @@ button.field-chip:hover{background:#eef3ff;color:#3b63b8}
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1790586338"></script>
-<script src="app.js?v=1790586338"></script>
+<script src="platform.js?v=1790586844"></script>
+<script src="app.js?v=1790586844"></script>
 </body></html>
