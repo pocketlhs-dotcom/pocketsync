@@ -817,4 +817,13 @@ button.field-chip:hover{background:#eef3ff;color:#3b63b8}
 .thread-day{font-size:11.5px;font-weight:600;color:#9aabc3;margin:14px 0 4px;text-align:center}
 .thread-ev>.dday{flex-shrink:0}
 @media(max-width:640px){.pl-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.pl-stats>div:nth-child(n+4){display:none}.pl-row{grid-template-columns:54px minmax(0,1fr) 74px;grid-template-areas:'d t p' 'd m s';row-gap:4px;padding:10px 10px}.pl-row>.dday{grid-area:d}.pl-row>.pl-title{grid-area:t}.pl-row>.pl-progress{grid-area:p}.pl-row>.priority-tag,.pl-row>.tag:not(.pl-status):not(.dday){grid-area:m;justify-self:start}.pl-row>.pl-status{grid-area:s}.pl-summary{padding:12px}.pl-state>.thread-link{margin-left:0}}
+.body-wrap{display:flex;align-items:flex-start;gap:9px;margin:6px -12px 0;padding:9px 12px;border:1px solid transparent;border-radius:9px;cursor:text;transition:background .12s,border-color .12s}
+.body-wrap>svg{flex-shrink:0;margin-top:5px;color:#a9b8d0}
+.body-wrap:hover{background:#f8faff;border-color:#e3eaf6}
+.body-wrap:hover>svg,.body-wrap:focus-within>svg{color:#3865e8}
+.body-wrap:focus-within{background:#fff;border-color:#a3bbf5;box-shadow:0 0 0 3px #e5edff}
+.body-wrap.empty{border:1px dashed #c6d4ea;background:#f8fbff}
+.body-wrap.empty>svg{color:#6f8fcf}
+.body-wrap .body-edit{flex:1;min-width:0;margin:0!important;width:auto!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important}
+.body-wrap .body-edit::placeholder{color:#6f84a6;opacity:1}
 </style>
