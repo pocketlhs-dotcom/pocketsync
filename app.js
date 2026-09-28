@@ -940,7 +940,7 @@ function Board() {
   <div class="page-heading"><div><p class="eyebrow">${dayLabel(today())}</p><h1>${pageTitle}</h1></div><button type="button" class="primary-button" disabled=${loading || !writable} onClick=${() => setCompose(view === 'schedule' ? {kind: 'task', assignee: myName || '함께'} : {kind: view === 'tasks' ? 'task' : 'daily', ackMode: view === 'notices' ? 'share' : 'none'})}>${I('Plus', 18)}${composeLabel}</button></div>
   <div class="board-tabs"><${TabsList} class="top-tabs" label="공유 보드 보기" value=${view} onChange=${v => { setView(v); if (v === 'weekly' && date === 'all') setDate(today()); }} tabs=${[
    {value: 'today', content: '오늘의 공유'},
-   {value: 'notices', content: html`<${Fragment}>확인 요청${unread.length > 0 && html`<span class="tab-count notification">${unread.length}</span>`}<//>`},
+   {value: 'notices', content: html`<${Fragment}>확인 요청${unread.length > 0 ? html`<span class="tab-count notification" title="내가 확인할 요청">${unread.length}</span>` : html`<span class="tab-count" title="확인을 기다리는 요청">${askItems.filter(i => !acks.some(a => a.item_id === i.id)).length}</span>`}<//>`},
    {value: 'schedule', content: html`<${Fragment}>서로의 스케줄${collabForMe.length > 0 && html`<span class="tab-count notification">${collabForMe.length}</span>`}<//>`},
    {value: 'tasks', content: html`<${Fragment}>함께하는 일<span class="tab-count">${tasks.filter(i => i.status !== 'done').length}</span><//>`},
    {value: 'weekly', content: '주간 회의'}
