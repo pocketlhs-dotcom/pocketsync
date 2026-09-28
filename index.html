@@ -833,6 +833,22 @@ button.field-chip:hover{background:#eef3ff;color:#3b63b8}
 .pl-tags{margin-top:1px}
 .pl-tags>.topic-badge{font-size:11.5px;padding:0 6px;line-height:1.7}
 @media(max-width:640px){.pl-row>.pl-main{grid-area:t}}
+.confirm-box{display:flex;flex-direction:column;gap:6px;width:100%}
+.confirm-req{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 10px;border-radius:8px;border:1px solid #e6edf7;background:#fbfcfe}
+.confirm-req:hover{border-color:#cbd9f2;background:#f5f8ff}
+.confirm-req.wait{background:#f6f8ff;border-color:#d9e3f8}
+.confirm-req>.tag{flex-shrink:0;font-size:11.5px;padding:2px 7px}
+.confirm-text{flex:1;min-width:0;font-size:13px;color:#40516b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.confirm-state{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;font-size:12px;color:#7d90ad}
+.confirm-req.ok .confirm-state{color:#3c8a62}
+.confirm-start{align-self:flex-start;color:#3865e8!important;border-color:#c9d8f6!important;background:#f4f7ff!important}
+.confirm-form{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid #cfdcf0;border-radius:9px;background:#f8fbff}
+.confirm-form>textarea{width:100%;border:1px solid #d6dfec;border-radius:7px;padding:8px 10px;font-size:13.5px;background:#fff;resize:vertical}
+.confirm-form>textarea:focus{outline:none;border-color:#a3bbf5;box-shadow:0 0 0 2px #e5edff}
+.confirm-label{font-size:12px;color:#8a9dbb;min-width:44px}
+.confirm-actions{display:flex;align-items:center;gap:8px}
+.kanban-meta>.tag.ask{font-size:11.5px;padding:1px 7px}
+@media(max-width:640px){.confirm-req{flex-wrap:wrap}.confirm-state{width:100%}}
 </style>
 </head><body>
 <div id="app"></div>
@@ -842,6 +858,6 @@ button.field-chip:hover{background:#eef3ff;color:#3b63b8}
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1790584920"></script>
-<script src="app.js?v=1790584920"></script>
+<script src="platform.js?v=1790585295"></script>
+<script src="app.js?v=1790585295"></script>
 </body></html>
