@@ -891,4 +891,6 @@ button.pl-rank.unset:hover:not(:disabled){color:#3865e8;border-color:#a3bbf5}
 .tag.req-tag.declined{background:#f1f4f9;color:#8c9ab1}
 @media(max-width:640px){.req-row{grid-template-columns:24px 50px minmax(0,1fr);grid-template-areas:'r d t' 'r d a'}.req-row>.req-actions,.req-row>.req-wait,.req-row>.req-decline{grid-area:a;justify-self:start}.req-row>.priority-tag,.req-row>.tag:not(.dday){display:none}.req-decline>input{width:140px}}
 @media(max-width:1180px){.edited-at{margin-right:0}}@media(max-width:940px){.edited-at{margin-right:30px}}@media(max-width:640px){.edited-at{margin-right:0}}
+.main-tags{display:inline-flex;align-items:center;gap:7px;flex-shrink:0}.main-tags>.reply-by{margin-right:0;font-size:13px;padding:3px 8px;border-radius:5px}
+@media(max-width:640px){.main-tags:has(.reply-by){flex-basis:100%;margin-left:35px}}
 </style>
