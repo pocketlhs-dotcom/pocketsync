@@ -24,8 +24,7 @@
  function boardFor(path, data) {
   if (data && data.board) return data.board;
   const [col, id = ''] = String(path).split('/');
-  if (col === 'checkins' && id.startsWith('lhs__')) return 'all';
-  if (['presence', 'profiles', 'seen', 'members'].includes(col) && id === 'lhs') return 'all';
+  if (['presence', 'seen', 'members'].includes(col) && id === 'lhs') return 'all';
   if (col === 'meta') return 'all';
   return BOARD;
  }
@@ -105,6 +104,31 @@
    if (n) await batch.commit();
   }
   await fs.doc('meta/boards_v2').set({board: 'all', done_at: new Date().toISOString()});
+ }
+ // 오늘의 나를 보드별로 나눈 뒤: 예전에 두 보드 공통('all')이던 이현성 오늘의 나는 A 보드 것으로 돌린다.
+ async function splitCheckins() {
+  try { const m = await fs.doc('meta/checkin_v2').get(); if (m.exists) return; } catch (e) { return; }
+  try {
+   for (const col of ['checkins', 'profiles']) {
+    const snap = await fs.collection(col).where('board', '==', 'all').get();
+    for (const d of snap.docs) await d.ref.update({board: 'A'});
+   }
+   await fs.doc('meta/checkin_v2').set({board: 'all', done_at: new Date().toISOString()});
+  } catch (e) { console.error('split checkins', e); }
+ }
+ // 요청(09-29): A의 '개발 협업' 카테고리 업무를 정규진 보드에도 보기 전용으로(한 번만). 이후 켜고 끄기는 카테고리 관리에서.
+ async function shareDevTopic() {
+  try { const m = await fs.doc('meta/share_dev_v1').get(); if (m.exists) return; } catch (e) { return; }
+  try {
+   const LHS = ['이현성', '현성 이', '부대표', 'pocket.lhs', 'lhs'];
+   const tops = (await fs.collection('topics').where('board', '==', 'A').get()).docs.filter(d => (d.data() || {}).name === '개발 협업');
+   for (const t of tops) {
+    await t.ref.update({share_boards: ['B']});
+    const its = await fs.collection('items').where('board', '==', 'A').get();
+    for (const d of its.docs) { const v = d.data() || {}; if (v.kind === 'task' && v.topic_id === t.id && (v.home || 'A') === 'A' && !(LHS.includes(v.assignee) && v.req !== 'pending')) await d.ref.update({board: 'all'}); }
+   }
+   await fs.doc('meta/share_dev_v1').set({board: 'all', done_at: new Date().toISOString()});
+  } catch (e) { console.error('share dev topic', e); }
  }
  // B 보드 첫 사용: 카테고리 '개발 협업', '디자인만'을 한 번 만들어 둔다.
  async function seedBoard(b) {
@@ -206,6 +230,8 @@
    showLoading(`${SEAT_NAMES[seat]}님, 보드를 여는 중이에요.`);
    try {
     if (seat !== 'jgj') { showLoading('보드를 정리하는 중이에요.'); await migrateBoards(); }
+    if (seat !== 'jgj') await splitCheckins();
+    if (seat === 'lhs') await shareDevTopic();
     await seedBoard(BOARD);
     const ref = fs.doc('members/' + seat), cur = await ref.get();
     if (!cur.exists || cur.data().user_id !== u.uid || !cur.data().board) await ref.set({name: SEAT_NAMES[seat], user_id: u.uid, claimed_at: new Date().toISOString(), board: seat === 'lhs' ? 'all' : BOARD});

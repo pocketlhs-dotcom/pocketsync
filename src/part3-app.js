@@ -2,7 +2,7 @@
 const COLLECTIONS = ['topics', 'items', 'comments', 'acks', 'profiles', 'members', 'checkins', 'reactions', 'presence', 'seen', 'daynotes'];
 // On Firebase only recent records stream live (quota); older ones load on demand (search, old items).
 const WINDOW_DAYS = 120;
-const NORMALIZE = {topics: normTopic, items: normItem, comments: normComment, acks: d => ({...normAck(d), id: d.id}), profiles: normProfile, members: normMember, checkins: normCheckin, reactions: d => ({...normReaction(d), id: String(d.id).replace(/^[A-Z]~/, '')}), presence: normPresence, seen: normSeen, daynotes: normDaynote};
+const NORMALIZE = {topics: normTopic, items: normItem, comments: normComment, acks: d => ({...normAck(d), id: d.id}), profiles: d => normProfile({...d, id: String(d.id).replace(/^[A-Z]~/, '')}), members: normMember, checkins: d => normCheckin({...d, id: String(d.id).replace(/^[A-Z]~/, '')}), reactions: d => ({...normReaction(d), id: String(d.id).replace(/^[A-Z]~/, '')}), presence: normPresence, seen: normSeen, daynotes: normDaynote};
 
 const PLATFORM = window.PS_PLATFORM || 'artifact';
 async function useCapability(name) {
@@ -58,11 +58,11 @@ const ops = {
  // 끌어서 바꾼 순서를 우선순위 번호(1..n)로 저장. 순서만 바꾸는 일이라 변경 기록·알림은 남기지 않는다.
  async reorder(db, ctx, ids) {
   const cur = new Map(ctx.items.map(i => [i.id, i]));
-  await Promise.all(ids.map((id, k) => cur.has(id) && cur.get(id).prio_no !== k + 1 ? db.doc('items/' + id).update({prio_no: k + 1}) : null));
+  await Promise.all(ids.map((id, k) => cur.has(id) && !cur.get(id).foreign && cur.get(id).prio_no !== k + 1 ? db.doc('items/' + id).update({prio_no: k + 1}) : null));
  },
  // 체크리스트는 항상 저장소의 최신 목록 위에서 바꿔 두 사람이 동시에 체크해도 서로 덮어쓰지 않게 한다.
  async checklist(db, ctx, id, act) {
-  const cur = await readItem(db, id); requireFresh(cur);
+  const cur = await readItem(db, id); requireFresh(cur); if (cur.foreign) throw new Error(`${(window.PS_BOARD_NAMES || {})[cur.home] || '다른 보드'} 업무라 여기서는 볼 수만 있어요.`);
   let list = normChecklist(cur.checklist);
   if (act.type === 'toggle') list = list.map(c => c.id === act.cid ? {...c, done: !!act.done, pct: act.done ? 100 : 0} : c);
   else if (act.type === 'pct') list = list.map(c => c.id === act.cid ? {...c, pct: act.pct, done: act.pct >= 100} : c);
@@ -84,7 +84,7 @@ const ops = {
  // Field-level edit: merge onto the freshly read document. `base` holds the values the editor started from;
  // if someone changed one of those fields in the meantime the save is refused instead of overwriting.
  async patch(db, ctx, id, fields, base = {}) {
-  const cur = await readItem(db, id); requireFresh(cur); guardPrivate(cur, ctx.actor);
+  const cur = await readItem(db, id); requireFresh(cur); guardPrivate(cur, ctx.actor); if (cur.foreign) throw new Error(`${(window.PS_BOARD_NAMES || {})[cur.home] || '다른 보드'} 업무라 여기서는 볼 수만 있어요.`);
   // 다른 보드에서 넘어온 업무: 이 보드에서 아직 카테고리를 안 정했으면 같은 이름 카테고리로 본다.
   if (!cur.topic_explicit && !cur.topic_id && cur.topic_label) { const m = (ctx.topics || []).find(t => t.name === cur.topic_label); if (m) cur.topic_id = m.id; }
   for (const k of Object.keys(base)) if (JSON.stringify(cur[k] ?? '') !== JSON.stringify(base[k] ?? '')) throw new Error(CONFLICT);
@@ -96,10 +96,10 @@ const ops = {
   const pin = p.pinned === cur.pinned ? {} : p.pinned ? {pinned_by: ctx.actor.name, pinned_at: now} : {pinned_by: '', pinned_at: ''};
   await db.doc('items/' + id).set({...cur, ...p, ...boardFields(cur, p, topic, ctx.topics), links: stampLinks(p.links, cur.links, ctx.actor, now), ...adopt(cur, ctx.actor), ...pin, done_at, updated_at: now, updated_by: ctx.actor.id, updated_by_name: ctx.actor.name, last_change: describeChange(cur, {...p, topic_id: topic}, ctx.topics)});
  },
- async remove(db, ctx, id) { const cur = await readItem(db, id); requireFresh(cur); guardPrivate(cur, ctx.actor); await cascadeDelete(db, ctx, [id]); },
+ async remove(db, ctx, id) { const cur = await readItem(db, id); requireFresh(cur); if (cur.foreign) throw new Error(`${(window.PS_BOARD_NAMES || {})[cur.home] || '다른 보드'} 업무라 여기서는 볼 수만 있어요.`); guardPrivate(cur, ctx.actor); await cascadeDelete(db, ctx, [id]); },
  async comment(db, ctx, id, body, links) {
   body = String(body || '').trim(); if (!body || body.length > 3000) throw new Error(INPUT_ERROR);
-  const l = validateLinks(links || []), cur = await readItem(db, id); requireFresh(cur);
+  const l = validateLinks(links || []), cur = await readItem(db, id); requireFresh(cur); if (cur.foreign) throw new Error(`${(window.PS_BOARD_NAMES || {})[cur.home] || '다른 보드'} 업무라 여기서는 볼 수만 있어요.`);
   const now = nowIso();
   await db.doc('comments/' + uuid()).set({item_id: id, author_id: ctx.actor.id, author_name: ctx.actor.name, body, links: stampLinks(l, [], ctx.actor, now), created_at: now});
  },
@@ -147,9 +147,11 @@ const ops = {
  async checkin(db, ctx, day, form) {
   if (!DATE_RE.test(day) || !LOADS[form.load] || !MOODS[form.mood] || !ASKS[form.ask]) throw new Error('일의 양, 마음, 바라는 것을 하나씩 골라 주세요.');
   const message = String(form.message || '').trim().slice(0, 200), now = nowIso();
-  const doc = {seat: ctx.actor.id, name: ctx.actor.name, day, load: form.load, mood: form.mood, ask: form.ask, message, updated_at: now};
-  await db.doc(`checkins/${ctx.actor.id}__${day}`).set(doc);
-  await db.doc('profiles/' + ctx.actor.id).set({name: ctx.actor.name, day, load: form.load, mood: form.mood, ask: form.ask, message, updated_at: now});
+  // 오늘의 나는 보드마다 따로(같은 사람이라도 권중선·정규진에게 남기는 내용이 다를 수 있음). B 보드 문서 id는 'B~' 접두.
+  const px = BOARD === 'A' ? '' : BOARD + '~';
+  const doc = {seat: ctx.actor.id, name: ctx.actor.name, day, load: form.load, mood: form.mood, ask: form.ask, message, updated_at: now, board: BOARD};
+  await db.doc(`checkins/${px}${ctx.actor.id}__${day}`).set(doc);
+  await db.doc(`profiles/${px}${ctx.actor.id}`).set({name: ctx.actor.name, day, load: form.load, mood: form.mood, ask: form.ask, message, updated_at: now, board: BOARD});
  },
  async react(db, ctx, target, day, kind, forAt, note = '') {
   if (!REACTIONS[kind] || !DATE_RE.test(day) || target === ctx.actor.id) throw new Error(INPUT_ERROR);
@@ -558,6 +560,15 @@ function Board() {
   const sh = shares.find(x => x.id === id), db = dbRef.current;
   try { await db.doc('shares/' + id).delete(); if (sh && sh.mode === 'full') await Promise.all(SHARE_PARTS.map(n => db.doc(`shares/${id}_${n}`).delete().catch(() => {}))); toast.success('공유를 중지했어요. 이 링크는 더 이상 열리지 않아요.'); } catch (e) { toast.error(friendlyError(e)); }
  }
+ // 카테고리를 다른 보드에도 공유(보기 전용): 카테고리에 share_boards 표시 + 그 카테고리의 업무를 'all'로.
+ async function shareTopic(t, on) {
+  const other = (window.PS_BOARDS || []).find(b => b !== BOARD); if (!other) return;
+  try { await mutate(async db => {
+   await db.doc('topics/' + t.id).update({share_boards: on ? [other] : []});
+   const targets = items.filter(i => i.kind === 'task' && i.home === BOARD && i.topic_id === t.id && !(personName(i.assignee) === ADMIN_NAME && i.req !== 'pending'));
+   await Promise.all(targets.map(i => (on ? i.board !== 'all' : i.board === 'all') ? db.doc('items/' + i.id).update({board: on ? 'all' : BOARD}) : null));
+  }, on ? `‘${t.name}’ 업무를 ${(window.PS_BOARD_NAMES || {})[other] || '다른 보드'}에도 보여줘요(보기 전용).` : `‘${t.name}’ 공유를 껐어요.`, ['items', 'topics']); } catch {}
+ }
  async function reorderTasks(ids) { try { await mutate((db, ctx) => ops.reorder(db, ctx, ids), '', ['items']); } catch {} }
  async function checklistAct(item, act) {
   const after = act.type === 'toggle' || act.type === 'pct' ? item.checklist.map(c => c.id === act.cid ? {...c, done: act.type === 'pct' ? act.pct >= 100 : !!act.done} : c) : null;
@@ -638,7 +649,7 @@ function Board() {
  async function react(target, day, kind, forAt, note = '') { try { await mutate((db, ctx) => ops.react(db, ctx, target, day, kind, forAt, note), `${REACTIONS[kind]} 하고 전했어요.`, ['reactions']); } catch {} }
 
  const showKind = view === 'weekly' || (view === 'today' && kindFilter === 'all');
- const renderRow = (item, extra = {}) => html`<${RecordRow} key=${item.id} item=${item} onChecklist=${writable ? checklistAct : null} ...${extra} confirmReq=${confirmReqByRef.get(item.id)} onConfirm=${writable ? acknowledge : undefined} fresh=${freshItemIds.has(item.id)} showKind=${showKind} meId=${me.id} comments=${comments} busy=${busy} canWrite=${writable} onOpen=${openItem} onStatus=${status} onEditField=${openField} topicName=${topicName(item.topic_id)} />`;
+ const renderRow = (item, extra = {}) => html`<${RecordRow} key=${item.id} item=${item} onChecklist=${writable && !item.foreign ? checklistAct : null} ...${extra} confirmReq=${confirmReqByRef.get(item.id)} onConfirm=${writable ? acknowledge : undefined} fresh=${freshItemIds.has(item.id)} showKind=${showKind} meId=${me.id} comments=${comments} busy=${busy} canWrite=${writable && !item.foreign} onOpen=${openItem} onStatus=${status} onEditField=${openField} topicName=${topicName(item.topic_id)} />`;
  const ackRow = i => { const mine = i.author_id === me.id, list = acks.filter(a => a.item_id === i.id), done = ackedByMe(i); return html`<div class="notice-record" key=${i.id}>${renderRow(i, {replyTag: i.reply_by ? html`<span class=${cx('reply-by', !list.length && i.reply_by < seoulStamp() && 'late')}>${I('Clock', 12)}${replyLabel(i.reply_by)}까지 답</span>` : null})}<div class="notice-actions">${i.ref_id && items.find(x => x.id === i.ref_id) && html`<button type="button" class="text-button ref-link" onClick=${() => openItem(i.ref_id)}>${I(items.find(x => x.id === i.ref_id).kind === 'event' ? 'CalendarClock' : 'Layers3', 12)}관련 ${KINDS[items.find(x => x.id === i.ref_id).kind]} 열기</button>`}<span>${mine ? (list.length ? `${list.map(a => personName(a.name)).join(', ')} 확인함 · ${timeLabel(list[0].created_at)}` : '상대 확인 기다리는 중') : done ? '내가 확인함' : '읽었으면 확인을 눌러 주세요'}</span>${!mine && html`<button type="button" class=${cx('ack-button', done && 'acked')} disabled=${busy || !writable || done} onClick=${() => acknowledge(i)}>${I('CheckCheck', 15)}${done ? '확인함' : '확인했어요'}</button>`}</div></div>`; };
  const grouped = (list, emptyText = '선택한 날짜와 카테고리에 공유가 없어요.') => list.length ? html`<div class="topic-groups">${[...topics, {id: '', name: TOPIC_NONE}].map(topic => {
   const group = list.filter(i => (i.topic_id || '') === topic.id); if (!group.length) return null;
@@ -805,7 +816,7 @@ function Board() {
   ${active && html`<${Sheet} class="detail-sheet" onClose=${() => setSelected(null)} header=${null}><${ItemDetail} key=${active.id} item=${active} comments=${comments} acks=${acks} me=${me} canWrite=${writable} tab=${detailTab} onTab=${setDetailTab} busy=${busy} topicName=${topicName(active.topic_id)} onChecklist=${checklistAct} onSave=${savePatch} savedTick=${savedTick} onStatus=${status} onAck=${acknowledge} onDelete=${() => setConfirm(active)} onEditField=${openField} onPin=${togglePin} onToTask=${toTask} requests=${items.filter(i => i.kind === 'daily' && i.ack && i.ref_id === active.id).sort((a, b) => b.created_at.localeCompare(a.created_at))} refItem=${active.ref_id ? items.find(i => i.id === active.ref_id) : null} otherName=${otherSeat.name} onRequestConfirm=${requestConfirm} onOpenItem=${openItem} onCollab=${requestCollab} onCollabAnswer=${answerCollab} onCollabCancel=${cancelCollab} onThread=${(seat, day) => { setSelected(null); openThread(seat, day); }} onComment=${async (body, links) => { await mutate((db, ctx) => ops.comment(db, ctx, active.id, body, links), '업데이트를 남겼어요.', ['comments']); }} /><//>`}
   ${compose && html`<${Composer} preset=${compose} date=${compose.day || creationDate} initialTopic=${newTopicId} topics=${topics} onCreateTopic=${createTopic} author=${myName} onClose=${() => setCompose(null)} onSave=${async item => { await mutate((db, ctx) => ops.create(db, ctx, item), item.kind === 'event' ? '일정을 공유했어요.' : '공유했어요.', ['items']); if (compose.title !== undefined) { if (compose.kind === 'task') setQuickTask(t => ({...t, title: ''})); else if (compose.kind === 'daily') setQuickNote(''); } if (topicFilter !== 'all') setTopicFilter(item.topic_id || 'unassigned'); if (item.kind === 'task' && date !== 'all' && date !== today()) setDate('all'); if ((item.kind === 'daily' || item.kind === 'event') && date !== 'all' && item.day !== date) setDate(item.day); setCompose(null); }} />`}
   ${popover && html`<${InlinePopover} popover=${popover} items=${items} topics=${topics} myName=${myName} busy=${busy} onClose=${closePopover} onPatch=${patchField} onNewTopic=${newTopicFor} />`}
-  ${topicManagerOpen && html`<${TopicManager} topics=${topics} items=${items} busy=${busy} onRename=${renameTopic} onDelete=${deleteTopic} onMove=${moveTopic} onCreate=${() => { setTopicManagerOpen(false); setTopicOpen(true); }} onClose=${() => setTopicManagerOpen(false)} />`}
+  ${topicManagerOpen && html`<${TopicManager} topics=${topics} items=${items} busy=${busy} onShare=${(window.PS_BOARDS || []).length > 1 && myName === ADMIN_NAME ? shareTopic : null} onRename=${renameTopic} onDelete=${deleteTopic} onMove=${moveTopic} onCreate=${() => { setTopicManagerOpen(false); setTopicOpen(true); }} onClose=${() => setTopicManagerOpen(false)} />`}
   ${topicOpen && html`<${TopicCreator} target=${topicTarget} onClose=${() => { setTopicOpen(false); setTopicTarget(null); }} onSave=${async name => { const id = await createTopic(name); if (topicTarget) { const target = items.find(i => i.id === topicTarget.id) || topicTarget; await patchField(target, {topic_id: id}); } setTopicOpen(false); setTopicTarget(null); }} />`}
   ${thread && !thread.day && html`<${PersonThread} seat=${thread.seat} tasks=${tasks.filter(t => t.status !== 'done' && isMyTask(t, (SEATS.find(x => x.key === thread.seat) || SEATS[0]).name))} notes=${daynotes.filter(n => n.seat === thread.seat).sort((a, b) => a.created_at.localeCompare(b.created_at))} meId=${me.id} writable=${writable} busy=${busy} checkin=${checkins.find(c => c.seat === thread.seat && c.day === today())} presence=${presenceOf(thread.seat)} onOpen=${id => { setThread(null); openItem(id); }} onAdd=${body => addDayNote(thread.seat, today(), body)} onDelete=${removeDayNote} onClose=${() => setThread(null)} />`}
   ${thread && thread.day && html`<${DayThread} seat=${thread.seat} day=${thread.day} events=${items.filter(e => e.kind === 'event' && e.day === thread.day && involves(e, (SEATS.find(x => x.key === thread.seat) || SEATS[0]).name))} notes=${daynotes.filter(n => n.seat === thread.seat && n.day === thread.day).sort((a, b) => a.created_at.localeCompare(b.created_at))} comments=${comments} meId=${me.id} writable=${writable} busy=${busy} facts=${factsFor((SEATS.find(x => x.key === thread.seat) || SEATS[0]).name, thread.day)} checkin=${checkins.find(c => c.seat === thread.seat && c.day === thread.day)} presence=${thread.day === today() ? presenceOf(thread.seat) : null} onOpen=${id => { setThread(null); openItem(id); }} onAdd=${body => addDayNote(thread.seat, thread.day, body)} onDelete=${removeDayNote} onClose=${() => setThread(null)} />`}
@@ -1015,7 +1026,7 @@ function ItemDetail({item, comments, acks, me, canWrite, tab, onTab, busy, topic
  useEffect(() => { if (!savedTick || savedTick === mountTick.current) return; setShowSaved(true); const t = setTimeout(() => setShowSaved(false), 2400); return () => clearTimeout(t); }, [savedTick]);
  const updates = comments.filter(c => c.item_id === item.id), allLinks = collectLinks(item, comments);
  const acked = acks.some(a => a.item_id === item.id && a.user_id === me.id);
- const masked = isMasked(item, me.id), editable = canWrite && !masked;
+ const masked = isMasked(item, me.id), editable = canWrite && !masked && !item.foreign;
  const save = (fields, base) => onSave(item, fields, base || Object.fromEntries(Object.keys(fields).map(k => [k, item[k]])));
  const quiet = p => { p.catch(() => {}); };
  const pick = kind => e => onEditField(kind, item, e, 'detail');
@@ -1085,6 +1096,7 @@ function ItemDetail({item, comments, acks, me, canWrite, tab, onTab, busy, topic
    ${editable ? html`<label class=${cx('body-wrap', !item.body && 'empty')} for="detail-body" title="눌러서 설명 쓰기">${I('Pencil', 14)}<${AutoText} id="detail-body" class="body-edit" label="설명" value=${item.body} maxLength="6000" placeholder=${item.kind === 'task' ? '설명 추가 · 해야 할 일, 기준, 참고 내용' : item.kind === 'event' ? '설명 추가 · 장소, 준비물, 목적' : '설명 추가 · 자세한 내용이나 배경'} onCommit=${(v, o) => save({body: v}, {body: o})} /></label>` : !masked && item.body && html`<p class="body-read">${item.body}</p>`}
    ${item.kind === 'task' && !masked && onChecklist && html`<${Checklist} item=${item} editable=${editable} busy=${busy} onAct=${onChecklist} />`}
    ${!masked && html`<${LinkChips} links=${item.links} editable=${editable} busy=${busy} idPrefix="detail-link" meta=${linkMeta} onAdd=${l => save({links: [...item.links, l]})} onRemove=${i => quiet(save({links: item.links.filter((_, j) => j !== i)}))} />`}
+   ${item.foreign && html`<p class="board-share-line foreign">${I('Eye', 13)}<span>${(window.PS_BOARD_NAMES || {})[item.home] || '다른 보드'}에서 카테고리를 공유한 업무예요. 여기서는 볼 수만 있어요.</span></p>`}
    ${(item.kind === 'task' || item.kind === 'event') && personName(item.assignee) === ADMIN_NAME && me.name === ADMIN_NAME && (window.PS_BOARDS || []).length > 1 && !masked && html`<p class="board-share-line">${item.home === 'A' ? html`${I('Users', 13)}<span>내 업무라 ${(window.PS_BOARD_NAMES || {}).B || '다른 보드'}에도 함께 보여요</span>` : html`${I('Users', 13)}<span>${(window.PS_BOARD_NAMES || {}).A || '다른 보드'}에도 보이기</span><button type="button" class=${cx('board-share-toggle', item.share_all && 'on')} role="switch" aria-checked=${!!item.share_all} disabled=${!editable || busy} onClick=${() => save({share_all: !item.share_all})}><i></i></button><small>${item.share_all ? '두 보드에 보여요' : `지금은 ${(window.PS_BOARD_NAMES || {})[item.home] || '이 보드'}에만 보여요`}</small>`}</p>`}
    <p class="detail-meta"><strong class=${item.demo ? 'is-sample' : ''}>${authorLabel(item)}</strong><span>작성 <${Stamp} at=${item.created_at} /></span>${item.updated_at !== item.created_at && html`<span>수정 <${Stamp} at=${item.updated_at} /></span>`}${saveState}</p>
   </div>
@@ -1181,7 +1193,7 @@ function DateBar({date, onChange, count, weekly = false}) {
  return html`<section class="date-bar" aria-label="날짜 선택"><div class="date-bar-top"><div class="week-controls"><button type="button" class="icon-button" aria-label="지난주" onClick=${() => move(-7)}>${I('ChevronLeft', 17)}</button><strong>${week.slice(0, 4)}년 ${shortDate(week)} — ${shortDate(dates[6])}</strong><button type="button" class="icon-button" aria-label="다음 주" onClick=${() => move(7)}>${I('ChevronRight', 17)}</button></div><div class="date-shortcuts"><button type="button" class="text-button" onClick=${() => onChange(today())}>오늘로</button><label class="date-picker-label">${I('CalendarDays', 15)}<input id="date-picker" type="date" aria-label="다른 날짜 직접 선택" value=${date === 'all' ? '' : date} onChange=${e => { if (e.target.value) onChange(e.target.value); }} /></label></div></div><${ToggleGroup} class=${cx('date-tabs', weekly && 'weekly-dates')} label="날짜 필터" value=${date} onChange=${onChange} items=${items} /></section>`;
 }
 
-function TopicManager({topics, items, busy, onRename, onDelete, onMove, onCreate, onClose}) {
+function TopicManager({topics, items, busy, onRename, onDelete, onMove, onCreate, onClose, onShare = null}) {
  const [editing, setEditing] = useState(null), [name, setName] = useState(''), [deleting, setDeleting] = useState(null), [moveTo, setMoveTo] = useState(''), [error, setError] = useState('');
  const count = id => items.filter(i => i.topic_id === id).length, unassigned = items.filter(i => !i.topic_id).length;
  const startRename = t => { setDeleting(null); setEditing(t.id); setName(t.name); setError(''); };
@@ -1191,7 +1203,7 @@ function TopicManager({topics, items, busy, onRename, onDelete, onMove, onCreate
  return html`<${Dialog} class="topic-dialog topic-manager" title="카테고리 관리" description="이름을 바꾸거나 순서를 옮기고, 안 쓰는 카테고리는 지울 수 있어요. 지울 때 그 카테고리의 기록은 미분류나 다른 카테고리로 옮겨집니다." onClose=${onClose} canClose=${!busy}>
   ${topics.length ? html`<ul class="topic-list">${topics.map((t, i) => html`<li key=${t.id} class=${cx(editing === t.id && 'editing', deleting === t.id && 'deleting')}>
    ${editing === t.id ? html`<form class="topic-rename" onSubmit=${e => { e.preventDefault(); void submitRename(t); }}><input ref=${focusOnMount} aria-label="카테고리 이름" value=${name} maxLength="30" required onInput=${e => setName(e.target.value)} onKeyDown=${e => { if (e.key === 'Escape') { e.stopPropagation(); setEditing(null); } }} /><button class="primary-button" disabled=${busy || !name.trim()}>저장</button><button type="button" class="text-button" onClick=${() => setEditing(null)}>취소</button></form>`
-   : html`<div class="topic-row"><span class="topic-order"><button type="button" class="icon-button" aria-label="위로" disabled=${busy || i === 0} onClick=${() => onMove(t.id, -1)}>${I('ChevronDown', 14, {class: 'up'})}</button><button type="button" class="icon-button" aria-label="아래로" disabled=${busy || i === topics.length - 1} onClick=${() => onMove(t.id, 1)}>${I('ChevronDown', 14)}</button></span><strong>${t.name}</strong><span class="topic-count">${count(t.id)}건</span><span class="topic-actions"><button type="button" class="text-button" disabled=${busy} onClick=${() => startRename(t)}>${I('Pencil', 13)}이름</button><button type="button" class="text-button danger" disabled=${busy} onClick=${() => startDelete(t)}>${I('Trash2', 13)}삭제</button></span></div>`}
+   : html`<div class="topic-row"><span class="topic-order"><button type="button" class="icon-button" aria-label="위로" disabled=${busy || i === 0} onClick=${() => onMove(t.id, -1)}>${I('ChevronDown', 14, {class: 'up'})}</button><button type="button" class="icon-button" aria-label="아래로" disabled=${busy || i === topics.length - 1} onClick=${() => onMove(t.id, 1)}>${I('ChevronDown', 14)}</button></span><strong>${t.name}</strong><span class="topic-count">${count(t.id)}건</span>${onShare && html`<button type="button" class=${cx('topic-share', (t.share_boards || []).length && 'on')} disabled=${busy} title="이 카테고리 업무를 다른 보드에도 보기 전용으로 보여줘요" onClick=${() => onShare(t, !(t.share_boards || []).length)}>${I('Users', 12)}${(t.share_boards || []).length ? `${(window.PS_BOARD_NAMES || {})[t.share_boards[0]] || '다른 보드'}에 공유 중` : '다른 보드에 공유'}</button>`}<span class="topic-actions"><button type="button" class="text-button" disabled=${busy} onClick=${() => startRename(t)}>${I('Pencil', 13)}이름</button><button type="button" class="text-button danger" disabled=${busy} onClick=${() => startDelete(t)}>${I('Trash2', 13)}삭제</button></span></div>`}
    ${deleting === t.id && html`<div class="topic-delete">${count(t.id) ? html`<${Fragment}><p>이 카테고리의 기록 <b>${count(t.id)}건</b>을 어디로 옮길까요?</p><${Choice} id=${'move-' + t.id} label="옮길 카테고리" value=${moveTo || 'unassigned'} onChange=${v => setMoveTo(v === 'unassigned' ? '' : v)} options=${Object.fromEntries([['unassigned', '미분류로'], ...topics.filter(x => x.id !== t.id).map(x => [x.id, x.name])])} /><//>` : html`<p>기록이 없는 카테고리예요. 바로 지울 수 있어요.</p>`}<div class="topic-delete-actions"><button type="button" class="primary-button destructive-button" disabled=${busy} onClick=${() => void submitDelete(t)}>${busy ? '지우는 중' : count(t.id) ? '옮기고 지우기' : '지우기'}</button><button type="button" class="text-button" disabled=${busy} onClick=${() => setDeleting(null)}>취소</button></div></div>`}
   </li>`)}</ul>` : html`<p class="side-empty">아직 카테고리가 없어요.</p>`}
   <p class="topic-note">미분류 ${unassigned}건 · 미분류는 지울 수 없는 기본 칸이에요.</p>
