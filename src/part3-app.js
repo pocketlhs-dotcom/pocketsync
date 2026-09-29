@@ -358,7 +358,7 @@ function Board() {
  const loading = conn === 'connecting' || (conn === 'ready' && loaded.size < COLLECTIONS.length && !timedOut);
  const writable = conn === 'ready' && !!mySeat && canWrite !== false;
  const needSeat = conn === 'ready' && !loading && !!uid && !mySeat && canWrite !== false;
- const gate = conn === 'ready' && !loading && !mySeat && !seatDismissed ? (!uid ? 'signin' : canWrite === false ? 'readonly' : 'seat') : null;
+ const gate = PLATFORM === 'share' ? null : conn === 'ready' && !loading && !mySeat && !seatDismissed ? (!uid ? 'signin' : canWrite === false ? 'readonly' : 'seat') : null;
 
  const topicOptions = Object.fromEntries([...topics.map(t => [t.id, t.name]), ['unassigned', TOPIC_NONE]]);
  const newTopicId = topicFilter === 'all' || topicFilter === 'unassigned' ? '' : topicFilter;
@@ -514,21 +514,46 @@ function Board() {
  const [shares, setShares] = useState([]), [shareOpen, setShareOpen] = useState(false), shareTimer = useRef(null);
  useEffect(() => {
   if (conn !== 'ready' || PLATFORM !== 'firebase' || !dbRef.current) return;
-  try { return dbRef.current.collection('shares').onSnapshot(s => setShares(s.docs.map(d => ({id: d.id, ...d.data()}))), e => console.error('Board shares', e)); } catch (e) { console.error('Board shares', e); }
+  try { return dbRef.current.collection('shares').onSnapshot(s => setShares(s.docs.filter(d => !d.id.includes('_')).map(d => ({id: d.id, ...d.data()}))), e => console.error('Board shares', e)); } catch (e) { console.error('Board shares', e); }
  }, [conn]);
  useEffect(() => {
   if (!shares.length || !canWrite || !dbRef.current) return;
   clearTimeout(shareTimer.current);
-  shareTimer.current = setTimeout(() => { for (const sh of shares) { const data = buildShareData(sh, items, topics), sig = strHash(JSON.stringify(data)); if (sig !== sh.sig) dbRef.current.doc('shares/' + sh.id).update({data, sig, updated_at: nowIso()}).catch(e => console.error('Board share sync', e)); } }, 1500);
+  shareTimer.current = setTimeout(() => {
+   const db = dbRef.current;
+   for (const sh of shares) {
+    if (sh.mode === 'full') {
+     // 보드 전체 공유: 컬렉션마다 문서 하나(shares/{토큰}_{이름})에 담고, 바뀐 것만 다시 쓴다.
+     const parts = fullShareParts(data), sigs = {...(sh.parts || {})}; let changed = false;
+     for (const [name, rows] of Object.entries(parts)) { const sig = strHash(JSON.stringify(rows)); if (sigs[name] === sig) continue; sigs[name] = sig; changed = true; db.doc(`shares/${sh.id}_${name}`).set({rows, updated_at: nowIso()}).catch(e => console.error('Board share part', name, e)); }
+     if (changed) db.doc('shares/' + sh.id).update({parts: sigs, updated_at: nowIso()}).catch(e => console.error('Board share sync', e));
+     continue;
+    }
+    const d = buildShareData(sh, items, topics), sig = strHash(JSON.stringify(d)); if (sig !== sh.sig) db.doc('shares/' + sh.id).update({data: d, sig, updated_at: nowIso()}).catch(e => console.error('Board share sync', e));
+   }
+  }, 1500);
   return () => clearTimeout(shareTimer.current);
- }, [shares, items, topics, canWrite]);
+ }, [shares, data, items, topics, canWrite]);
  const shareUrl = t => location.origin + location.pathname + '?share=' + t;
  async function copyShare(t) { const url = shareUrl(t); try { await navigator.clipboard.writeText(url); toast.success('링크를 복사했어요. 카톡·메일에 붙여 넣어 보내면 돼요.'); } catch { window.prompt('아래 링크를 복사해 주세요', url); } }
- async function createShare(title, topicIds) {
-  const token = shareToken(), sh = {title: title.trim().slice(0, 60) || 'Pocket 진행 현황', topic_ids: topicIds}, data = buildShareData(sh, items, topics);
-  try { await dbRef.current.doc('shares/' + token).set({...sh, active: true, created_by: myName, created_at: nowIso(), updated_at: nowIso(), data, sig: strHash(JSON.stringify(data))}); await copyShare(token); } catch (e) { console.error('Board share create', e); toast.error(friendlyError(e)); }
+ async function createShare(title, topicIds, mode = 'tasks') {
+  const token = shareToken(), db = dbRef.current, sh = {title: title.trim().slice(0, 60) || (mode === 'full' ? 'Pocket 공유 보드' : 'Pocket 진행 현황'), topic_ids: mode === 'full' ? [] : topicIds, mode};
+  try {
+   if (mode === 'full') {
+    const parts = fullShareParts(data), sigs = {};
+    await Promise.all(Object.entries(parts).map(([name, rows]) => { sigs[name] = strHash(JSON.stringify(rows)); return db.doc(`shares/${token}_${name}`).set({rows, updated_at: nowIso()}); }));
+    await db.doc('shares/' + token).set({...sh, active: true, created_by: myName, created_at: nowIso(), updated_at: nowIso(), parts: sigs});
+   } else {
+    const d = buildShareData(sh, items, topics);
+    await db.doc('shares/' + token).set({...sh, active: true, created_by: myName, created_at: nowIso(), updated_at: nowIso(), data: d, sig: strHash(JSON.stringify(d))});
+   }
+   await copyShare(token);
+  } catch (e) { console.error('Board share create', e); toast.error(friendlyError(e)); }
  }
- async function stopShare(id) { try { await dbRef.current.doc('shares/' + id).delete(); toast.success('공유를 중지했어요. 이 링크는 더 이상 열리지 않아요.'); } catch (e) { toast.error(friendlyError(e)); } }
+ async function stopShare(id) {
+  const sh = shares.find(x => x.id === id), db = dbRef.current;
+  try { await db.doc('shares/' + id).delete(); if (sh && sh.mode === 'full') await Promise.all(SHARE_PARTS.map(n => db.doc(`shares/${id}_${n}`).delete().catch(() => {}))); toast.success('공유를 중지했어요. 이 링크는 더 이상 열리지 않아요.'); } catch (e) { toast.error(friendlyError(e)); }
+ }
  async function reorderTasks(ids) { try { await mutate((db, ctx) => ops.reorder(db, ctx, ids), '', ['items']); } catch {} }
  async function checklistAct(item, act) {
   const after = act.type === 'toggle' || act.type === 'pct' ? item.checklist.map(c => c.id === act.cid ? {...c, done: act.type === 'pct' ? act.pct >= 100 : !!act.done} : c) : null;
@@ -718,7 +743,7 @@ function Board() {
  const pageTitle = view === 'today' ? (date === today() ? '오늘의 공유' : date === 'all' ? '전체 공유' : `${shortDate(date)}의 공유`) : VIEW_TITLES[view];
  const composeLabel = view === 'schedule' ? '업무 추가' : view === 'tasks' ? '업무 추가' : view === 'notices' ? '확인 요청 남기기' : '공유 남기기';
 
- const banner = conn === 'nodb' ? null : connError ? html`<div class="error-banner" role="alert"><span>${connError}</span><button type="button" onClick=${() => location.reload()}>${I('RefreshCw', 15)}다시 시도</button></div>`
+ const banner = PLATFORM === 'share' ? html`<div class="info-banner share-banner"><span>${I('Eye', 16)}외부 공유 화면이에요. 보기만 할 수 있고, 두 사람의 보드가 바뀌면 자동으로 반영돼요.</span></div>` : conn === 'nodb' ? null : connError ? html`<div class="error-banner" role="alert"><span>${connError}</span><button type="button" onClick=${() => location.reload()}>${I('RefreshCw', 15)}다시 시도</button></div>`
   : conn === 'ready' && !loading && !uid ? html`<div class="info-banner"><span>${I('Lock', 16)}로그인 정보를 확인할 수 없어 읽기 전용으로 표시합니다. claude.ai에 로그인한 뒤 보드를 다시 열어 주세요.</span></div>`
   : conn === 'ready' && canWrite === false ? html`<div class="info-banner"><span>${I('Lock', 16)}이 보드를 읽을 수만 있어요. 기록을 남기려면 공유 설정에서 참여자(Contributor) 이상으로 초대받아야 해요.</span></div>`
   : conn === 'ready' && !loading && uid && !mySeat && seatDismissed ? html`<div class="info-banner"><span>${I('UserRound', 16)}둘러보는 중이에요. 기록을 남기려면 내 이름으로 들어가야 해요.</span><button type="button" class="text-button" onClick=${() => setSeatDismissed(false)}>내 이름으로 들어가기${I('ChevronRight', 13)}</button></div>` : null;
@@ -1205,16 +1230,18 @@ function startSortDrag(e, id, onDrop) {
 }
 const SortGrip = ({id, onDrop, label}) => html`<span class="sort-grip" role="button" tabindex="-1" aria-label=${label} title=${label} onPointerDown=${e => startSortDrag(e, id, onDrop)}>${I('GripVertical', 14)}</span>`;
 function ShareDialog({shares, topics, shareUrl, onCopy, onCreate, onStop, onClose}) {
- const [title, setTitle] = useState('Pocket 진행 현황'), [pick, setPick] = useState([]), [busy, setBusy] = useState(false), [stopping, setStopping] = useState('');
+ const [mode, setMode] = useState('full'), [title, setTitle] = useState('Pocket 공유 보드'), [pick, setPick] = useState([]), [busy, setBusy] = useState(false), [stopping, setStopping] = useState('');
  const tName = id => id ? ((topics.find(t => t.id === id) || {}).name || '카테고리') : '미분류';
  const toggle = id => setPick(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
- async function create(e) { e.preventDefault(); if (busy) return; setBusy(true); try { await onCreate(title, pick); setPick([]); } finally { setBusy(false); } }
+ async function create(e) { e.preventDefault(); if (busy) return; setBusy(true); try { await onCreate(title, pick, mode); setPick([]); } finally { setBusy(false); } }
+ const pickMode = m => { setMode(m); setTitle(t => (t === 'Pocket 공유 보드' || t === 'Pocket 진행 현황') ? (m === 'full' ? 'Pocket 공유 보드' : 'Pocket 진행 현황') : t); };
  const list = [...shares].sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
- return html`<${Dialog} class="share-dialog" title="외부 공유 링크" description="로그인 없이 보기만 되는 진행 현황 링크예요. 고른 카테고리의 업무 · 담당 · 마감 · 상태 · 진행률 · 세부 업무만 담기고, 오늘의 나 · 전할 말 · 댓글 · 일정은 담기지 않아요." onClose=${onClose}>
-  ${list.length > 0 && html`<section class="share-links"><h3>공유 중인 링크 <span class="count">${list.length}</span></h3>${list.map(sh => html`<div class="share-link-row" key=${sh.id}><div class="share-link-info"><strong>${sh.title || 'Pocket 진행 현황'}</strong><small>${(sh.topic_ids || []).length ? sh.topic_ids.map(tName).join(' · ') : '전체 카테고리'} · 업무 ${((sh.data || {}).tasks || []).length}개${sh.created_by ? ` · ${sh.created_by} 만듦` : ''}</small></div><div class="share-link-actions"><button type="button" class="secondary-button" onClick=${() => onCopy(sh.id)}>${I('Copy', 14)}링크 복사</button><a class="secondary-button" href=${shareUrl(sh.id)} target="_blank" rel="noreferrer">${I('ArrowUpRight', 14)}열어 보기</a>${stopping === sh.id ? html`<button type="button" class="secondary-button danger" onClick=${async () => { setStopping(''); await onStop(sh.id); }}>정말 중지</button>` : html`<button type="button" class="text-button share-stop" onClick=${() => setStopping(sh.id)}>공유 중지</button>`}</div></div>`)}</section>`}
+ return html`<${Dialog} class="share-dialog" title="외부 공유 링크" description="로그인 없이 보기만 되는 링크예요. 받는 사람은 아무것도 고치거나 남길 수 없어요." onClose=${onClose}>
+  ${list.length > 0 && html`<section class="share-links"><h3>공유 중인 링크 <span class="count">${list.length}</span></h3>${list.map(sh => html`<div class="share-link-row" key=${sh.id}><div class="share-link-info"><strong>${sh.title || 'Pocket 진행 현황'}</strong><small>${sh.mode === 'full' ? '보드 전체 · 모든 탭' : `업무 현황 · ${(sh.topic_ids || []).length ? sh.topic_ids.map(tName).join(' · ') : '전체 카테고리'} · 업무 ${((sh.data || {}).tasks || []).length}개`}${sh.created_by ? ` · ${sh.created_by} 만듦` : ''}</small></div><div class="share-link-actions"><button type="button" class="secondary-button" onClick=${() => onCopy(sh.id)}>${I('Copy', 14)}링크 복사</button><a class="secondary-button" href=${shareUrl(sh.id)} target="_blank" rel="noreferrer">${I('ArrowUpRight', 14)}열어 보기</a>${stopping === sh.id ? html`<button type="button" class="secondary-button danger" onClick=${async () => { setStopping(''); await onStop(sh.id); }}>정말 중지</button>` : html`<button type="button" class="text-button share-stop" onClick=${() => setStopping(sh.id)}>공유 중지</button>`}</div></div>`)}</section>`}
   <form class="share-new" onSubmit=${create}><h3>새 링크 만들기</h3>
+   <div class="share-field"><span>공유 범위</span><div class="share-modes"><button type="button" class=${cx('share-mode', mode === 'full' && 'on')} aria-pressed=${mode === 'full'} onClick=${() => pickMode('full')}><strong>보드 전체</strong><small>모든 탭을 그대로 보기만. 오늘의 나 · 전할 말 · 댓글 · 확인 요청 · 일정 포함 (개인 일정은 제목 없이 시간만)</small></button><button type="button" class=${cx('share-mode', mode === 'tasks' && 'on')} aria-pressed=${mode === 'tasks'} onClick=${() => pickMode('tasks')}><strong>업무 현황만</strong><small>고른 카테고리의 업무 · 담당 · 마감 · 진행률 · 세부 업무만 한 화면으로</small></button></div></div>
    <label class="share-field"><span>화면 제목</span><input value=${title} maxLength="60" onInput=${e => setTitle(e.target.value)} placeholder="예: Bloom 프로젝트 진행 현황" /></label>
-   <div class="share-field"><span>보여줄 카테고리 <small>${pick.length ? `${pick.length}개 선택` : '고르지 않으면 전체'}</small></span><div class="share-topics">${[...topics, {id: '', name: '미분류'}].map(t => html`<button type="button" class="chip" key=${t.id || 'none'} aria-pressed=${pick.includes(t.id)} onClick=${() => toggle(t.id)}>${t.name}</button>`)}</div></div>
+   ${mode === 'tasks' && html`<div class="share-field"><span>보여줄 카테고리 <small>${pick.length ? `${pick.length}개 선택` : '고르지 않으면 전체'}</small></span><div class="share-topics">${[...topics, {id: '', name: '미분류'}].map(t => html`<button type="button" class="chip" key=${t.id || 'none'} aria-pressed=${pick.includes(t.id)} onClick=${() => toggle(t.id)}>${t.name}</button>`)}</div></div>`}
    <div class="share-submit"><button type="submit" class="primary-button" disabled=${busy}>${I('Link2', 15)}링크 만들고 복사</button><small>새로 만든 링크는 바로 복사돼요. 공유 중지를 누르면 그 링크는 더 이상 열리지 않아요.</small></div>
   </form>
  <//>`;

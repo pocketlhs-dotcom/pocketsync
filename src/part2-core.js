@@ -70,6 +70,17 @@ function buildShareData(share, items, topics) {
  const topicIds = [...new Set(tasks.map(t => t.topic_id))];
  return {topics: topicIds.map(id => ({id, name: id ? (names.get(id) || '카테고리') : '미분류'})).sort((a, b) => topics.findIndex(t => t.id === a.id) - topics.findIndex(t => t.id === b.id)), tasks};
 }
+// 보드 전체 공유에 담는 컬렉션. 개인 일정은 제목·설명·링크를 지우고, 자리 정보의 계정 id는 뺀다.
+const SHARE_PARTS = ['topics', 'items', 'comments', 'acks', 'profiles', 'members', 'checkins', 'reactions', 'presence', 'daynotes'];
+function fullShareParts(data) {
+ const out = {};
+ for (const name of SHARE_PARTS) {
+  let rows = (data[name] || []).map(r => name === 'items' && r.category === 'personal' ? {...r, title: '개인 일정', body: '', links: [], checklist: []} : name === 'members' ? {...r, user_id: ''} : r);
+  if (JSON.stringify(rows).length > 900000) { rows = [...rows].sort((a, b) => String(b.updated_at || b.created_at || '').localeCompare(String(a.updated_at || a.created_at || ''))); while (rows.length && JSON.stringify(rows).length > 900000) rows.pop(); }
+  out[name] = rows;
+ }
+ return out;
+}
 const doneAt = t => t.done_at || t.updated_at || '';
 const ARCHIVE_DAYS = 7;
 const isArchived = t => t.kind === 'task' && t.status === 'done' && doneAt(t) && (Date.now() - Date.parse(doneAt(t))) > ARCHIVE_DAYS * 864e5;

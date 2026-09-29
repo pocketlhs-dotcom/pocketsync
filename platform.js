@@ -17,7 +17,8 @@
  const SEAT_BY_EMAIL_HASH = { "8e12e0a9af82ae0fd0366552ef4f22740be5fc1a589943635e9c58572ee89c2a": "lhs", "806b357d8daa64177bec9c842594a5680d45d40ba02742ce6cc81403585811ad": "kjs"};
  const SEAT_NAMES = {lhs: '이현성', kjs: '권중선'};
 
- window.PS_PLATFORM = 'firebase';
+ const SHARE_TOKEN = (() => { const m = new URLSearchParams(location.search).get('share'); return m && /^[A-Za-z0-9]{12,64}$/.test(m) ? m : ''; })();
+ window.PS_PLATFORM = SHARE_TOKEN ? 'share' : 'firebase';
  const fb = window.firebase;
  fb.initializeApp(FIREBASE_CONFIG);
  const auth = fb.auth();
@@ -107,14 +108,28 @@
  let Board = null, ShareView = null, mounted = false;
  window.PS_MOUNT = (B, SV) => { Board = B; ShareView = SV; start(); };
  // ?share=토큰 으로 들어오면 로그인 없이 그 공유 문서 하나만 읽어 보기 전용 화면을 띄운다.
- function shareToken() { const m = new URLSearchParams(location.search).get('share'); return m && /^[A-Za-z0-9]{12,64}$/.test(m) ? m : ''; }
+ // 보드 전체 공유: 같은 보드 화면을 띄우되, 데이터는 shares/{토큰}_{컬렉션} 문서에서 읽고 쓰기는 모두 막는다.
+ function shareBackend(token) {
+  const nope = () => Promise.reject(Object.assign(new Error('보기 전용 공유 화면이에요.'), {code: 'permission-denied'}));
+  const snapOf = s => { const rows = (s && s.exists && (s.data() || {}).rows) || []; return {docs: rows.map(r => ({id: r.id, exists: true, data: () => r}))}; };
+  const roDoc = path => ({id: String(path).split('/').pop(), path, get: async () => ({exists: false, id: String(path).split('/').pop(), data: () => ({})}), set: nope, update: nope, delete: nope, onSnapshot: next => { next({exists: false, data: () => ({})}); return () => {}; }, acquire: async () => ({acquired: false})});
+  const col = name => ({path: name, where: () => col(name), doc: id => roDoc(name + '/' + id), get: async () => snapOf(await fs.doc(`shares/${token}_${name}`).get()), onSnapshot: (next, err) => fs.doc(`shares/${token}_${name}`).onSnapshot(s => next(snapOf(s)), err)});
+  const sdb = {doc: roDoc, collection: col};
+  const suser = {id: async () => 'share-viewer', can: async () => false, isOwner: async () => false, canEdit: async () => false, me: async () => ({id: 'share-viewer', name: '', avatarUrl: '', color: '#3865e8', email: null, isOwner: false, canEdit: false})};
+  window.claude = {use: async name => (name === 'db' ? sdb : name === 'user' ? suser : null)};
+ }
 
  function start() {
-  const token = shareToken();
+  const token = SHARE_TOKEN;
   if (token && ShareView) {
    const meta = document.createElement('meta'); meta.name = 'referrer'; meta.content = 'no-referrer'; document.head.appendChild(meta);
-   root().innerHTML = '';
-   preact.render(preact.h(ShareView, {token, watch: (next, fail) => fs.doc('shares/' + token).onSnapshot(s => next(s.exists ? s.data() : null), fail)}), root());
+   showLoading('공유된 보드를 여는 중이에요.');
+   const showTasks = () => { root().innerHTML = ''; preact.render(preact.h(ShareView, {token, watch: (next, fail) => fs.doc('shares/' + token).onSnapshot(s => next(s.exists ? s.data() : null), fail)}), root()); };
+   fs.doc('shares/' + token).get().then(s => {
+    const d = s.exists ? s.data() : null;
+    if (d && d.mode === 'full' && d.active !== false) { shareBackend(token); document.title = (d.title || 'Pocket 공유 보드') + ' · pocket sync'; root().innerHTML = ''; preact.render(preact.h(Board, null), root()); }
+    else showTasks();
+   }, showTasks);
    return;
   }
   showLoading('불러오는 중이에요.');
