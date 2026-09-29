@@ -53,8 +53,9 @@ function replyLabel(v) { if (!REPLY_RE.test(v || '')) return ''; const [d, t] = 
 function progressFields(item, v) { const p = Math.max(0, Math.min(100, Math.round(Number(v) || 0))); return {progress: p, ...(p === 100 && item.status !== 'done' ? {status: 'done'} : p < 100 && item.status === 'done' ? {status: 'doing'} : p > 0 && item.status === 'todo' ? {status: 'doing'} : {})}; }
 function dDay(due) { if (!due) return {label: '마감 없음', cls: 'none', n: null}; const n = Math.round((Date.parse(due + 'T00:00:00+09:00') - Date.parse(today() + 'T00:00:00+09:00')) / 864e5); return n < 0 ? {label: `D+${-n}`, cls: 'late', n} : n === 0 ? {label: 'D-day', cls: 'today', n} : {label: `D-${n}`, cls: n <= 3 ? 'soon' : '', n}; }
 // 업무 안의 과업 체크리스트. 진행률은 체크한 비율로 자동 계산된다.
-function normChecklist(v) { return (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => ({id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), done: !!c.done})); }
-function checkStat(item) { const l = (item && item.checklist) || []; const done = l.filter(c => c.done).length; return {total: l.length, done, pct: l.length ? Math.round(done / l.length * 100) : 0}; }
+// 과업마다 진행률(pct)을 가진다. 체크 = 100%, 업무 진행률 = 과업 진행률의 평균.
+function normChecklist(v) { return (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const pct = c.done ? 100 : Math.max(0, Math.min(100, Math.round(Number(c.pct) || 0))); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct, done: pct === 100}; }); }
+function checkStat(item) { const l = (item && item.checklist) || []; const done = l.filter(c => c.done).length; return {total: l.length, done, pct: l.length ? Math.round(l.reduce((a, c) => a + (c.pct || 0), 0) / l.length) : 0}; }
 const newCheckId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 // 설명의 여러 줄을 과업으로: 글머리표·번호·체크 표시를 떼어 낸다.
 function bodyToChecks(body) { return String(body || '').split(/\n+/).map(l => l.replace(/^\s*(?:[-*•·▪◦]|\d+[.)]|\[[ xX]?\])\s*/, '').trim()).filter(Boolean).slice(0, 60); }
@@ -334,7 +335,8 @@ function describeChange(cur, next, topics) {
  if (next.kind === 'task' && (cur.progress || 0) !== (next.progress || 0) && !(next.status === 'done' && next.progress === 100)) out.push(`진행률 ${cur.progress || 0}% → ${next.progress}%`);
  if ((cur.prio_no || 0) !== (next.prio_no || 0)) out.push(next.prio_no ? `우선순위 ${next.prio_no}` : '우선순위 비움');
  if ((cur.req || '') !== (next.req || '') && next.req !== 'pending') out.unshift(next.req === 'accepted' ? '요청 수락 · 맡기로 함' : next.req === 'declined' ? '요청이 어렵다고 답함' : '');
- if (JSON.stringify(cur.checklist || []) !== JSON.stringify(next.checklist || [])) { const a = cur.checklist || [], b = next.checklist || [], was = id => (a.find(x => x.id === id) || {}).done; const fin = b.filter(c => c.done && !was(c.id)), undo = b.filter(c => !c.done && was(c.id)), added = b.filter(c => !a.some(x => x.id === c.id)), gone = a.filter(c => !b.some(x => x.id === c.id)), st = checkStat(next); const short = l => l.slice(0, 2).map(c => `‘${c.text.slice(0, 30)}’`).join(', ') + (l.length > 2 ? ` 외 ${l.length - 2}` : ''); out.push(fin.length ? `과업 완료 ${short(fin)} · ${st.done}/${st.total}` : undo.length ? `과업 되돌림 ${short(undo)} · ${st.done}/${st.total}` : added.length ? `과업 추가 ${short(added)}` : gone.length ? `과업 삭제 ${short(gone)}` : '과업 수정'); }
+ if (JSON.stringify(cur.checklist || []) !== JSON.stringify(next.checklist || [])) { const a = cur.checklist || [], b = next.checklist || [], was = id => (a.find(x => x.id === id) || {}).done; const fin = b.filter(c => c.done && !was(c.id)), undo = b.filter(c => !c.done && was(c.id)), added = b.filter(c => !a.some(x => x.id === c.id)), gone = a.filter(c => !b.some(x => x.id === c.id)), st = checkStat(next); const short = l => l.slice(0, 2).map(c => `‘${c.text.slice(0, 30)}’`).join(', ') + (l.length > 2 ? ` 외 ${l.length - 2}` : ''); const moved = b.filter(c => !c.done && a.some(x => x.id === c.id && !x.done && (x.pct || 0) !== (c.pct || 0)));
+ out.push(fin.length ? `과업 완료 ${short(fin)} · ${st.done}/${st.total}` : moved.length ? `과업 진행 ${moved.slice(0, 2).map(c => `‘${c.text.slice(0, 30)}’ ${c.pct}%`).join(', ')}` : undo.length ? `과업 되돌림 ${short(undo)} · ${st.done}/${st.total}` : added.length ? `과업 추가 ${short(added)}` : gone.length ? `과업 삭제 ${short(gone)}` : '과업 수정'); }
  if (cur.pinned !== next.pinned) out.push(next.pinned ? '인사이트로 보관' : '보관 해제');
  if ((cur.reply_by || '') !== (next.reply_by || '')) out.push(next.reply_by ? `답 ${replyLabel(next.reply_by)}까지` : '답 시각 지움');
  if ((cur.topic_id || '') !== (next.topic_id || '')) out.push(`카테고리 ${tName(next.topic_id)}`);
@@ -349,7 +351,8 @@ const ops = {
  async checklist(db, ctx, id, act) {
   const cur = await readItem(db, id); requireFresh(cur);
   let list = normChecklist(cur.checklist);
-  if (act.type === 'toggle') list = list.map(c => c.id === act.cid ? {...c, done: !!act.done} : c);
+  if (act.type === 'toggle') list = list.map(c => c.id === act.cid ? {...c, done: !!act.done, pct: act.done ? 100 : 0} : c);
+  else if (act.type === 'pct') list = list.map(c => c.id === act.cid ? {...c, pct: act.pct, done: act.pct >= 100} : c);
   else if (act.type === 'add') list = [...list, ...act.texts.map(t => ({id: newCheckId(), text: t, done: false}))];
   else if (act.type === 'remove') list = list.filter(c => c.id !== act.cid);
   else if (act.type === 'edit') list = list.map(c => c.id === act.cid ? {...c, text: act.text} : c);
@@ -794,7 +797,7 @@ function Board() {
  async function setPresence(state) { try { await mutate((db, ctx) => ops.presence(db, ctx, state), state ? `지금 상태: ${PRESENCE[state]}` : '지금 상태를 지웠어요.', ['presence']); } catch {} }
  async function reactNote(target, day, note) { try { await mutate((db, ctx) => ops.reactNote(db, ctx, target, day, note), '한마디를 남겼어요.', ['reactions']); } catch {} }
  async function checklistAct(item, act) {
-  const after = act.type === 'toggle' ? item.checklist.map(c => c.id === act.cid ? {...c, done: !!act.done} : c) : null;
+  const after = act.type === 'toggle' || act.type === 'pct' ? item.checklist.map(c => c.id === act.cid ? {...c, done: act.type === 'pct' ? act.pct >= 100 : !!act.done} : c) : null;
   const finish = after && after.length && after.every(c => c.done) && item.status !== 'done';
   const msg = finish ? '과업을 모두 마쳐서 업무를 완료로 바꿨어요.' : act.body !== undefined ? '설명 줄을 과업으로 옮겼어요.' : '';
   try { await mutate((db, ctx) => ops.checklist(db, ctx, item.id, act), msg, ['items']); } catch {}
@@ -1436,7 +1439,7 @@ function Checklist({item, editable, busy, onAct, compact = false}) {
  return html`<section class=${cx('checklist', compact && 'compact')}>
   ${!compact && html`<div class="checklist-head"><strong>${I('ListChecks', 15)}과업</strong>${st.total ? html`<span class="check-count">${st.done}/${st.total}</span><span class="check-bar"><i style=${`width:${st.pct}%`}></i></span><b>${st.pct}%</b>` : html`<span class="check-hint">과업을 적어 두면 체크한 만큼 진행률이 자동으로 올라가요</span>`}</div>`}
   ${lines.length >= 2 && html`<button type="button" class="check-convert" disabled=${busy} onClick=${() => onAct(item, {type: 'add', texts: lines, body: ''})}>${I('ListChecks', 14)}설명 ${lines.length}줄을 과업 체크리스트로 옮기기</button>`}
-  ${st.total > 0 && html`<ul class="check-list">${item.checklist.map(c => html`<li key=${c.id} class=${c.done ? 'done' : ''}><label><input type="checkbox" checked=${c.done} disabled=${!editable || busy} onChange=${e => onAct(item, {type: 'toggle', cid: c.id, done: e.target.checked})} /><span class="check-box">${I('Check', 12)}</span><span class="check-text">${c.text}</span></label>${editable && html`<button type="button" class="check-remove" title="과업 삭제" aria-label=${`과업 삭제: ${c.text}`} disabled=${busy} onClick=${() => onAct(item, {type: 'remove', cid: c.id})}>${I('X', 13)}</button>`}</li>`)}</ul>`}
+  ${st.total > 0 && html`<ul class="check-list">${item.checklist.map(c => html`<li key=${c.id} class=${c.done ? 'done' : ''}><label><input type="checkbox" checked=${c.done} disabled=${!editable || busy} onChange=${e => onAct(item, {type: 'toggle', cid: c.id, done: e.target.checked})} /><span class="check-box">${I('Check', 12)}</span><span class="check-text">${c.text}</span></label>${editable ? html`<label class=${cx('check-pct', c.pct > 0 && !c.done && 'mid', c.done && 'full')} title="이 과업의 진행률"><span class="check-pct-bar"><i style=${`width:${c.pct}%`}></i></span><select aria-label=${`진행률: ${c.text}`} value=${String(c.pct)} disabled=${busy} onChange=${e => onAct(item, {type: 'pct', cid: c.id, pct: Number(e.target.value)})}>${[...new Set([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, c.pct])].sort((a, b) => a - b).map(v => html`<option value=${String(v)}>${v}%</option>`)}</select></label>` : html`<span class=${cx('check-pct', c.pct > 0 && !c.done && 'mid', c.done && 'full')}><span class="check-pct-bar"><i style=${`width:${c.pct}%`}></i></span><b>${c.pct}%</b></span>`}${editable && html`<button type="button" class="check-remove" title="과업 삭제" aria-label=${`과업 삭제: ${c.text}`} disabled=${busy} onClick=${() => onAct(item, {type: 'remove', cid: c.id})}>${I('X', 13)}</button>`}</li>`)}</ul>`}
   ${editable && html`<form class="check-add" onSubmit=${add}>${I('Plus', 14)}<input value=${text} maxLength="200" placeholder=${st.total ? '과업 추가 후 Enter' : '첫 과업을 적고 Enter'} aria-label="과업 추가" onInput=${e => setText(e.target.value)} /></form>`}
  </section>`;
 }

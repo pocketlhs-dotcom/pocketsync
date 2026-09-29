@@ -52,8 +52,9 @@ function replyLabel(v) { if (!REPLY_RE.test(v || '')) return ''; const [d, t] = 
 function progressFields(item, v) { const p = Math.max(0, Math.min(100, Math.round(Number(v) || 0))); return {progress: p, ...(p === 100 && item.status !== 'done' ? {status: 'done'} : p < 100 && item.status === 'done' ? {status: 'doing'} : p > 0 && item.status === 'todo' ? {status: 'doing'} : {})}; }
 function dDay(due) { if (!due) return {label: '마감 없음', cls: 'none', n: null}; const n = Math.round((Date.parse(due + 'T00:00:00+09:00') - Date.parse(today() + 'T00:00:00+09:00')) / 864e5); return n < 0 ? {label: `D+${-n}`, cls: 'late', n} : n === 0 ? {label: 'D-day', cls: 'today', n} : {label: `D-${n}`, cls: n <= 3 ? 'soon' : '', n}; }
 // 업무 안의 과업 체크리스트. 진행률은 체크한 비율로 자동 계산된다.
-function normChecklist(v) { return (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => ({id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), done: !!c.done})); }
-function checkStat(item) { const l = (item && item.checklist) || []; const done = l.filter(c => c.done).length; return {total: l.length, done, pct: l.length ? Math.round(done / l.length * 100) : 0}; }
+// 과업마다 진행률(pct)을 가진다. 체크 = 100%, 업무 진행률 = 과업 진행률의 평균.
+function normChecklist(v) { return (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const pct = c.done ? 100 : Math.max(0, Math.min(100, Math.round(Number(c.pct) || 0))); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct, done: pct === 100}; }); }
+function checkStat(item) { const l = (item && item.checklist) || []; const done = l.filter(c => c.done).length; return {total: l.length, done, pct: l.length ? Math.round(l.reduce((a, c) => a + (c.pct || 0), 0) / l.length) : 0}; }
 const newCheckId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 // 설명의 여러 줄을 과업으로: 글머리표·번호·체크 표시를 떼어 낸다.
 function bodyToChecks(body) { return String(body || '').split(/\n+/).map(l => l.replace(/^\s*(?:[-*•·▪◦]|\d+[.)]|\[[ xX]?\])\s*/, '').trim()).filter(Boolean).slice(0, 60); }
