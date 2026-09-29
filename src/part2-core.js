@@ -11,8 +11,12 @@ function Icon({name, size = 16, class: cls = '', ...rest}) {
 const I = (name, size, extra) => html`<${Icon} name=${name} size=${size} ...${extra || {}} />`;
 
 /* ---------- Board model (port of lib/board-types.ts + lib/board-model.ts) ---------- */
+// 보드: A = 이현성·권중선, B = 이현성·정규진. 로그인 뒤 플랫폼이 PS_CONFIGURE로 현재 보드와 두 자리를 채운다.
 const SEATS = [{key: 'lhs', name: '이현성'}, {key: 'kjs', name: '권중선'}];
-const team = SEATS.map(s => ({name: s.name}));
+const ADMIN_NAME = '이현성';
+let BOARD = 'A';
+window.PS_CONFIGURE = () => { if (Array.isArray(window.PS_SEATS) && window.PS_SEATS.length === 2) SEATS.splice(0, SEATS.length, ...window.PS_SEATS); BOARD = window.PS_BOARD || 'A'; };
+const boardTitle = () => SEATS.map(s => s.name).join(' · ');
 const moods = [
  {value: 'sad', icon: 'CloudRain', label: '슬픔'},
  {value: 'normal', icon: 'Smile', label: '정상'},
@@ -81,6 +85,19 @@ function fullShareParts(data) {
  }
  return out;
 }
+// 어느 보드에 보일지와 카테고리 저장 위치를 정한다. 이현성 혼자 업무·일정: A에서 만든 것은 두 보드 모두('all'),
+// B에서 만든 것은 share_all을 켠 것만 두 보드. 나머지는 지금 보드. 카테고리는 home 보드는 topic_id, 다른 보드는 topic_map[보드].
+function boardFields(cur, p, topicId, topics) {
+ const lhsSolo = (p.kind === 'task' || p.kind === 'event') && personName(p.assignee) === ADMIN_NAME && p.req !== 'pending';
+ const prevHome = (cur && cur.home) || BOARD;
+ const board = lhsSolo ? (prevHome === 'A' || p.share_all ? 'all' : prevHome) : BOARD;
+ const home = board === 'all' ? prevHome : board;
+ const name = id => ((topics || []).find(t => t.id === id) || {}).name || '';
+ const out = {board, home, share_all: !!p.share_all && home !== 'A', topic_home: undefined, topic_explicit: undefined};
+ if (home === BOARD) { out.topic_id = topicId || ''; out.topic_label = name(topicId); out.topic_map = (cur && cur.topic_map) || {}; }
+ else { out.topic_id = (cur && cur.topic_home) || ''; out.topic_label = (cur && cur.topic_label) || ''; out.topic_map = {...((cur && cur.topic_map) || {}), [BOARD]: topicId || ''}; }
+ return out;
+}
 const doneAt = t => t.done_at || t.updated_at || '';
 const ARCHIVE_DAYS = 7;
 const isArchived = t => t.kind === 'task' && t.status === 'done' && doneAt(t) && (Date.now() - Date.parse(doneAt(t))) > ARCHIVE_DAYS * 864e5;
@@ -96,7 +113,7 @@ const displayTitle = (item, meId) => isMasked(item, meId) ? '개인 일정' : it
 const authorLabel = item => item.demo ? '샘플' : personName(item.author_name);
 
 function personName(value) {
- const aliases = {'현성 이': '이현성', '부대표': '이현성', 'pocket.lhs': '이현성', 'lhs': '이현성', '중선 권': '권중선', '개발이사': '권중선', 'kjs': '권중선'};
+ const aliases = {'현성 이': '이현성', '부대표': '이현성', 'pocket.lhs': '이현성', 'lhs': '이현성', '중선 권': '권중선', '개발이사': '권중선', 'kjs': '권중선', 'jgj': '정규진', '규진 정': '정규진'};
  return aliases[value] || value || '';
 }
 const seoulDate = d => new Intl.DateTimeFormat('en-CA', {timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'}).format(d);
@@ -161,7 +178,8 @@ function ro(word) { const w = String(word || ''); const code = w.charCodeAt(w.le
 
 /* Row normalisation: documents may come back with missing fields. */
 function normItem(d) {
- return {id: d.id, kind: KINDS[d.kind] ? d.kind : 'daily', ack: d.kind === 'notice' ? true : (d.kind === 'daily' || !KINDS[d.kind]) ? !!d.ack : false, start: TIME_RE.test(d.start || '') ? d.start : '', end: TIME_RE.test(d.end || '') ? d.end : '', title: String(d.title || ''), body: String(d.body || ''), topic_id: String(d.topic_id || ''), category: d.category === 'personal' ? 'personal' : 'work', priority: priorities[d.priority] ? d.priority : 'share', status: statuses[d.status] ? d.status : 'todo', day: String(d.day || ''), due: String(d.due || ''), assignee: String(d.assignee || '함께'), links: Array.isArray(d.links) ? d.links.filter(l => l && typeof l.url === 'string').map(l => ({...l, label: String(l.label || '')})) : [], author_id: String(d.author_id || ''), author_name: String(d.author_name || ''), created_at: String(d.created_at || ''), updated_at: String(d.updated_at || d.created_at || ''), updated_by: String(d.updated_by || ''), updated_by_name: String(d.updated_by_name || ''), last_change: String(d.last_change || ''), done_at: String(d.done_at || ''), pinned: !!d.pinned, pinned_by: String(d.pinned_by || ''), pinned_at: String(d.pinned_at || ''), reply_by: REPLY_RE.test(d.reply_by || '') ? d.reply_by : '', prio_no: Math.max(0, Math.min(99, Math.round(Number(d.prio_no) || 0))), req: ['pending', 'accepted', 'declined'].includes(d.req) ? d.req : '', req_reply: String(d.req_reply || ''), req_at: String(d.req_at || ''), ref_id: String(d.ref_id || ''), progress: Math.max(0, Math.min(100, Math.round(Number(d.progress) || 0))), collab: COLLAB[d.collab] ? d.collab : '', collab_note: String(d.collab_note || ''), collab_by: String(d.collab_by || ''), collab_at: String(d.collab_at || ''), collab_reply: String(d.collab_reply || ''), collab_reply_at: String(d.collab_reply_at || ''), checklist: normChecklist(d.checklist), demo: d.demo ? 1 : 0};
+ const home = ['A', 'B'].includes(d.home) ? d.home : 'A', tmap = d.topic_map && typeof d.topic_map === 'object' ? d.topic_map : {};
+ return {id: d.id, board: String(d.board || 'A'), home, topic_home: String(d.topic_id || ''), topic_map: tmap, topic_label: String(d.topic_label || ''), topic_explicit: home === BOARD || Object.prototype.hasOwnProperty.call(tmap, BOARD), share_all: !!d.share_all, kind: KINDS[d.kind] ? d.kind : 'daily', ack: d.kind === 'notice' ? true : (d.kind === 'daily' || !KINDS[d.kind]) ? !!d.ack : false, start: TIME_RE.test(d.start || '') ? d.start : '', end: TIME_RE.test(d.end || '') ? d.end : '', title: String(d.title || ''), body: String(d.body || ''), topic_id: home === BOARD ? String(d.topic_id || '') : String(tmap[BOARD] || ''), category: d.category === 'personal' ? 'personal' : 'work', priority: priorities[d.priority] ? d.priority : 'share', status: statuses[d.status] ? d.status : 'todo', day: String(d.day || ''), due: String(d.due || ''), assignee: String(d.assignee || '함께'), links: Array.isArray(d.links) ? d.links.filter(l => l && typeof l.url === 'string').map(l => ({...l, label: String(l.label || '')})) : [], author_id: String(d.author_id || ''), author_name: String(d.author_name || ''), created_at: String(d.created_at || ''), updated_at: String(d.updated_at || d.created_at || ''), updated_by: String(d.updated_by || ''), updated_by_name: String(d.updated_by_name || ''), last_change: String(d.last_change || ''), done_at: String(d.done_at || ''), pinned: !!d.pinned, pinned_by: String(d.pinned_by || ''), pinned_at: String(d.pinned_at || ''), reply_by: REPLY_RE.test(d.reply_by || '') ? d.reply_by : '', prio_no: Math.max(0, Math.min(99, Math.round(Number(d.prio_no) || 0))), req: ['pending', 'accepted', 'declined'].includes(d.req) ? d.req : '', req_reply: String(d.req_reply || ''), req_at: String(d.req_at || ''), ref_id: String(d.ref_id || ''), progress: Math.max(0, Math.min(100, Math.round(Number(d.progress) || 0))), collab: COLLAB[d.collab] ? d.collab : '', collab_note: String(d.collab_note || ''), collab_by: String(d.collab_by || ''), collab_at: String(d.collab_at || ''), collab_reply: String(d.collab_reply || ''), collab_reply_at: String(d.collab_reply_at || ''), checklist: normChecklist(d.checklist), demo: d.demo ? 1 : 0};
 }
 function normComment(d) { return {id: d.id, item_id: String(d.item_id || ''), author_id: String(d.author_id || ''), author_name: String(d.author_name || ''), body: String(d.body || ''), links: Array.isArray(d.links) ? d.links.filter(l => l && typeof l.url === 'string').map(l => ({...l, label: String(l.label || '')})) : [], created_at: String(d.created_at || '')}; }
 function normTopic(d) { return {id: d.id, name: String(d.name || ''), name_key: String(d.name_key || topicKey(String(d.name || ''))), sort_order: Number(d.sort_order) || 0, created_at: String(d.created_at || '')}; }
@@ -208,7 +226,7 @@ function validateItem(draft) {
  const collab = (kind === 'event' || kind === 'task') && COLLAB[draft.collab] ? draft.collab : '';
  const progress = kind === 'task' ? Math.max(0, Math.min(100, Math.round(Number(draft.progress) || 0))) : 0;
  const cx2 = collab ? {collab_note: String(draft.collab_note || '').trim().slice(0, 300), collab_by: String(draft.collab_by || ''), collab_at: String(draft.collab_at || ''), collab_reply: String(draft.collab_reply || '').trim().slice(0, 300), collab_reply_at: String(draft.collab_reply_at || '')} : {collab_note: '', collab_by: '', collab_at: '', collab_reply: '', collab_reply_at: ''};
- return {kind, title, body, category, priority, ack, status, day, due, assignee, start, end, links: validateLinks(draft.links || []), topic_id: String(draft.topic_id || ''), pinned: !!draft.pinned, reply_by, progress, ref_id: String(draft.ref_id || '').slice(0, 80), prio_no: kind === 'task' ? Math.max(0, Math.min(99, Math.round(Number(draft.prio_no) || 0))) : 0, req: kind === 'task' && ['pending', 'accepted', 'declined'].includes(draft.req) ? draft.req : '', req_reply: kind === 'task' ? String(draft.req_reply || '').trim().slice(0, 300) : '', req_at: kind === 'task' ? String(draft.req_at || '') : '', checklist: kind === 'task' ? normChecklist(draft.checklist) : [], collab, ...cx2};
+ return {kind, title, body, category, priority, ack, status, day, due, assignee, start, end, links: validateLinks(draft.links || []), topic_id: String(draft.topic_id || ''), pinned: !!draft.pinned, reply_by, progress, ref_id: String(draft.ref_id || '').slice(0, 80), prio_no: kind === 'task' ? Math.max(0, Math.min(99, Math.round(Number(draft.prio_no) || 0))) : 0, req: kind === 'task' && ['pending', 'accepted', 'declined'].includes(draft.req) ? draft.req : '', req_reply: kind === 'task' ? String(draft.req_reply || '').trim().slice(0, 300) : '', req_at: kind === 'task' ? String(draft.req_at || '') : '', checklist: kind === 'task' ? normChecklist(draft.checklist) : [], share_all: !!draft.share_all, collab, ...cx2};
 }
 function friendlyError(e) {
  const code = e && e.code;

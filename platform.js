@@ -14,8 +14,21 @@
   appId: '1:926307454788:web:828f9ac2f0dad176285111'
  };
  // sha256(lowercased email) -> seat key. Filled in build.sh from the owner's list.
- const SEAT_BY_EMAIL_HASH = { "8e12e0a9af82ae0fd0366552ef4f22740be5fc1a589943635e9c58572ee89c2a": "lhs", "806b357d8daa64177bec9c842594a5680d45d40ba02742ce6cc81403585811ad": "kjs"};
- const SEAT_NAMES = {lhs: '이현성', kjs: '권중선'};
+ const SEAT_BY_EMAIL_HASH = { "8e12e0a9af82ae0fd0366552ef4f22740be5fc1a589943635e9c58572ee89c2a": "lhs", "806b357d8daa64177bec9c842594a5680d45d40ba02742ce6cc81403585811ad": "kjs", "1e23b9055ac3df9364043002b1e1f0d85708c78a9fd476a17030361a3a010053": "jgj"};
+ const SEAT_NAMES = {lhs: '이현성', kjs: '권중선', jgj: '정규진'};
+ // 보드: A = 이현성·권중선, B = 이현성·정규진. 이현성은 두 보드, 나머지는 자기 보드만.
+ const BOARDS = {A: {seats: ['lhs', 'kjs'], name: '권중선 보드'}, B: {seats: ['lhs', 'jgj'], name: '정규진 보드'}};
+ const SEAT_BOARDS = {lhs: ['A', 'B'], kjs: ['A'], jgj: ['B']};
+ let BOARD = 'A', VISIBLE = ['A', 'all'];
+ // 문서마다 board 필드: 이현성 개인 상태(오늘의 나·지금 상태·프로필·자리)는 두 보드 공통('all'), 나머지는 지금 보드.
+ function boardFor(path, data) {
+  if (data && data.board) return data.board;
+  const [col, id = ''] = String(path).split('/');
+  if (col === 'checkins' && id.startsWith('lhs__')) return 'all';
+  if (['presence', 'profiles', 'seen', 'members'].includes(col) && id === 'lhs') return 'all';
+  if (col === 'meta') return 'all';
+  return BOARD;
+ }
 
  const SHARE_TOKEN = (() => { const m = new URLSearchParams(location.search).get('share'); return m && /^[A-Za-z0-9]{12,64}$/.test(m) ? m : ''; })();
  window.PS_PLATFORM = SHARE_TOKEN ? 'share' : 'firebase';
@@ -33,7 +46,7 @@
   return {
    id: ref.id, path: ref.path,
    get: () => ref.get(),
-   set: data => ref.set(data),
+   set: data => ref.set(data && typeof data === 'object' && !data.board ? {...data, board: boardFor(ref.path, data)} : data),
    update: data => ref.update(data),
    delete: () => ref.delete(),
    onSnapshot: (next, err) => ref.onSnapshot(next, err),
@@ -50,7 +63,8 @@
  const db = {
   doc: path => wrapDoc(fs.doc(path)),
   collection: name => {
-   const c = fs.collection(name), base = wrapQuery(c);
+   // 목록 읽기는 항상 '지금 보드 + 공통' 문서만 (Firestore 규칙도 같은 조건으로 막는다).
+   const c = fs.collection(name), base = wrapQuery(c.where('board', 'in', VISIBLE));
    return {...base, path: name, doc: id => wrapDoc(id ? c.doc(id) : c.doc())};
   }
  };
@@ -63,6 +77,46 @@
  };
  window.claude = {use: async name => (name === 'db' ? db : name === 'user' ? user : null)};
  window.PS_SIGNOUT = () => auth.signOut().then(() => location.reload());
+ window.PS_SWITCH_BOARD = b => { try { localStorage.setItem('ps.board', b); } catch (e) {} location.reload(); };
+ // 이현성: 다른 보드의 업무·확인 표시만 가볍게 들어서 전환 버튼에 새 알림 개수를 보여준다.
+ window.PS_WATCH_BOARD = (b, cb) => {
+  let its = [], aks = []; const push = () => cb(its, aks);
+  const u1 = fs.collection('items').where('board', '==', b).onSnapshot(s => { its = s.docs.map(d => ({id: d.id, ...d.data()})); push(); }, e => console.error('watch items', e));
+  const u2 = fs.collection('acks').where('board', '==', b).onSnapshot(s => { aks = s.docs.map(d => ({id: d.id, ...d.data()})); push(); }, e => console.error('watch acks', e));
+  return () => { u1(); u2(); };
+ };
+ // 보드 도입 전 기록에 board 필드를 붙인다(한 번만). 이현성 혼자 업무·일정과 개인 상태는 'all', 나머지는 A.
+ async function migrateBoards() {
+  try { const m = await fs.doc('meta/boards_v2').get(); if (m.exists) return; } catch (e) { return; }
+  const LHS = ['이현성', '현성 이', '부대표', 'pocket.lhs', 'lhs'];
+  let topicNames = {};
+  try { const t = await fs.collection('topics').get(); t.docs.forEach(d => { topicNames[d.id] = (d.data() || {}).name || ''; }); } catch (e) { return; }
+  const cols = ['topics', 'items', 'comments', 'acks', 'profiles', 'members', 'checkins', 'reactions', 'presence', 'seen', 'daynotes', 'shares'];
+  for (const col of cols) {
+   let snap; try { snap = await fs.collection(col).get(); } catch (e) { console.error('migrate read', col, e); return; }
+   let batch = fs.batch(), n = 0;
+   for (const d of snap.docs) {
+    const v = d.data() || {}; if (v.board) continue;
+    let patch = {board: boardFor(col + '/' + d.id, null) === 'all' ? 'all' : 'A'};
+    if (col === 'items') { const solo = (v.kind === 'task' || v.kind === 'event') && LHS.includes(v.assignee) && v.req !== 'pending'; patch = {board: solo ? 'all' : 'A', home: 'A', topic_label: topicNames[v.topic_id] || ''}; }
+    batch.update(d.ref, patch); n++;
+    if (n >= 400) { await batch.commit(); batch = fs.batch(); n = 0; }
+   }
+   if (n) await batch.commit();
+  }
+  await fs.doc('meta/boards_v2').set({board: 'all', done_at: new Date().toISOString()});
+ }
+ // B 보드 첫 사용: 카테고리 '개발 협업', '디자인만'을 한 번 만들어 둔다.
+ async function seedBoard(b) {
+  if (b !== 'B') return;
+  try {
+   const m = await fs.doc('meta/seed_B').get(); if (m.exists) return;
+   const now = new Date().toISOString();
+   await fs.doc('topics/B-dev').set({name: '개발 협업', name_key: '개발협업', sort_order: 0, created_at: now, board: 'B'});
+   await fs.doc('topics/B-design').set({name: '디자인만', name_key: '디자인만', sort_order: 1, created_at: now, board: 'B'});
+   await fs.doc('meta/seed_B').set({board: 'B', done_at: now});
+  } catch (e) { console.error('seed B', e); }
+ }
 
  async function sha256(text) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
@@ -71,17 +125,17 @@
 
  const root = () => document.getElementById('app');
  function screen(inner) {
-  root().innerHTML = `<div class="app-shell"><header class="app-header"><div class="header-inner"><a class="brand" href="#"><span class="brand-mark">p</span><span>pocket<span> sync</span></span></a><span class="workspace-name">이현성 · 권중선의 공유 보드</span></div></header><main class="board-main"><section class="login-gate"><div class="gate-card"><div class="gate-brand"><span class="brand-mark">p</span><span>pocket<span> sync</span></span></div>${inner}</div></section></main></div>`;
+  root().innerHTML = `<div class="app-shell"><header class="app-header"><div class="header-inner"><a class="brand" href="#"><span class="brand-mark">p</span><span>pocket<span> sync</span></span></a><span class="workspace-name">Pocket 공유 보드</span></div></header><main class="board-main"><section class="login-gate"><div class="gate-card"><div class="gate-brand"><span class="brand-mark">p</span><span>pocket<span> sync</span></span></div>${inner}</div></section></main></div>`;
  }
  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
  const googleMark = '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
 
  function showSignIn(message) {
-  screen(`<h2>로그인해 주세요</h2><p>이현성 · 권중선 두 사람의 구글 계정으로만 들어올 수 있어요. 한 번 로그인하면 이 브라우저에서는 다음부터 바로 열립니다.</p>${message ? `<p class="form-error" role="alert">${esc(message)}</p>` : ''}<button type="button" class="primary-button google-signin" id="ps-signin">${googleMark}Google 계정으로 로그인</button>`);
+  screen(`<h2>로그인해 주세요</h2><p>이현성 · 권중선 · 정규진의 구글 계정으로만 들어올 수 있어요. 한 번 로그인하면 이 브라우저에서는 다음부터 바로 열립니다.</p>${message ? `<p class="form-error" role="alert">${esc(message)}</p>` : ''}<button type="button" class="primary-button google-signin" id="ps-signin">${googleMark}Google 계정으로 로그인</button>`);
   document.getElementById('ps-signin').onclick = signIn;
  }
  function showDenied(email) {
-  screen(`<h2>허용되지 않은 계정이에요</h2><p><strong>${esc(email)}</strong> 계정은 이 보드에 들어올 수 없어요. 이현성 · 권중선의 구글 계정으로 다시 로그인해 주세요.</p><button type="button" class="secondary-button" id="ps-switch">다른 계정으로 로그인</button>`);
+  screen(`<h2>허용되지 않은 계정이에요</h2><p><strong>${esc(email)}</strong> 계정은 이 보드에 들어올 수 없어요. 허용된 구글 계정으로 다시 로그인해 주세요.</p><button type="button" class="secondary-button" id="ps-switch">다른 계정으로 로그인</button>`);
   document.getElementById('ps-switch').onclick = () => auth.signOut();
  }
  function showLoading(text) {
@@ -127,6 +181,7 @@
    const showTasks = () => { root().innerHTML = ''; preact.render(preact.h(ShareView, {token, watch: (next, fail) => fs.doc('shares/' + token).onSnapshot(s => next(s.exists ? s.data() : null), fail)}), root()); };
    fs.doc('shares/' + token).get().then(s => {
     const d = s.exists ? s.data() : null;
+    if (d) { const b = BOARDS[d.board] ? d.board : 'A'; BOARD = b; window.PS_BOARD = b; window.PS_SEATS = BOARDS[b].seats.map(k => ({key: k, name: SEAT_NAMES[k]})); if (window.PS_CONFIGURE) window.PS_CONFIGURE(); }
     if (d && d.mode === 'full' && d.active !== false) { shareBackend(token); document.title = (d.title || 'Pocket 공유 보드') + ' · pocket sync'; root().innerHTML = ''; preact.render(preact.h(Board, null), root()); }
     else showTasks();
    }, showTasks);
@@ -141,10 +196,19 @@
    if (!seat) { showDenied(email); return; }
    session = {uid: u.uid, seat, email};
    window.PS_EMAIL = email;
+   const mine = SEAT_BOARDS[seat] || ['A'];
+   let want = ''; try { want = localStorage.getItem('ps.board') || ''; } catch (e) {}
+   BOARD = mine.includes(want) ? want : mine[0]; VISIBLE = [BOARD, 'all'];
+   window.PS_BOARD = BOARD; window.PS_BOARDS = mine;
+   window.PS_BOARD_NAMES = Object.fromEntries(Object.entries(BOARDS).map(([k, v]) => [k, v.name]));
+   window.PS_SEATS = BOARDS[BOARD].seats.map(k => ({key: k, name: SEAT_NAMES[k]}));
+   if (window.PS_CONFIGURE) window.PS_CONFIGURE();
    showLoading(`${SEAT_NAMES[seat]}님, 보드를 여는 중이에요.`);
    try {
+    if (seat !== 'jgj') { showLoading('보드를 정리하는 중이에요.'); await migrateBoards(); }
+    await seedBoard(BOARD);
     const ref = fs.doc('members/' + seat), cur = await ref.get();
-    if (!cur.exists || cur.data().user_id !== u.uid) await ref.set({name: SEAT_NAMES[seat], user_id: u.uid, claimed_at: new Date().toISOString()});
+    if (!cur.exists || cur.data().user_id !== u.uid || !cur.data().board) await ref.set({name: SEAT_NAMES[seat], user_id: u.uid, claimed_at: new Date().toISOString(), board: seat === 'lhs' ? 'all' : BOARD});
    } catch (e) {
     screen(`<h2>보드에 연결하지 못했어요</h2><p>로그인은 됐지만 기록 저장소가 이 계정을 막고 있어요. Firebase의 Firestore 규칙에 이 이메일이 들어 있는지 확인해 주세요.</p><p class="form-error">${esc((e && e.code) || '')}</p><button type="button" class="secondary-button" id="ps-retry">다시 시도</button>`);
     document.getElementById('ps-retry').onclick = () => location.reload();

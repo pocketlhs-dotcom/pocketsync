@@ -1,18 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 두 사람의 구글 이메일만 읽고 쓸 수 있습니다. 실제 이메일은 Firebase 콘솔에만 넣습니다.
-    function allowed() {
-      return request.auth != null
-        && request.auth.token.email_verified == true
-        && request.auth.token.email.lower() in ['EMAIL_1', 'EMAIL_2'];
+    // 보드: A = 이현성·권중선, B = 이현성·정규진. 문서마다 board 필드('A' | 'B' | 'all').
+    // 실제 이메일은 Firebase 콘솔에만 넣습니다.
+    function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
+    function me() { return request.auth.token.email.lower(); }
+    function boards() {
+      return me() == 'EMAIL_LHS' ? ['A', 'B', 'all']
+        : me() == 'EMAIL_KJS' ? ['A', 'all']
+        : me() == 'EMAIL_JGJ' ? ['B', 'all'] : [];
     }
-    match /{document=**} {
-      allow read, write: if allowed();
-    }
-    // 외부 공유 링크: 주소(토큰)를 아는 사람은 그 문서 하나만 읽을 수 있습니다. 목록 조회·쓰기는 두 사람만.
+    function member() { return signedIn() && boards().size() > 0; }
+    // 외부 공유 링크: 주소(토큰)를 아는 사람은 그 문서 하나만 읽을 수 있습니다.
     match /shares/{token} {
       allow get: if true;
+    }
+    match /{col}/{id} {
+      allow read: if member() && (resource == null || resource.data.board in boards());
+      allow create: if member() && request.resource.data.board in boards();
+      allow update: if member() && resource.data.board in boards() && request.resource.data.board in boards();
+      allow delete: if member() && resource.data.board in boards();
     }
   }
 }
