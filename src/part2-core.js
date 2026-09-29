@@ -58,6 +58,18 @@ function checkStat(item) { const l = (item && item.checklist) || []; const done 
 const newCheckId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 // 설명의 여러 줄을 세부 업무로: 글머리표·번호·체크 표시를 떼어 낸다.
 function bodyToChecks(body) { return String(body || '').split(/\n+/).map(l => l.replace(/^\s*(?:[-*•·▪◦]|\d+[.)]|\[[ xX]?\])\s*/, '').trim()).filter(Boolean).slice(0, 60); }
+// 외부 공유 링크: 고른 카테고리의 업무만 따로 담은 보기 전용 데이터.
+function shareToken() { const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789', b = new Uint8Array(24); crypto.getRandomValues(b); return Array.from(b, x => abc[x % abc.length]).join(''); }
+function strHash(str) { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + ':' + str.length; }
+function buildShareData(share, items, topics) {
+ const want = new Set(share.topic_ids || []), all = !want.size, cutoff = offsetDate(today(), -14), rank = {critical: 2, urgent: 1, share: 0};
+ const tasks = items.filter(i => i.kind === 'task' && !i.demo && i.req !== 'pending' && i.category !== 'personal' && (all || want.has(i.topic_id || '')) && (i.status !== 'done' || doneAt(i) >= cutoff))
+  .map(t => ({id: t.id, title: t.title, assignee: personName(t.assignee), due: t.due || '', status: t.status, priority: t.priority, progress: t.progress || 0, topic_id: t.topic_id || '', prio_no: t.prio_no || 0, done_at: t.status === 'done' ? doneAt(t) : '', checklist: (t.checklist || []).map(c => ({text: c.text, pct: c.pct || 0, done: !!c.done}))}))
+  .sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done') || (a.status === 'done' ? b.done_at.localeCompare(a.done_at) : ((a.prio_no || 999) - (b.prio_no || 999)) || (a.due && b.due ? a.due.localeCompare(b.due) : a.due ? -1 : b.due ? 1 : 0) || (rank[b.priority] - rank[a.priority]) || a.title.localeCompare(b.title)));
+ const names = new Map(topics.map(t => [t.id, t.name]));
+ const topicIds = [...new Set(tasks.map(t => t.topic_id))];
+ return {topics: topicIds.map(id => ({id, name: id ? (names.get(id) || '카테고리') : '미분류'})).sort((a, b) => topics.findIndex(t => t.id === a.id) - topics.findIndex(t => t.id === b.id)), tasks};
+}
 const doneAt = t => t.done_at || t.updated_at || '';
 const ARCHIVE_DAYS = 7;
 const isArchived = t => t.kind === 'task' && t.status === 'done' && doneAt(t) && (Date.now() - Date.parse(doneAt(t))) > ARCHIVE_DAYS * 864e5;

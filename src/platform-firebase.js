@@ -104,10 +104,19 @@
   return '로그인하지 못했어요. 다시 시도해 주세요.' + (code ? ` (${code})` : '');
  }
 
- let Board = null, mounted = false;
- window.PS_MOUNT = B => { Board = B; start(); };
+ let Board = null, ShareView = null, mounted = false;
+ window.PS_MOUNT = (B, SV) => { Board = B; ShareView = SV; start(); };
+ // ?share=토큰 으로 들어오면 로그인 없이 그 공유 문서 하나만 읽어 보기 전용 화면을 띄운다.
+ function shareToken() { const m = new URLSearchParams(location.search).get('share'); return m && /^[A-Za-z0-9]{12,64}$/.test(m) ? m : ''; }
 
  function start() {
+  const token = shareToken();
+  if (token && ShareView) {
+   const meta = document.createElement('meta'); meta.name = 'referrer'; meta.content = 'no-referrer'; document.head.appendChild(meta);
+   root().innerHTML = '';
+   preact.render(preact.h(ShareView, {token, watch: (next, fail) => fs.doc('shares/' + token).onSnapshot(s => next(s.exists ? s.data() : null), fail)}), root());
+   return;
+  }
   showLoading('불러오는 중이에요.');
   auth.getRedirectResult().catch(e => showSignIn(message(e)));
   auth.onAuthStateChanged(async u => {
