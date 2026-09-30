@@ -26,8 +26,8 @@ const moods = [
 /* Daily check-in: how much work (fact + self-rating) -> how I feel -> what I'd like from you. */
 const LOADS = {light: '여유', ok: '적당', many: '많음', limit: '한계'};
 const LOAD_LONG = {light: '여유 있어요', ok: '적당해요', many: '많아요', limit: '한계예요'};
-const MOODS = {great: '좋아요', normal: '괜찮아요', tired: '지쳐요', sad: '힘들어요'};
-const MOOD_ICONS = {great: 'Flame', normal: 'Smile', tired: 'BatteryLow', sad: 'CloudRain'};
+const MOODS = {great: '좋아요', normal: '괜찮아요', trying: '노력 중', tired: '지쳐요', sad: '힘들어요'};
+const MOOD_ICONS = {great: 'Flame', normal: 'Smile', trying: 'TrendingUp', tired: 'BatteryLow', sad: 'CloudRain'};
 const ASKS = {none: '특별히 없어요', know: '그냥 알아줘요', cheer: '응원해줘요', space: '여유를 줘요', help: '도와줘요'};
 const ASK_ICONS = {none: 'Check', know: 'Eye', cheer: 'Sparkles', space: 'Coffee', help: 'HeartHandshake'};
 const REACTIONS = {seen: '알겠어요', cheer: '응원해요', help: '도와줄게요'};
