@@ -24,7 +24,6 @@ const TEAM_URL_RE = /(https?:\/\/[^\s<>()"']+[^\s<>()"'.,!?;:])/g;
 // 글 속 주소를 눌러 열 수 있게.
 function TeamText({text, class: cls = ''}) { const parts = String(text || '').split(TEAM_URL_RE); return html`<p class=${cx('tb-text', cls)}>${parts.map((p, i) => i % 2 ? html`<a key=${i} href=${safeLink(p)} target="_blank" rel="noreferrer">${p}</a>` : p)}</p>`; }
 const teamUrlsIn = text => [...String(text || '').matchAll(TEAM_URL_RE)].map(m => m[1]);
-const normMarks = v => ({check: Array.isArray(v && v.check) ? v.check.map(String).slice(0, 10) : [], like: Array.isArray(v && v.like) ? v.like.map(String).slice(0, 10) : []});
 // 댓글 아래 확인 · 좋아요 버튼. 누른 사람 이름이 옆에 보인다.
 function TeamMarks({c, me, onMark}) {
  if (!onMark) return null;
