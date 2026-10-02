@@ -59,7 +59,7 @@ function progressFields(item, v) { const p = Math.max(0, Math.min(100, Math.roun
 function dDay(due) { if (!due) return {label: '마감 없음', cls: 'none', n: null}; const n = Math.round((Date.parse(due + 'T00:00:00+09:00') - Date.parse(today() + 'T00:00:00+09:00')) / 864e5); return n < 0 ? {label: `D+${-n}`, cls: 'late', n} : n === 0 ? {label: '오늘', cls: 'today', n} : {label: `D-${n}`, cls: n <= 3 ? 'soon' : '', n}; }
 // 업무 안의 세부 업무 목록. 진행률은 체크한 비율로 자동 계산된다.
 // 세부 업무마다 진행률(pct)을 가진다. 체크 = 100%, 업무 진행률 = 세부 업무 진행률의 평균.
-function normChecklist(v) { return (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const pct = c.done ? 100 : Math.max(0, Math.min(100, Math.round(Number(c.pct) || 0))); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct, done: pct === 100, ...(c.by ? {by: String(c.by).slice(0, 20)} : {})}; }); }
+function normChecklist(v) { return (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const pct = c.done ? 100 : Math.max(0, Math.min(100, Math.round(Number(c.pct) || 0))); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct, done: pct === 100, ...(c.by ? {by: String(c.by).slice(0, 20)} : {}), ...(c.at ? {at: String(c.at).slice(0, 30)} : {})}; }); }
 function checkStat(item) { const l = (item && item.checklist) || []; const done = l.filter(c => c.done).length; return {total: l.length, done, pct: l.length ? Math.round(l.reduce((a, c) => a + (c.pct || 0), 0) / l.length) : 0}; }
 const newCheckId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 // 설명의 여러 줄을 세부 업무로: 글머리표·번호·체크 표시를 떼어 낸다.

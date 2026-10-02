@@ -106,7 +106,7 @@ function TeamBoard() {
   let list = normChecklist((snap.data() || {}).checklist);
   if (act.type === 'toggle') list = list.map(c => c.id === act.cid ? {...c, done: !!act.done, pct: act.done ? 100 : 0} : c);
   else if (act.type === 'pct') list = list.map(c => c.id === act.cid ? {...c, pct: act.pct, done: act.pct >= 100} : c);
-  else if (act.type === 'add') list = [...list, ...act.texts.map(t => ({id: newCheckId(), text: t, done: false, by: me.name}))];
+  else if (act.type === 'add') list = [...list, ...act.texts.map(t => ({id: newCheckId(), text: t, done: false, by: me.name, at: nowIso()}))];
   else if (act.type === 'remove') list = list.filter(c => c.id !== act.cid);
   else if (act.type === 'edit') list = list.map(c => c.id === act.cid ? {...c, text: act.text} : c);
   else if (act.type === 'reorder') { const byId = new Map(list.map(c => [c.id, c])); list = [...act.ids.map(i => byId.get(i)).filter(Boolean), ...list.filter(c => !act.ids.includes(c.id))]; }
