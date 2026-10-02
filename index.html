@@ -1075,6 +1075,8 @@ button.dday-edit{cursor:pointer;border:0;font-family:inherit;transition:box-shad
 @media(max-width:640px){.tb-arow-checks{padding-left:0;grid-area:auto}}
 .tb-duepick{position:relative;justify-self:start;display:inline-flex}.tb-duepick>.dday{cursor:pointer;border:0;height:30px;padding:0 10px;border-radius:30px;font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;background:#edeff6;color:#9699a8;white-space:nowrap}.tb-row .tb-duepick>.dday{height:33px;padding:0 11px;font-size:13px}.tb-duepick>.dday:hover{box-shadow:0 0 0 2px #c9d4fb}.tb-duepick>.dday.late{background:#fff3ef;color:#d13737}.tb-duepick>.dday.today{background:#ffe9e1;color:#ff482b}.tb-duepick>.dday.soon{background:#fff3e2;color:#c27a1c}
 .tb-duepop{position:absolute;left:0;top:calc(100% + 6px);z-index:30;width:200px;background:#fff;border:1px solid #e1e4f3;border-radius:8px;box-shadow:0 12px 30px rgba(15,30,70,.16);padding:8px;display:flex;flex-direction:column;gap:4px}.tb-duepop .chip{display:flex;justify-content:space-between;align-items:center;height:32px;padding:0 10px;border-radius:5px;border:1px solid transparent;background:#fff;color:#2b3550;font-size:13.5px;font-weight:600;text-align:left}.tb-duepop .chip:hover{background:#f3f6ff}.tb-duepop .chip.on{background:#e8edff;color:#315df8}.tb-duepop .chip small{font-size:12px;color:#a7a7a7;font-weight:500}.tb-duepop input{height:32px;border:1px solid #e3e6ef;border-radius:5px;padding:0 8px;font-size:13px;margin-top:2px}
+.tb-whopick{position:relative;display:inline-flex;min-width:0}.tb-whopick>.tb-who{display:inline-flex;align-items:center;justify-content:space-between;gap:4px;width:100%;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.tb-whopick>.tb-who.none{color:#a3a8b8}.tb-whopop{left:auto;right:0;width:180px}.tb-whopop small{font-size:11.5px;color:#a7a7a7;padding:2px 4px 0}.tb-check{width:16px;height:16px;border-radius:4px;border:1.5px solid #c9d0e0;display:grid;place-items:center;color:#fff}.tb-whopop .chip.on .tb-check{background:#315df8;border-color:#315df8}.tb-multi-hint{font-size:11.5px;color:#b0b5c6;margin-left:4px}
+@media(min-width:901px){.tb-row{grid-template-columns:74px minmax(0,1fr) 120px 64px 110px 92px}}.tb-row>.tb-whopick{grid-area:w}@media(min-width:901px){.tb-row>.tb-whopick{grid-area:auto}}.tb-row>.tb-duepick{grid-area:d}@media(min-width:901px){.tb-row>.tb-duepick{grid-area:auto}}
 </style>
 </head><body>
 <div id="app"></div>
@@ -1084,6 +1086,6 @@ button.dday-edit{cursor:pointer;border:0;font-family:inherit;transition:box-shad
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1790909904"></script>
-<script src="app.js?v=1790909904"></script>
+<script src="platform.js?v=1790910944"></script>
+<script src="app.js?v=1790910944"></script>
 </body></html>
