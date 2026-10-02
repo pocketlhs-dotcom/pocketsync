@@ -239,16 +239,16 @@ function TeamAssignList({items, cmap, onOpen, isAdmin, onPatch, onImport, onCrea
  </section>`;
 }
 
-function TeamOrders({items, who, onWho, isAdmin, cmap, onOpen, onCreate, onImport, onPatch, onChecklist, busy}) {
+function TeamOrders({items, who, onWho, isAdmin, cmap, onOpen, onCreate, onImport, onPatch, onChecklist, busy, me}) {
  const [checksOpen, setChecksOpen] = useState({});
- const [title, setTitle] = useState(''), [assignee, setAssignee] = useState(''), [dueMode, setDueMode] = useState('none'), [dueDate, setDueDate] = useState(''), [priority, setPriority] = useState('share');
+ const [title, setTitle] = useState(''), [assignee, setAssignee] = useState(isAdmin ? '' : (me && me.name) || ''), [dueMode, setDueMode] = useState('none'), [dueDate, setDueDate] = useState(''), [priority, setPriority] = useState('share');
  const names = teamNames();
  const dueOf = () => dueMode === 'today' ? today() : dueMode === 'tomorrow' ? offsetDate(today(), 1) : dueMode === 'dayafter' ? offsetDate(today(), 2) : dueMode === 'date' ? dueDate : '';
  async function submit(e) { e.preventDefault(); const t = title.trim(); if (!t || busy) return; try { await onCreate({title: t.slice(0, 150), assignee, due: dueOf(), priority}); setTitle(''); } catch {} }
  const list = (who === 'all' ? items : who === 'none' ? items.filter(x => !x.assignee) : items.filter(x => teamHas(x, who))).sort(teamByDue);
  const filters = [['all', '전체', items.length], ...names.map(n => [n, n, items.filter(x => teamHas(x, n)).length]), ['none', '미배정', items.filter(x => !x.assignee).length]];
  return html`<section class="tb-orders">
-  <form class="quick-task pl-add tb-add" onSubmit=${submit}><div class="quick-compose">${I('Plus', 18)}<input aria-label="오더 제목" placeholder="디자인팀에 맡길 일을 한 줄로 적고 Enter" maxLength="150" value=${title} onInput=${e => setTitle(e.target.value)} /><button class="quick-submit" disabled=${!title.trim() || busy} aria-label="오더 등록">${I('ArrowRight', 18)}</button></div>
+  <form class="quick-task pl-add tb-add" onSubmit=${submit}><div class="quick-compose">${I('Plus', 18)}<input aria-label="오더 제목" placeholder=${isAdmin ? '디자인팀에 맡길 일을 한 줄로 적고 Enter' : '내가 맡은 일이나 팀에 올릴 업무를 한 줄로 적고 Enter'} maxLength="150" value=${title} onInput=${e => setTitle(e.target.value)} /><button class="quick-submit" disabled=${!title.trim() || busy} aria-label="오더 등록">${I('ArrowRight', 18)}</button></div>
    <div class="quick-task-options">
     <div class="chip-group" role="group" aria-label="담당"><span>담당</span>${[['', '미배정'], ...names.map(n => [n, n]), ['모두', '셋 다']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${assignee === v} onClick=${() => setAssignee(v)}>${l}</button>`)}</div>
     <div class="chip-group" role="group" aria-label="마감"><span>마감</span>${[['none', '없음'], ['today', '오늘'], ['tomorrow', '내일'], ['dayafter', '모레']].map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${dueMode === v} onClick=${() => setDueMode(v)}>${l}</button>`)}<input type="date" class="chip-date" aria-label="마감일 직접 선택" value=${dueMode === 'date' ? dueDate : ''} onInput=${e => { setDueDate(e.target.value); setDueMode(e.target.value ? 'date' : 'none'); }} /></div>
