@@ -14,7 +14,7 @@
   appId: '1:926307454788:web:828f9ac2f0dad176285111'
  };
  // sha256(lowercased email) -> seat key. Filled in build.sh from the owner's list.
- const SEAT_BY_EMAIL_HASH = { "8e12e0a9af82ae0fd0366552ef4f22740be5fc1a589943635e9c58572ee89c2a": "lhs", "806b357d8daa64177bec9c842594a5680d45d40ba02742ce6cc81403585811ad": "kjs", "1e23b9055ac3df9364043002b1e1f0d85708c78a9fd476a17030361a3a010053": "jgj"};
+ const SEAT_BY_EMAIL_HASH = {"8e12e0a9af82ae0fd0366552ef4f22740be5fc1a589943635e9c58572ee89c2a": "lhs", "806b357d8daa64177bec9c842594a5680d45d40ba02742ce6cc81403585811ad": "kjs", "1e23b9055ac3df9364043002b1e1f0d85708c78a9fd476a17030361a3a010053": "jgj", "8cfd1949433cc4097bb106e847b87b2bdff67a143d1fe1045e6c916867e465ca": "ksy", "6ae108ee9454314166821aa6ce6abdf64675d613f60546c829dc8888615edd5b": "aej"};
  const SEAT_NAMES = {lhs: '이현성', kjs: '권중선', jgj: '정규진', ksy: '강승연', aej: '안은지'};
  // 보드: A = 이현성·권중선, B = 이현성·정규진, C = 이현성·디자인팀(강승연·안은지). 이현성은 모든 보드, 나머지는 자기 보드만.
  // C는 'all' 문서(이현성 개인 업무 등)를 보지 않는다: 디자이너 규칙이 ['C']뿐이라 목록 조건도 C만.
