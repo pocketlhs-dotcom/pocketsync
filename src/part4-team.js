@@ -37,7 +37,8 @@ function normTeam(d) {
 }
 const teamByDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || ({critical: 0, urgent: 1, share: 2}[a.priority] - {critical: 0, urgent: 1, share: 2}[b.priority]) || String(a.created_at || '').localeCompare(String(b.created_at || ''));
 // 팀 현황 순서: 손으로 정한 순서(prio_no) 먼저, 나머지는 미배정 먼저 · 마감순.
-const teamOrder = (a, b) => ((a.prio_no || 999) - (b.prio_no || 999)) || (Number(!!a.assignee) - Number(!!b.assignee)) || teamByDue(a, b);
+// 순서: 아직 손으로 순서를 정하지 않은 업무(새로 만든 것 포함)가 맨 위, 최근 만든 것부터. 그 아래는 끌어서 정한 순서.
+const teamOrder = (a, b) => (Number(!!a.prio_no) - Number(!!b.prio_no)) || (!a.prio_no ? String(b.created_at || '').localeCompare(String(a.created_at || '')) : a.prio_no - b.prio_no);
 const teamLate = x => x.status !== 'done' && x.due && x.due < today();
 function teamClock(iso) { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('ko-KR', {timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false}); }
 function teamDay(d) { const t = today(); return d === t ? '오늘' : d === offsetDate(t, -1) ? '어제' : d === offsetDate(t, 1) ? '내일' : `${shortDate(d)} (${'일월화수목금토'[new Date(d + 'T12:00:00Z').getUTCDay()]})`; }
@@ -257,7 +258,7 @@ function TeamAssignList({items, cmap, onOpen, isAdmin, onPatch, onImport, onCrea
  const assign = async (x, v) => { const next = teamToggle(x.assignee, v); await onPatch(x, {assignee: next}, next ? `담당 ${teamWho(next)}` : '담당 비움'); if (x.assignee && onHandoff) onHandoff(x, x.assignee, next); };
  async function add(e) { e.preventDefault(); const t = title.trim(); if (!t || busy) return; try { await onCreate({title: t.slice(0, 150), assignee: pick, due: dueOf(), priority}); setTitle(''); } catch {} }
  return html`<section class="tb-assign">
-  <div class="tb-assign-head"><div><strong>업무 리스트</strong><small>줄마다 담당을 눌러 바로 배정해요 · 왼쪽 손잡이를 끌어 순서를 바꿔요</small></div>${isAdmin && html`<button type="button" class="tb-import-btn" onClick=${onImport}>${I('Download', 15)}A 보드에서 불러오기</button>`}</div>
+  <div class="tb-assign-head"><div><strong>업무 리스트</strong><small>줄마다 담당을 눌러 바로 배정해요 · 새로 만든 업무는 맨 위 · 왼쪽 손잡이를 끌어 순서를 바꿔요</small></div>${isAdmin && html`<button type="button" class="tb-import-btn" onClick=${onImport}>${I('Download', 15)}A 보드에서 불러오기</button>`}</div>
   <div class="tb-assign-tools"><div class="dv-who" role="group" aria-label="담당 필터">${filters.map(([v, l, n]) => html`<button type="button" key=${v} class="chip" aria-pressed=${filter === v} onClick=${() => setFilter(v)}>${l}<span>${n}</span></button>`)}</div>
    <form class="tb-assign-add" onSubmit=${add}>${I('Plus', 15)}<input aria-label="업무 추가" maxLength="150" placeholder=${pick ? `${teamWho(pick)}에게 줄 업무 한 줄 추가 후 Enter` : '업무 한 줄 추가 후 Enter (담당은 줄에서 바로 정하기)'} value=${title} onInput=${e => setTitle(e.target.value)} /><button class="tb-assign-go" disabled=${!title.trim() || busy} aria-label="추가">${I('ArrowRight', 15)}</button></form>
   </div>
