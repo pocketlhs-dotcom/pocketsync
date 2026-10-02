@@ -109,6 +109,7 @@ function TeamBoard() {
   else if (act.type === 'add') list = [...list, ...act.texts.map(t => ({id: newCheckId(), text: t, done: false, by: me.name, at: nowIso()}))];
   else if (act.type === 'remove') list = list.filter(c => c.id !== act.cid);
   else if (act.type === 'edit') list = list.map(c => c.id === act.cid ? {...c, text: act.text} : c);
+  else if (act.type === 'by') list = list.map(c => c.id === act.cid ? (act.by ? {...c, by: act.by} : (({by, ...rest}) => rest)(c)) : c);
   else if (act.type === 'reorder') { const byId = new Map(list.map(c => [c.id, c])); list = [...act.ids.map(i => byId.get(i)).filter(Boolean), ...list.filter(c => !act.ids.includes(c.id))]; }
   list = normChecklist(list); const st = checkStat({checklist: list});
   const fields = {checklist: list, ...(act.body !== undefined ? {body: act.body} : {})};
