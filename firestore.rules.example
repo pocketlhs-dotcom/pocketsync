@@ -1,14 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 보드: A = 이현성·권중선, B = 이현성·정규진. 문서마다 board 필드('A' | 'B' | 'all').
+    // 보드: A = 이현성·권중선, B = 이현성·정규진, C = 이현성·디자인팀(강승연·안은지). 문서마다 board 필드('A' | 'B' | 'C' | 'all').
+    // 디자이너는 C만: 'all'(이현성 개인 업무 등)은 보지 못합니다.
     // 실제 이메일은 Firebase 콘솔에만 넣습니다.
     function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
     function me() { return request.auth.token.email.lower(); }
     function boards() {
-      return me() == 'EMAIL_LHS' ? ['A', 'B', 'all']
+      return me() == 'EMAIL_LHS' ? ['A', 'B', 'C', 'all']
         : me() == 'EMAIL_KJS' ? ['A', 'all']
-        : me() == 'EMAIL_JGJ' ? ['B', 'all'] : [];
+        : me() == 'EMAIL_JGJ' ? ['B', 'all']
+        : me() == 'EMAIL_KSY' ? ['C']
+        : me() == 'EMAIL_AEJ' ? ['C'] : [];
     }
     function member() { return signedIn() && boards().size() > 0; }
     // 외부 공유 링크: 주소(토큰)를 아는 사람은 그 문서 하나만 읽을 수 있습니다.

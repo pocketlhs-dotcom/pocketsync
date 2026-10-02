@@ -15,10 +15,12 @@
  };
  // sha256(lowercased email) -> seat key. Filled in build.sh from the owner's list.
  const SEAT_BY_EMAIL_HASH = { "8e12e0a9af82ae0fd0366552ef4f22740be5fc1a589943635e9c58572ee89c2a": "lhs", "806b357d8daa64177bec9c842594a5680d45d40ba02742ce6cc81403585811ad": "kjs", "1e23b9055ac3df9364043002b1e1f0d85708c78a9fd476a17030361a3a010053": "jgj"};
- const SEAT_NAMES = {lhs: '이현성', kjs: '권중선', jgj: '정규진'};
- // 보드: A = 이현성·권중선, B = 이현성·정규진. 이현성은 두 보드, 나머지는 자기 보드만.
- const BOARDS = {A: {seats: ['lhs', 'kjs'], name: '권중선 보드'}, B: {seats: ['lhs', 'jgj'], name: '정규진 보드'}};
- const SEAT_BOARDS = {lhs: ['A', 'B'], kjs: ['A'], jgj: ['B']};
+ const SEAT_NAMES = {lhs: '이현성', kjs: '권중선', jgj: '정규진', ksy: '강승연', aej: '안은지'};
+ // 보드: A = 이현성·권중선, B = 이현성·정규진, C = 이현성·디자인팀(강승연·안은지). 이현성은 모든 보드, 나머지는 자기 보드만.
+ // C는 'all' 문서(이현성 개인 업무 등)를 보지 않는다: 디자이너 규칙이 ['C']뿐이라 목록 조건도 C만.
+ const BOARDS = {A: {seats: ['lhs', 'kjs'], name: '권중선 보드'}, B: {seats: ['lhs', 'jgj'], name: '정규진 보드'}, C: {seats: ['lhs', 'ksy', 'aej'], name: '디자인팀 보드'}};
+ const SEAT_BOARDS = {lhs: ['A', 'B', 'C'], kjs: ['A'], jgj: ['B'], ksy: ['C'], aej: ['C']};
+ const visibleFor = b => (b === 'C' ? ['C'] : [b, 'all']);
  let BOARD = 'A', VISIBLE = ['A', 'all'];
  // 문서마다 board 필드: 이현성 개인 상태(오늘의 나·지금 상태·프로필·자리)는 두 보드 공통('all'), 나머지는 지금 보드.
  function boardFor(path, data) {
@@ -142,6 +144,26 @@
   } catch (e) { console.error('seed B', e); }
  }
 
+ // 이현성: C(디자인팀)에서 A 업무를 불러올 때 A 목록을 한 번 읽는다.
+ window.PS_READ_BOARD = async b => {
+  const [its, tops] = await Promise.all([fs.collection('items').where('board', 'in', [b, 'all']).get(), fs.collection('topics').where('board', '==', b).get()]);
+  return {items: its.docs.map(d => ({id: d.id, ...d.data()})), topics: tops.docs.map(d => ({id: d.id, ...d.data()}))};
+ };
+ // 이현성이 어느 보드를 열어 두든: C 오더의 진행 상황을 A 원본(c_link)에 옮겨 적는다. 디자이너는 A에 쓸 수 없어서 이현성 쪽에서 맞춘다.
+ function watchTeamLinks() {
+  let seen = {}; try { seen = JSON.parse(localStorage.getItem('ps.clink') || '{}') || {}; } catch (e) {}
+  fs.collection('items').where('board', '==', 'C').onSnapshot(async s => {
+   for (const d of s.docs) {
+    const v = d.data() || {}; if (v.src_board !== 'A' || !v.src_id) continue;
+    const who = v.assignee === '함께' ? BOARDS.C.seats.filter(k => k !== 'lhs').map(k => SEAT_NAMES[k]).join('·') : (v.assignee || '미배정');
+    const link = {id: d.id, status: v.status || 'todo', progress: Number(v.progress) || 0, assignee: who, due: v.due || '', issue: v.issue || '', at: v.updated_at || ''};
+    const key = JSON.stringify(link); if (seen[d.id] === key) continue;
+    try { await fs.doc('items/' + v.src_id).update({c_link: link}); seen[d.id] = key; } catch (e) { console.error('team link', e); seen[d.id] = key; }
+   }
+   try { localStorage.setItem('ps.clink', JSON.stringify(seen)); } catch (e) {}
+  }, e => console.error('team links', e));
+ }
+
  async function sha256(text) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -155,7 +177,7 @@
  const googleMark = '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
 
  function showSignIn(message) {
-  screen(`<h2>로그인해 주세요</h2><p>이현성 · 권중선 · 정규진의 구글 계정으로만 들어올 수 있어요. 한 번 로그인하면 이 브라우저에서는 다음부터 바로 열립니다.</p>${message ? `<p class="form-error" role="alert">${esc(message)}</p>` : ''}<button type="button" class="primary-button google-signin" id="ps-signin">${googleMark}Google 계정으로 로그인</button>`);
+  screen(`<h2>로그인해 주세요</h2><p>허용된 구글 계정으로만 들어올 수 있어요. 한 번 로그인하면 이 브라우저에서는 다음부터 바로 열립니다.</p>${message ? `<p class="form-error" role="alert">${esc(message)}</p>` : ''}<button type="button" class="primary-button google-signin" id="ps-signin">${googleMark}Google 계정으로 로그인</button>`);
   document.getElementById('ps-signin').onclick = signIn;
  }
  function showDenied(email) {
@@ -219,18 +241,17 @@
    const seat = SEAT_BY_EMAIL_HASH[await sha256(email)] || null;
    if (!seat) { showDenied(email); return; }
    session = {uid: u.uid, seat, email};
-   window.PS_EMAIL = email;
+   window.PS_EMAIL = email; window.PS_SEAT = seat;
    const mine = SEAT_BOARDS[seat] || ['A'];
    let want = ''; try { want = localStorage.getItem('ps.board') || ''; } catch (e) {}
-   BOARD = mine.includes(want) ? want : mine[0]; VISIBLE = [BOARD, 'all'];
+   BOARD = mine.includes(want) ? want : mine[0]; VISIBLE = visibleFor(BOARD);
    window.PS_BOARD = BOARD; window.PS_BOARDS = mine;
    window.PS_BOARD_NAMES = Object.fromEntries(Object.entries(BOARDS).map(([k, v]) => [k, v.name]));
    window.PS_SEATS = BOARDS[BOARD].seats.map(k => ({key: k, name: SEAT_NAMES[k]}));
    if (window.PS_CONFIGURE) window.PS_CONFIGURE();
    showLoading(`${SEAT_NAMES[seat]}님, 보드를 여는 중이에요.`);
    try {
-    if (seat !== 'jgj') { showLoading('보드를 정리하는 중이에요.'); await migrateBoards(); }
-    if (seat !== 'jgj') await splitCheckins();
+    if (seat === 'lhs' || seat === 'kjs') { showLoading('보드를 정리하는 중이에요.'); await migrateBoards(); await splitCheckins(); }
     if (seat === 'lhs') await shareDevTopic();
     await seedBoard(BOARD);
     const ref = fs.doc('members/' + seat), cur = await ref.get();
@@ -241,6 +262,7 @@
     return;
    }
    mounted = true;
+   if (seat === 'lhs') watchTeamLinks();
    root().innerHTML = '';
    preact.render(preact.h(Board, null), root());
   });
