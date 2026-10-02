@@ -2165,7 +2165,7 @@ function TeamDetail({item: x, comments, me, isAdmin, busy, onClose, onPatch, onC
  return html`<${Sheet} class="tb-detail" onClose=${onClose} header=${header}>
   <div class="tb-detail-body">
    <${AutoText} class="tb-d-title" single value=${x.title} label="업무 제목" maxLength="150" disabled=${busy} onCommit=${v => onPatch(x, {title: v}, '제목 수정')} />
-   <button type="button" class="tb-full-btn" onClick=${() => setFull(true)}>${I('NotebookPen', 15)}업무 자세히 보기<small>${[x.body || x.src_body ? '내용' : '', x.checklist.length || x.src_checks.length ? `세부 업무 ${x.checklist.length + x.src_checks.length}` : '', x.links.length + x.src_links.length ? `링크 ${x.links.length + x.src_links.length}` : ''].filter(Boolean).join(' · ') || '내용 · 세부 업무 · 레퍼런스 링크'}</small>${I('ChevronRight', 15)}</button>
+   <button type="button" class="tb-full-btn" onClick=${() => setFull(true)}>${I('NotebookPen', 15)}업무 자세히 보기<small>${[x.body || x.src_body ? '내용' : '', x.checklist.length || x.src_checks.length ? `세부 업무 ${x.checklist.length + x.src_checks.length}` : '', x.links.length + x.src_links.length ? `링크 ${x.links.length + x.src_links.length}` : ''].filter(Boolean).join(' · ') || '내용 · 세부 업무 · 링크'}</small>${I('ChevronRight', 15)}</button>
    <${AutoText} class="tb-d-body" value=${x.body} label="설명" placeholder="설명이나 요청 사항을 적어 주세요 (레퍼런스, 사이즈, 톤 등)" maxLength="6000" disabled=${busy} onCommit=${v => onPatch(x, {body: v}, '내용 수정')} />
    <div class="tb-fields">
     <div><span>담당</span><div class="tb-chips">${[['', '미배정'], ...names.map(n => [n, n]), ['함께', '둘 다']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${x.assignee === v} disabled=${busy} onClick=${() => x.assignee !== v && onPatch(x, {assignee: v}, `담당 ${teamWho(v)}`)}>${l}</button>`)}</div></div>
@@ -2179,7 +2179,7 @@ function TeamDetail({item: x, comments, me, isAdmin, busy, onClose, onPatch, onC
     ${issue && html`<textarea class="tb-issue-note" rows="2" maxLength="300" placeholder="무엇 때문인지 짧게 적어 주세요 (예: 원본 이미지 해상도 부족, 피드백 대기)" value=${note} onInput=${e => setNote(e.target.value)}></textarea>`}
     ${(issue !== x.issue || (issue && note !== x.issue_note)) && html`<button type="button" class="primary-button tb-issue-save" disabled=${busy} onClick=${saveIssue}>${issue ? '특이사항 보고하기' : '특이사항 해결로 바꾸기'}</button>`}
    </section>
-   <section class="tb-links"><h3>${I('Link2', 15)}레퍼런스 링크 <span>${x.links.length}</span></h3><${LinkChips} links=${x.links} editable=${true} busy=${busy} max=${20} addLabel="링크 공유" idPrefix=${'tbl-' + x.id} meta=${l => `${l.shared_by ? l.shared_by + ' 공유 · ' : ''}${l.url}`} onAdd=${l => onAddLink(x, l)} onRemove=${i => onRemoveLink(x, i)} /></section>
+   <section class="tb-links"><h3>${I('Link2', 15)}링크 <span>${x.links.length}</span></h3><${LinkChips} links=${x.links} editable=${true} busy=${busy} max=${20} addLabel="링크 공유" idPrefix=${'tbl-' + x.id} meta=${l => `${l.shared_by ? l.shared_by + ' 공유 · ' : ''}${l.url}`} onAdd=${l => onAddLink(x, l)} onRemove=${i => onRemoveLink(x, i)} /></section>
    ${!x.checklist.length && x.src_checks.length > 0 && html`<button type="button" class="tb-pull-wide" disabled=${busy} onClick=${() => pullSrcChecks(x, onPatch)}>${I('ListChecks', 15)}A 원본 세부 업무 ${x.src_checks.length}개 가져오기</button>`}
    <${Checklist} item=${x} editable=${true} busy=${busy} onAct=${onChecklist} />
    ${isAdmin && html`<section class="tb-send"><h3>${I('ArrowUpRight', 15)}다른 보드로 보내기</h3>
@@ -2215,7 +2215,7 @@ function TeamFull({x, comments, busy, onClose, onChecklist, onAddLink, onRemoveL
     ${x.src_board && x.src_body && x.src_body.trim() !== x.body.trim() && html`<div class="tb-full-src"><h4>${I('Link2', 13)}A 보드 원본 내용</h4><${TeamText} text=${x.src_body} /></div>`}</section>
    <section><h3>세부 업무 ${st.total ? html`<span>${st.done}/${st.total} · ${st.pct}%</span>` : ''}</h3><${Checklist} item=${x} editable=${true} busy=${busy} onAct=${onChecklist} compact=${true} />${!st.total && html`<p class="tb-none">세부 업무를 아래 칸에 적으면 체크한 만큼 진행률이 올라가요.</p>`}
     ${x.src_checks.length > 0 && !st.total && html`<div class="tb-full-src"><h4>${I('Link2', 13)}A 보드 원본 세부 업무 <span>${srcSt.done}/${srcSt.total}</span><button type="button" class="tb-pull" disabled=${busy} onClick=${() => pullSrcChecks(x, onPatch)}>세부 업무로 가져오기</button></h4><ul class="tb-src-checks">${x.src_checks.map(c => html`<li key=${c.id} class=${cx(c.done && 'done')}><span class="check-box">${c.done ? I('Check', 11) : ''}</span>${c.text}${!c.done && c.pct ? html`<small>${c.pct}%</small>` : ''}</li>`)}</ul></div>`}</section>
-   <section><h3>레퍼런스 링크 <span>${linkCount}</span></h3>
+   <section><h3>링크 <span>${linkCount}</span></h3>
     <ul class="tb-full-links">${x.links.map((l, i) => linkRow(l, `${l.shared_by ? l.shared_by + ' 공유' : '공유한 링크'}${l.shared_at ? ` · ${teamDay(inSeoul(l.shared_at))}` : ''} · ${l.url}`, i, true))}${srcOnly.map((l, i) => linkRow(l, `A 보드 원본 · ${l.url}`, 'src' + i, false))}${found.map((f, i) => linkRow({url: f.url, label: ''}, `${f.from}에서${f.at ? ` · ${teamDay(inSeoul(f.at))}` : ''}`, 'f' + i, false))}</ul>
     ${!linkCount && html`<p class="tb-none">아직 공유된 링크가 없어요.</p>`}
     <${LinkChips} links=${[]} editable=${true} busy=${busy} max=${20} addLabel="링크 공유" idPrefix=${'tbf-' + x.id} onAdd=${l => onAddLink(x, l)} onRemove=${() => {}} /></section>
