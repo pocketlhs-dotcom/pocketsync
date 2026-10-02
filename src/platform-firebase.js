@@ -154,11 +154,14 @@
   let seen = {}; try { seen = JSON.parse(localStorage.getItem('ps.clink') || '{}') || {}; } catch (e) {}
   fs.collection('items').where('board', '==', 'C').onSnapshot(async s => {
    for (const d of s.docs) {
-    const v = d.data() || {}; if (v.src_board !== 'A' || !v.src_id) continue;
+    const v = d.data() || {};
+    const targets = [...(v.src_board === 'A' && v.src_id ? [v.src_id] : []), ...(Array.isArray(v.out_links) ? v.out_links.map(o => o && o.id).filter(Boolean) : [])];
+    if (!targets.length) continue;
     const who = v.assignee === '함께' ? BOARDS.C.seats.filter(k => k !== 'lhs').map(k => SEAT_NAMES[k]).join('·') : (v.assignee || '미배정');
     const link = {id: d.id, status: v.status || 'todo', progress: Number(v.progress) || 0, assignee: who, due: v.due || '', issue: v.issue || '', at: v.updated_at || ''};
-    const key = JSON.stringify(link); if (seen[d.id] === key) continue;
-    try { await fs.doc('items/' + v.src_id).update({c_link: link}); seen[d.id] = key; } catch (e) { console.error('team link', e); seen[d.id] = key; }
+    const key = JSON.stringify([link, targets]); if (seen[d.id] === key) continue;
+    for (const t of targets) { try { await fs.doc('items/' + t).update({c_link: link}); } catch (e) { console.error('team link', e); } }
+    seen[d.id] = key;
    }
    try { localStorage.setItem('ps.clink', JSON.stringify(seen)); } catch (e) {}
   }, e => console.error('team links', e));
