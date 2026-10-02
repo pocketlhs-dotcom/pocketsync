@@ -2066,11 +2066,11 @@ function TeamDuePick({x, busy, onPatch}) {
  const set = v => { setOpen(false); if (v !== x.due) onPatch(x, {due: v}, v ? `마감 ${shortDate(v)}` : '마감 지움'); };
  return html`<span class="tb-duepick" ref=${ref}><button type="button" class=${cx('dday', d.cls)} title=${x.due ? `마감 ${shortDate(x.due)} · 눌러서 바꾸기` : '마감일 정하기'} disabled=${busy} onClick=${() => setOpen(v => !v)}>${d.label}</button>${open && html`<div class="tb-duepop" role="dialog" aria-label="마감일 바꾸기">${[['', '없음'], [today(), '오늘'], [offsetDate(today(), 1), '내일'], [offsetDate(today(), 2), '모레'], [offsetDate(today(), 7), '일주일 뒤']].map(([v, l]) => html`<button type="button" key=${l} class=${cx('chip', x.due === v && 'on')} onClick=${() => set(v)}>${l}${v ? html`<small>${shortDate(v)}</small>` : ''}</button>`)}<input type="date" aria-label="날짜 직접 선택" value=${x.due} onChange=${e => set(e.target.value)} /></div>`}</span>`;
 }
-function TeamMini({x, cmap, onOpen, showWho = true, extra}) {
- const d = dDay(x.due);
+function TeamMini({x, cmap, onOpen, showWho = true, extra, self = ''}) {
+ const d = dDay(x.due), co = self ? teamList(x.assignee).filter(n => n !== self) : [];
  return html`<button type="button" class=${cx('tb-mini', x.status === 'doing' && 'doing', x.issue && 'has-issue')} onClick=${() => onOpen(x.id)}>
   <span class=${cx('dday', d.cls)}>${d.label}</span>
-  <span class="tb-mini-main"><strong>${x.title}</strong><small>${[showWho && teamWho(x.assignee), statuses[x.status], x.checklist.length ? `세부 ${checkStat(x).done}/${x.checklist.length}` : '', cmap[x.id] ? `댓글 ${cmap[x.id]}` : ''].filter(Boolean).join(' · ')}</small></span>
+  <span class="tb-mini-main"><strong>${x.title}${co.length > 0 && html`<span class="tb-co" title=${`함께: ${co.join(', ')}`}>${I('Users', 12)}${co.map(n => html`<i key=${n}>${n.slice(0, 1)}</i>`)}</span>`}</strong><small>${[showWho && teamWho(x.assignee), statuses[x.status], x.checklist.length ? `세부 ${checkStat(x).done}/${x.checklist.length}` : '', cmap[x.id] ? `댓글 ${cmap[x.id]}` : ''].filter(Boolean).join(' · ')}</small></span>
   ${x.issue && html`<span class=${'tb-issue ' + x.issue}>${I('AlertCircle', 12)}${TEAM_ISSUES[x.issue]}</span>`}
   ${extra}
   <span class="tb-prog"><i><b style=${`width:${x.progress || 0}%`}></b></i><em>${x.progress || 0}%</em></span>
@@ -2086,8 +2086,8 @@ function TeamStatus({items, kpi, issues, cmap, onOpen, onGo, isAdmin, onPatch, o
   <div class="tb-split"><${TeamAssignList} items=${items} cmap=${cmap} onOpen=${onOpen} isAdmin=${isAdmin} onPatch=${onPatch} onImport=${onImport} onCreate=${onCreate} onReorder=${onReorder} filter=${who} onFilter=${onWho} onChecklist=${onChecklist} onHandoff=${onHandoff} busy=${busy} />
   <div class="tb-people">${people.map(p => { const doing = p.list.filter(x => x.status === 'doing').sort(teamOrder), wait = p.list.filter(x => x.status !== 'doing').sort(teamOrder), late = p.list.filter(teamLate).length, avg = p.list.length ? Math.round(p.list.reduce((a, x) => a + (x.progress || 0), 0) / p.list.length) : 0; return html`<article class="tb-person" key=${p.key}>
    <div class="tb-person-head"><span class=${cx('avatar', p.key === 'none' && 'ghost')}>${p.key === 'none' ? '?' : p.name.slice(0, 1)}</span><div><strong>${p.name}</strong><small>진행 ${doing.length} · 대기 ${wait.length}${late ? html` · <b class="late">지연 ${late}</b>` : ''} · 평균 ${avg}%</small></div><button type="button" class="text-button" onClick=${() => onGo('status', p.key === 'none' ? 'none' : p.name)}>목록${I('ChevronRight', 13)}</button></div>
-   <div class="tb-sub"><span>지금 하는 일</span></div>${doing.length ? doing.map(x => html`<${TeamMini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} showWho=${x.assignee === '함께' || x.assignee === '모두'} />`) : html`<p class="tb-none">진행 중인 업무가 없어요.</p>`}
-   ${wait.length > 0 && html`<${Fragment}><div class="tb-sub"><span>대기 · 보류</span></div>${wait.slice(0, 6).map(x => html`<${TeamMini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} showWho=${x.assignee === '함께' || x.assignee === '모두'} />`)}${wait.length > 6 && html`<button type="button" class="tb-more" onClick=${() => onGo('status', p.key === 'none' ? 'none' : p.name)}>외 ${wait.length - 6}건 더 보기</button>`}<//>`}
+   <div class="tb-sub"><span>지금 하는 일</span></div>${doing.length ? doing.map(x => html`<${TeamMini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} showWho=${false} self=${p.name} />`) : html`<p class="tb-none">진행 중인 업무가 없어요.</p>`}
+   ${wait.length > 0 && html`<${Fragment}><div class="tb-sub"><span>대기 · 보류</span></div>${wait.slice(0, 6).map(x => html`<${TeamMini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} showWho=${false} self=${p.name} />`)}${wait.length > 6 && html`<button type="button" class="tb-more" onClick=${() => onGo('status', p.key === 'none' ? 'none' : p.name)}>외 ${wait.length - 6}건 더 보기</button>`}<//>`}
   </article>`; })}</div></div>
  </section>`;
 }
