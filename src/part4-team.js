@@ -26,7 +26,7 @@ function TeamText({text, class: cls = ''}) { const parts = String(text || '').sp
 const teamUrlsIn = text => [...String(text || '').matchAll(TEAM_URL_RE)].map(m => m[1]);
 function normTeam(d) {
  const b = normItem(d);
- return {...b, assignee: String(d.assignee || ''), topic_label: String(d.topic_label || ''), src_board: String(d.src_board || ''), src_id: String(d.src_id || ''), src_title: String(d.src_title || ''), issue: TEAM_ISSUES[d.issue] ? d.issue : '', issue_note: String(d.issue_note || ''), issue_at: String(d.issue_at || ''), issue_by: String(d.issue_by || ''), src_body: String(d.src_body || ''), src_checks: normChecklist(d.src_checks), src_links: teamLinks(d.src_links), src_synced_at: String(d.src_synced_at || ''), out_links: (Array.isArray(d.out_links) ? d.out_links : []).filter(o => o && ['A', 'B'].includes(o.board) && o.id).map(o => ({board: o.board, id: String(o.id), at: String(o.at || '')}))};
+ return {...b, assignee: String(d.assignee || ''), topic_label: String(d.topic_label || ''), src_board: String(d.src_board || ''), src_id: String(d.src_id || ''), src_title: String(d.src_title || ''), issue: TEAM_ISSUES[d.issue] ? d.issue : '', issue_note: String(d.issue_note || ''), issue_at: String(d.issue_at || ''), issue_by: String(d.issue_by || ''), src_body: String(d.src_body || ''), src_checks: normChecklist(d.src_checks), src_links: teamLinks(d.src_links), src_synced_at: String(d.src_synced_at || ''), history: (Array.isArray(d.history) ? d.history : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), text: String(h.text || ''), kind: String(h.kind || '')})), handoffs: (Array.isArray(d.handoffs) ? d.handoffs : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), from: String(h.from || ''), to: String(h.to || ''), note: String(h.note || '')})), out_links: (Array.isArray(d.out_links) ? d.out_links : []).filter(o => o && ['A', 'B'].includes(o.board) && o.id).map(o => ({board: o.board, id: String(o.id), at: String(o.at || '')}))};
 }
 const teamByDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || ({critical: 0, urgent: 1, share: 2}[a.priority] - {critical: 0, urgent: 1, share: 2}[b.priority]) || String(a.created_at || '').localeCompare(String(b.created_at || ''));
 // 팀 현황 순서: 손으로 정한 순서(prio_no) 먼저, 나머지는 미배정 먼저 · 마감순.
@@ -43,7 +43,7 @@ function TeamBoard() {
  const [asks, setAsks] = useState([]), [reports, setReports] = useState([]);
  const [db, setDb] = useState(null), [items, setItems] = useState([]), [comments, setComments] = useState([]), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
  const [tab, setTab] = useState(() => { let v = 'status'; try { v = localStorage.getItem('ps.teamTab') || 'status'; } catch {} return TEAM_TABS[v] ? v : 'status'; });
- const [sel, setSel] = useState(null), [importOpen, setImportOpen] = useState(false), [who, setWho] = useState('all'), [menu, setMenu] = useState(false);
+ const [handoff, setHandoff] = useState(null), [sel, setSel] = useState(null), [importOpen, setImportOpen] = useState(false), [who, setWho] = useState('all'), [menu, setMenu] = useState(false);
  useEffect(() => { try { localStorage.setItem('ps.teamTab', tab); } catch {} }, [tab]);
  useEffect(() => {
   let un = [], dead = false;
@@ -73,12 +73,13 @@ function TeamBoard() {
   const status = next.status || x.status;
   if (status === 'done' && x.status !== 'done') { next.done_at = nowIso(); if (!('progress' in fields)) next.progress = 100; }
   if (status !== 'done' && x.status === 'done') next.done_at = '';
+  if (change) next.history = [...(x.history || []), {at: nowIso(), by: me.name, text: change, kind: next.handoffs ? 'handoff' : 'assignee' in fields ? 'assign' : ''}].slice(-200);
   await run(() => db.doc('items/' + x.id).update({...next, ...stamp(), last_change: change || ''}));
   syncLink(x, next);
  }
  async function create(draft) {
   const id = uuid(), now = nowIso();
-  const doc = {kind: 'task', title: draft.title, body: draft.body || '', due: draft.due || '', priority: draft.priority || 'share', status: 'todo', progress: draft.checklist && normChecklist(draft.checklist).length ? checkStat({checklist: normChecklist(draft.checklist)}).pct : 0, checklist: normChecklist(draft.checklist).map(c => ({...c, id: newCheckId()})), assignee: draft.assignee || '', day: today(), topic_id: '', topic_label: draft.topic_label || '', src_board: draft.src_board || '', src_id: draft.src_id || '', src_title: draft.src_title || '', src_body: draft.src_body || '', src_checks: normChecklist(draft.src_checks), src_links: teamLinks(draft.src_links), src_synced_at: draft.src_id ? now : '', issue: '', issue_note: '', issue_at: '', issue_by: '', links: teamLinks(draft.links), category: 'work', ack: false, start: '', end: '', pinned: false, prio_no: 0, req: '', demo: 0, board: 'C', home: 'C', author_id: me.id, author_name: me.name, created_at: now, updated_at: now, updated_by: me.id, updated_by_name: me.name, last_change: draft.src_id ? 'A 보드에서 불러옴' : '오더', done_at: ''};
+  const doc = {kind: 'task', title: draft.title, body: draft.body || '', due: draft.due || '', priority: draft.priority || 'share', status: 'todo', progress: draft.checklist && normChecklist(draft.checklist).length ? checkStat({checklist: normChecklist(draft.checklist)}).pct : 0, checklist: normChecklist(draft.checklist).map(c => ({...c, id: newCheckId()})), assignee: draft.assignee || '', day: today(), topic_id: '', topic_label: draft.topic_label || '', src_board: draft.src_board || '', src_id: draft.src_id || '', src_title: draft.src_title || '', src_body: draft.src_body || '', src_checks: normChecklist(draft.src_checks), src_links: teamLinks(draft.src_links), src_synced_at: draft.src_id ? now : '', issue: '', issue_note: '', issue_at: '', issue_by: '', links: teamLinks(draft.links), category: 'work', ack: false, start: '', end: '', pinned: false, prio_no: 0, req: '', demo: 0, board: 'C', home: 'C', author_id: me.id, author_name: me.name, created_at: now, updated_at: now, updated_by: me.id, updated_by_name: me.name, last_change: draft.src_id ? 'A 보드에서 불러옴' : '오더', done_at: '', history: [{at: now, by: me.name, text: draft.src_id ? 'A 보드에서 불러옴' : '등록', kind: ''}], handoffs: []};
   await db.doc('items/' + id).set(doc);
   if (isAdmin && doc.src_board === 'A' && doc.src_id) { try { await db.doc('items/' + doc.src_id).update({c_link: teamLinkOf({...doc, id})}); } catch (e) { console.error('link A', e); } }
   return id;
@@ -162,7 +163,7 @@ function TeamBoard() {
  const current = sel ? items.find(x => x.id === sel) : null;
  const myBoards = window.PS_BOARDS || [], boardNames = window.PS_BOARD_NAMES || {};
  const go = (v, w) => { setTab(v); if (w !== undefined) setWho(w); window.scrollTo(0, 0); };
- const common = {cmap, onOpen: setSel, busy, me};
+ const common = {cmap, onOpen: id => { setHandoff(null); setSel(id); }, busy, me, onHandoff: (x, prev, next) => toast.info(`담당 ${teamWho(prev)} → ${teamWho(next)}`, {duration: 9000, action: {label: '인수인계 메모', onClick: () => { setHandoff({id: x.id, from: prev}); setSel(x.id); }}})};
 
  return html`<div class="app-shell team-shell">
   <header class="app-header"><div class="header-inner"><a href="#top" class="brand" onClick=${e => { e.preventDefault(); go('status'); }}><span class="brand-mark">p</span><span>pocket<span> sync</span></span></a><span class="workspace-name">C 보드 : ${String(boardNames.C || '디자인팀').replace(/ 보드$/, '')}</span>
@@ -179,7 +180,7 @@ function TeamBoard() {
     ${tab === 'done' && html`<${TeamDone} items=${done} onPatch=${patch} ...${common} />`}
    </div>`}
   </main>
-  ${current && html`<${TeamDetail} item=${current} comments=${comments.filter(c => c.item_id === current.id).sort((a, b) => a.created_at.localeCompare(b.created_at))} me=${me} isAdmin=${isAdmin} busy=${busy} onClose=${() => setSel(null)} onPatch=${patch} onChecklist=${checklistAct} onComment=${comment} onEditComment=${editComment} onDeleteComment=${deleteComment} onRemove=${remove} onAddLink=${addLink} onRemoveLink=${removeLink} onRefreshSource=${refreshSource} onSendTo=${sendTo} onUnlink=${unlink} />`}
+  ${current && html`<${TeamDetail} key=${current.id} handoffFrom=${handoff && handoff.id === current.id ? handoff.from : null} item=${current} comments=${comments.filter(c => c.item_id === current.id).sort((a, b) => a.created_at.localeCompare(b.created_at))} me=${me} isAdmin=${isAdmin} busy=${busy} onClose=${() => setSel(null)} onPatch=${patch} onChecklist=${checklistAct} onComment=${comment} onEditComment=${editComment} onDeleteComment=${deleteComment} onRemove=${remove} onAddLink=${addLink} onRemoveLink=${removeLink} onRefreshSource=${refreshSource} onSendTo=${sendTo} onUnlink=${unlink} />`}
   ${importOpen && html`<${TeamImport} existing=${new Set(items.map(x => x.src_id).filter(Boolean))} busy=${busy} onClose=${() => setImportOpen(false)} onImport=${importRows} />`}
   <${Toaster} />
  </div>`;
@@ -188,10 +189,10 @@ function TeamBoard() {
 // 한 줄 업무(현황·마감·특이사항 공용).
 // D-day 칩을 누르면 바로 마감일을 바꾼다.
 // 오더 목록의 담당: 눌러서 여러 명 고르기.
-function TeamWhoPick({x, busy, onPatch}) {
+function TeamWhoPick({x, busy, onPatch, onHandoff}) {
  const [open, setOpen] = useState(false), ref = useRef(null);
  useEffect(() => { if (!open) return; const off = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }; const esc = e => { if (e.key === 'Escape') setOpen(false); }; document.addEventListener('pointerdown', off); document.addEventListener('keydown', esc); return () => { document.removeEventListener('pointerdown', off); document.removeEventListener('keydown', esc); }; }, [open]);
- const set = v => { const n = teamToggle(x.assignee, v); if (n !== x.assignee) onPatch(x, {assignee: n}, n ? `담당 ${teamWho(n)}` : '담당 비움'); };
+ const set = async v => { const n = teamToggle(x.assignee, v); if (n === x.assignee) return; await onPatch(x, {assignee: n}, n ? `담당 ${teamWho(n)}` : '담당 비움'); if (x.assignee && onHandoff) onHandoff(x, x.assignee, n); };
  return html`<span class="tb-whopick" ref=${ref}><button type="button" class=${cx('tb-who', !x.assignee && 'none')} disabled=${busy} title=${teamWho(x.assignee)} onClick=${() => setOpen(v => !v)}>${teamWho(x.assignee)}${I('ChevronDown', 12)}</button>${open && html`<div class="tb-duepop tb-whopop" role="dialog" aria-label="담당 고르기">${[...teamNames().map(n => [n, n]), ['모두', '셋 다'], ['', '미배정']].map(([v, l]) => html`<button type="button" key=${l} class=${cx('chip', teamOn(x.assignee, v) && 'on')} disabled=${busy} onClick=${() => set(v)}>${l}${v && v !== '모두' ? html`<span class="tb-check">${teamOn(x.assignee, v) ? I('Check', 12) : ''}</span>` : ''}</button>`)}<small>여러 명 선택 가능</small></div>`}</span>`;
 }
 function TeamDuePick({x, busy, onPatch}) {
@@ -211,13 +212,13 @@ function TeamMini({x, cmap, onOpen, showWho = true, extra}) {
  </button>`;
 }
 
-function TeamStatus({items, kpi, issues, cmap, onOpen, onGo, isAdmin, onPatch, onImport, onCreate, onReorder, who, onWho, onChecklist, busy}) {
+function TeamStatus({items, kpi, issues, cmap, onOpen, onGo, isAdmin, onPatch, onImport, onCreate, onReorder, who, onWho, onChecklist, onHandoff, busy}) {
  const people = [...SEATS.map(s => ({key: s.key, name: s.name, list: items.filter(x => teamHas(x, s.name))}))];
  const tiles = [['진행 중', kpi.doing, () => onGo('status', 'all'), ''], ['오늘·내일 마감', kpi.soon, () => onGo('due'), kpi.soon ? 'warn' : ''], ['지난 마감', kpi.late, () => onGo('due'), kpi.late ? 'alert' : ''], ['특이사항', kpi.issue, () => onGo('issues'), kpi.issue ? 'alert' : ''], ['미배정', kpi.none, () => onGo('status', 'none'), kpi.none ? 'warn' : '']];
  return html`<section class="tb-status">
   <div class="tb-kpis">${tiles.map(([l, n, f, c]) => html`<button type="button" key=${l} class=${cx('tb-kpi', c)} onClick=${f}><small>${l}</small><strong>${n}</strong></button>`)}</div>
   ${issues.length > 0 && html`<div class="tb-alert">${I('AlertCircle', 16)}<strong>특이사항 ${issues.length}</strong><span>${issues[0].title} · ${TEAM_ISSUES[issues[0].issue]}${issues[0].issue_note ? ` · ${issues[0].issue_note}` : ''}</span><button type="button" class="text-button" onClick=${() => onGo('issues')}>모두 보기${I('ChevronRight', 13)}</button></div>`}
-  <div class="tb-split"><${TeamAssignList} items=${items} cmap=${cmap} onOpen=${onOpen} isAdmin=${isAdmin} onPatch=${onPatch} onImport=${onImport} onCreate=${onCreate} onReorder=${onReorder} filter=${who} onFilter=${onWho} onChecklist=${onChecklist} busy=${busy} />
+  <div class="tb-split"><${TeamAssignList} items=${items} cmap=${cmap} onOpen=${onOpen} isAdmin=${isAdmin} onPatch=${onPatch} onImport=${onImport} onCreate=${onCreate} onReorder=${onReorder} filter=${who} onFilter=${onWho} onChecklist=${onChecklist} onHandoff=${onHandoff} busy=${busy} />
   <div class="tb-people">${people.map(p => { const doing = p.list.filter(x => x.status === 'doing').sort(teamOrder), wait = p.list.filter(x => x.status !== 'doing').sort(teamOrder), late = p.list.filter(teamLate).length, avg = p.list.length ? Math.round(p.list.reduce((a, x) => a + (x.progress || 0), 0) / p.list.length) : 0; return html`<article class="tb-person" key=${p.key}>
    <div class="tb-person-head"><span class=${cx('avatar', p.key === 'none' && 'ghost')}>${p.key === 'none' ? '?' : p.name.slice(0, 1)}</span><div><strong>${p.name}</strong><small>진행 ${doing.length} · 대기 ${wait.length}${late ? html` · <b class="late">지연 ${late}</b>` : ''} · 평균 ${avg}%</small></div><button type="button" class="text-button" onClick=${() => onGo('status', p.key === 'none' ? 'none' : p.name)}>목록${I('ChevronRight', 13)}</button></div>
    <div class="tb-sub"><span>지금 하는 일</span></div>${doing.length ? doing.map(x => html`<${TeamMini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} showWho=${x.assignee === '함께' || x.assignee === '모두'} />`) : html`<p class="tb-none">진행 중인 업무가 없어요.</p>`}
@@ -227,7 +228,7 @@ function TeamStatus({items, kpi, issues, cmap, onOpen, onGo, isAdmin, onPatch, o
 }
 
 // 팀 현황의 전체 업무 리스트: 불러온·등록한 업무를 쭉 보고 줄마다 바로 담당을 정한다.
-function TeamAssignList({items, cmap, onOpen, isAdmin, onPatch, onImport, onCreate, onReorder, filter, onFilter: setFilter, onChecklist, busy}) {
+function TeamAssignList({items, cmap, onOpen, isAdmin, onPatch, onImport, onCreate, onReorder, filter, onFilter: setFilter, onChecklist, onHandoff, busy}) {
  const [checksOpen, setChecksOpen] = useState({});
  const [title, setTitle] = useState(''), [assignee, setAssignee] = useState(null), [dueMode, setDueMode] = useState('none'), [dueDate, setDueDate] = useState(''), [priority, setPriority] = useState('share');
  const pick = assignee !== null ? assignee : filter !== 'all' && filter !== 'none' ? filter : '';
@@ -235,7 +236,7 @@ function TeamAssignList({items, cmap, onOpen, isAdmin, onPatch, onImport, onCrea
  const names = teamNames();
  const list = (filter === 'all' ? items : filter === 'none' ? items.filter(x => !x.assignee) : items.filter(x => teamHas(x, filter))).sort(teamOrder);
  const filters = [['all', '전체', items.length], ['none', '미배정', items.filter(x => !x.assignee).length], ...names.map(n => [n, n, items.filter(x => teamHas(x, n)).length])];
- const assign = (x, v) => { const next = teamToggle(x.assignee, v); onPatch(x, {assignee: next}, next ? `담당 ${teamWho(next)}` : '담당 비움'); };
+ const assign = async (x, v) => { const next = teamToggle(x.assignee, v); await onPatch(x, {assignee: next}, next ? `담당 ${teamWho(next)}` : '담당 비움'); if (x.assignee && onHandoff) onHandoff(x, x.assignee, next); };
  async function add(e) { e.preventDefault(); const t = title.trim(); if (!t || busy) return; try { await onCreate({title: t.slice(0, 150), assignee: pick, due: dueOf(), priority}); setTitle(''); } catch {} }
  return html`<section class="tb-assign">
   <div class="tb-assign-head"><div><strong>업무 리스트</strong><small>줄마다 담당을 눌러 바로 배정해요 · 왼쪽 손잡이를 끌어 순서를 바꿔요</small></div>${isAdmin && html`<button type="button" class="tb-import-btn" onClick=${onImport}>${I('Download', 15)}A 보드에서 불러오기</button>`}</div>
@@ -251,7 +252,7 @@ function TeamAssignList({items, cmap, onOpen, isAdmin, onPatch, onImport, onCrea
  </section>`;
 }
 
-function TeamOrders({items, who, onWho, isAdmin, cmap, onOpen, onCreate, onImport, onPatch, onChecklist, busy, me}) {
+function TeamOrders({items, who, onWho, isAdmin, cmap, onOpen, onCreate, onImport, onPatch, onChecklist, onHandoff, busy, me}) {
  const [checksOpen, setChecksOpen] = useState({});
  const [title, setTitle] = useState(''), [assignee, setAssignee] = useState(isAdmin ? '' : (me && me.name) || ''), [dueMode, setDueMode] = useState('none'), [dueDate, setDueDate] = useState(''), [priority, setPriority] = useState('share');
  const names = teamNames();
@@ -271,7 +272,7 @@ function TeamOrders({items, who, onWho, isAdmin, cmap, onOpen, onCreate, onImpor
    <${TeamDuePick} x=${x} busy=${busy} onPatch=${onPatch} />
    <div class="tb-row-main"><button type="button" class="pl-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong>${x.due ? html`<span class="pl-date">${shortDate(x.due)} 마감</span>` : ''}</button>${descLine(x) && html`<button type="button" class="pl-desc" onClick=${() => onOpen(x.id)}>${descLine(x)}</button>`}
     <span class="pl-tags">${x.src_board && html`<span class="tag tb-src" title=${`A 보드 원본: ${x.src_title}`}>${I('Link2', 12)}A${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${x.issue && html`<span class=${'tag tb-issue ' + x.issue}>${I('AlertCircle', 12)}${TEAM_ISSUES[x.issue]}</span>`}<button type="button" class=${cx('tag tb-check-chip', checksOpen[x.id] && 'on', !st.total && 'empty')} aria-expanded=${!!checksOpen[x.id]} onClick=${() => setChecksOpen(o => ({...o, [x.id]: !o[x.id]}))}>${I('ListChecks', 12)}${st.total ? `세부 ${st.done}/${st.total}` : '세부 업무'}${I(checksOpen[x.id] ? 'ChevronUp' : 'ChevronDown', 12)}</button><button type="button" class=${cx('reply-chip', cmap[x.id] && 'has')} onClick=${() => onOpen(x.id)}>${I('MessageCircle', 12)}${cmap[x.id] ? `댓글 ${cmap[x.id]}` : '댓글'}</button></span></div>
-   <${TeamWhoPick} x=${x} busy=${busy} onPatch=${onPatch} />
+   <${TeamWhoPick} x=${x} busy=${busy} onPatch=${onPatch} onHandoff=${onHandoff} />
    <span class=${'tag priority-tag ' + x.priority}>${taskPriorities[x.priority]}</span>
    <span class="tb-prog"><i><b style=${`width:${x.progress || 0}%`}></b></i><em>${x.progress || 0}%</em></span>
    <select class=${'tb-status-sel ' + x.status} aria-label="상태" value=${x.status} disabled=${busy} onChange=${e => onPatch(x, {status: e.target.value}, `상태 ${statuses[e.target.value]}`)}>${Object.entries(statuses).map(([v, l]) => html`<option key=${v} value=${v}>${l}</option>`)}</select>
@@ -313,8 +314,11 @@ function TeamDone({items, cmap, onOpen, onPatch, busy}) {
  return html`<section class="done-view">${!list.length && html`<p class="dv-empty">아직 완료한 업무가 없어요.</p>`}${groups.map(g => html`<div class="pl-group dv-group" key=${g.day}><div class="pl-group-head"><span>${teamDay(g.day)}</span><small>${g.items.length}건</small></div>${g.items.map(x => html`<div class="dv-row" key=${x.id}><span class="dv-check">${I('Check', 14)}</span><div class="dv-main"><button type="button" class="dv-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong>${x.due ? html`<span class="pl-date">${shortDate(x.due)} 마감${inSeoul(doneAt(x)) > x.due ? ' · 늦게 완료' : ''}</span>` : ''}</button><span class="pl-tags"><span class="tag">${teamWho(x.assignee)}</span>${x.src_board && html`<span class="tag tb-src">A${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${cmap[x.id] ? html`<span class="tag">댓글 ${cmap[x.id]}</span>` : ''}</span></div><span class="dv-time">${teamClock(doneAt(x))}</span><button type="button" class="dv-undo" disabled=${busy} onClick=${() => onPatch(x, {status: 'doing'}, '완료 취소')}>되돌리기</button></div>`)}</div>`)}${list.length > limit && html`<button type="button" class="dv-more" onClick=${() => setLimit(l => l + 60)}>이전 완료 더 보기 (${list.length - limit}건)</button>`}</section>`;
 }
 
-function TeamDetail({item: x, comments, me, isAdmin, busy, onClose, onPatch, onChecklist, onComment, onEditComment, onDeleteComment, onRemove, onAddLink, onRemoveLink, onRefreshSource, onSendTo, onUnlink}) {
- const [full, setFull] = useState(false), [sendBoard, setSendBoard] = useState('');
+function TeamDetail({handoffFrom = null, item: x, comments, me, isAdmin, busy, onClose, onPatch, onChecklist, onComment, onEditComment, onDeleteComment, onRemove, onAddLink, onRemoveLink, onRefreshSource, onSendTo, onUnlink}) {
+ const [full, setFull] = useState(false), [sendBoard, setSendBoard] = useState(''), startWho = useRef(handoffFrom !== null ? handoffFrom : x.assignee), [hoNote, setHoNote] = useState(''), [hoOpen, setHoOpen] = useState(false), [histAll, setHistAll] = useState(false), [hoAll, setHoAll] = useState(false);
+ const whoChanged = startWho.current !== x.assignee && !!startWho.current;
+ async function saveHandoff() { const note = hoNote.trim(); if (!note) return; const from = teamWho(startWho.current || x.assignee), to = teamWho(x.assignee); try { await onPatch(x, {handoffs: [...x.handoffs, {at: nowIso(), by: me.name, from, to, note: note.slice(0, 2000)}]}, `인수인계 ${from} → ${to}`); startWho.current = x.assignee; setHoNote(''); setHoOpen(false); } catch {} }
+ const lastHo = x.handoffs[x.handoffs.length - 1];
  useEffect(() => { if (x.src_board) onRefreshSource(x); }, [x.id]);
  const [issue, setIssue] = useState(x.issue), [note, setNote] = useState(x.issue_note), [text, setText] = useState(''), [editing, setEditing] = useState(null), [editText, setEditText] = useState('');
  useEffect(() => { setIssue(x.issue); setNote(x.issue_note); }, [x.id, x.issue, x.issue_note]);
@@ -326,9 +330,11 @@ function TeamDetail({item: x, comments, me, isAdmin, busy, onClose, onPatch, onC
   <div class="tb-detail-body">
    <${AutoText} class="tb-d-title" single value=${x.title} label="업무 제목" maxLength="150" disabled=${busy} onCommit=${v => onPatch(x, {title: v}, '제목 수정')} />
    <button type="button" class="tb-full-btn" onClick=${() => setFull(true)}>${I('NotebookPen', 15)}업무 자세히 보기<small>${[x.body || x.src_body ? '내용' : '', x.checklist.length || x.src_checks.length ? `세부 업무 ${x.checklist.length + x.src_checks.length}` : '', x.links.length + x.src_links.length ? `링크 ${x.links.length + x.src_links.length}` : ''].filter(Boolean).join(' · ') || '내용 · 세부 업무 · 링크'}</small>${I('ChevronRight', 15)}</button>
+   ${lastHo && html`<section class="tb-ho-pin"><div class="tb-ho-pin-head">${I('MoveRight', 14)}<strong>인수인계</strong><span>${lastHo.from} → ${lastHo.to}</span><small>${lastHo.by} · ${teamDay(inSeoul(lastHo.at))} ${teamClock(lastHo.at)}</small>${x.handoffs.length > 1 && html`<button type="button" class="text-button" onClick=${() => setHoAll(v => !v)}>${hoAll ? '접기' : `이전 ${x.handoffs.length - 1}건`}</button>`}</div><${TeamText} text=${lastHo.note} />${hoAll && x.handoffs.slice(0, -1).reverse().map(h => html`<div class="tb-ho-old" key=${h.at}><small>${h.from} → ${h.to} · ${h.by} · ${teamDay(inSeoul(h.at))}</small><${TeamText} text=${h.note} /></div>`)}</section>`}
    <${AutoText} class="tb-d-body" value=${x.body} label="설명" placeholder="설명이나 요청 사항을 적어 주세요 (레퍼런스, 사이즈, 톤 등)" maxLength="6000" disabled=${busy} onCommit=${v => onPatch(x, {body: v}, '내용 수정')} />
    <div class="tb-fields">
-    <div><span>담당</span><div class="tb-chips">${[['', '미배정'], ...names.map(n => [n, n]), ['모두', '셋 다']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${teamOn(x.assignee, v)} disabled=${busy} onClick=${() => { const n = teamToggle(x.assignee, v); if (n !== x.assignee) onPatch(x, {assignee: n}, n ? `담당 ${teamWho(n)}` : '담당 비움'); }}>${l}</button>`)}<small class="tb-multi-hint">여러 명 선택 가능</small></div></div>
+    <div><span>담당</span><div class="tb-chips">${[['', '미배정'], ...names.map(n => [n, n]), ['모두', '셋 다']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${teamOn(x.assignee, v)} disabled=${busy} onClick=${() => { const n = teamToggle(x.assignee, v); if (n !== x.assignee) onPatch(x, {assignee: n}, n ? `담당 ${teamWho(n)}` : '담당 비움'); }}>${l}</button>`)}<small class="tb-multi-hint">여러 명 선택 가능</small><button type="button" class="text-button tb-ho-link" onClick=${() => setHoOpen(v => !v)}>${I('MoveRight', 13)}인수인계 메모</button></div></div>
+    ${(whoChanged || hoOpen) && html`<div class="tb-ho-box"><strong>${I('MoveRight', 14)}인수인계 ${whoChanged ? html`<span>${teamWho(startWho.current)} → ${teamWho(x.assignee)}</span>` : ''}</strong><textarea rows="3" maxLength="2000" placeholder="지금까지 진행한 것 · 남은 일 · 파일 위치 · 주의할 점" value=${hoNote} onInput=${e => setHoNote(e.target.value)}></textarea><div><button type="button" class="secondary-button" onClick=${() => { startWho.current = x.assignee; setHoOpen(false); setHoNote(''); }}>나중에</button><button type="button" class="primary-button" disabled=${busy || !hoNote.trim()} onClick=${saveHandoff}>인수인계 남기기</button></div></div>`}
     <div><span>마감</span><div class="tb-chips">${[['', '없음'], [today(), '오늘'], [offsetDate(today(), 1), '내일'], [offsetDate(today(), 2), '모레']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${x.due === v} disabled=${busy} onClick=${() => x.due !== v && onPatch(x, {due: v}, v ? `마감 ${shortDate(v)}` : '마감 지움')}>${l}</button>`)}<input type="date" class="chip-date" aria-label="마감일" value=${x.due} disabled=${busy} onChange=${e => onPatch(x, {due: e.target.value}, e.target.value ? `마감 ${shortDate(e.target.value)}` : '마감 지움')} /><b class=${cx('dday', dDay(x.due).cls)}>${dDay(x.due).label}</b></div></div>
     <div><span>중요도</span><div class="tb-chips">${Object.entries(taskPriorities).map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${x.priority === v} disabled=${busy} onClick=${() => x.priority !== v && onPatch(x, {priority: v}, `중요도 ${l}`)}>${l}</button>`)}</div></div>
     <div><span>상태</span><div class="tb-chips">${Object.entries(statuses).map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${x.status === v} disabled=${busy} onClick=${() => x.status !== v && onPatch(x, {status: v}, `상태 ${l}`)}>${l}</button>`)}</div></div>
@@ -351,6 +357,7 @@ function TeamDetail({item: x, comments, me, isAdmin, busy, onClose, onPatch, onC
     ${comments.map(c => html`<article class="update" key=${c.id}><span class="avatar mini">${personName(c.author_name).slice(0, 1)}</span><div><div class="update-meta"><strong>${personName(c.author_name)}</strong><small>${teamDay(inSeoul(c.created_at))} ${teamClock(c.created_at)}${c.edited_at ? ' · 수정됨' : ''}</small>${c.author_id === me.id && editing !== c.id && html`<span class="tb-c-tools"><button type="button" class="text-button" onClick=${() => { setEditing(c.id); setEditText(c.body); }}>수정</button><button type="button" class="text-button" onClick=${() => onDeleteComment(c)}>삭제</button></span>`}</div>${editing === c.id ? html`<form class="tb-c-edit" onSubmit=${async e => { e.preventDefault(); try { await onEditComment(c, editText); setEditing(null); } catch {} }}><textarea rows="2" value=${editText} onInput=${e => setEditText(e.target.value)}></textarea><div><button type="button" class="secondary-button" onClick=${() => setEditing(null)}>취소</button><button class="primary-button" disabled=${busy || !editText.trim()}>저장</button></div></form>` : html`<${TeamText} text=${c.body} />`}</div></article>`)}
     <form class="tb-c-add" onSubmit=${send}><textarea rows="2" maxLength="3000" placeholder="진행 상황, 질문, 시안 링크 등을 남겨 주세요" value=${text} onInput=${e => setText(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send(e); }}></textarea><button class="primary-button" disabled=${busy || !text.trim()}>${I('Send', 14)}남기기</button></form>
    </section>
+   <section class="tb-history"><h3>${I('History', 15)}기록 <span>${x.history.length}</span></h3>${!x.history.length ? html`<p class="tb-none">아직 기록이 없어요. 이제부터 바뀐 내용이 여기에 쌓여요.</p>` : html`<ol>${[...x.history].reverse().slice(0, histAll ? 200 : 8).map((h, i) => html`<li key=${h.at + i} class=${h.kind}><time>${teamDay(inSeoul(h.at))} ${teamClock(h.at)}</time><b>${h.by}</b><span>${h.text}</span></li>`)}</ol>`}${x.history.length > 8 && html`<button type="button" class="text-button" onClick=${() => setHistAll(v => !v)}>${histAll ? '접기' : `전체 ${x.history.length}건 보기`}</button>`}</section>
    <p class="tb-meta">${x.author_name} 등록 · ${fullTime(x.created_at)}${x.last_change ? ` · 최근: ${x.updated_by_name} ${x.last_change}` : ''}</p>
    ${canDelete && html`<button type="button" class="text-button tb-delete" disabled=${busy} onClick=${() => onRemove(x)}>${I('Trash2', 14)}업무 지우기</button>`}
   </div>
