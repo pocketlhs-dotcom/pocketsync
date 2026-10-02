@@ -302,7 +302,7 @@ function TeamOrders({items, who, onWho, isAdmin, cmap, onOpen, onCreate, onImpor
 function TeamDue({items, done, cmap, onOpen}) {
  const [f, setF] = useState('all');
  const t = today(), wEnd = offsetDate(mondayOf(t), 6), nEnd = offsetDate(wEnd, 7);
- const groups = [['late', '지난 마감', x => x.due && x.due < t, 'late'], ['today', '오늘 마감', x => x.due === t, 'today'], ['week', '이번 주', x => x.due > t && x.due <= wEnd, ''], ['next', '다음 주', x => x.due > wEnd && x.due <= nEnd, ''], ['later', '그 후', x => x.due > nEnd, ''], ['none', '마감 없음', x => !x.due, 'muted']];
+ const groups = [['late', '지난 마감', x => x.due && x.due < t, 'late'], ['today', '오늘', x => x.due === t, 'today'], ['week', '이번 주', x => x.due > t && x.due <= wEnd, ''], ['next', '다음 주', x => x.due > wEnd && x.due <= nEnd, ''], ['later', '그 후', x => x.due > nEnd, ''], ['none', '마감 없음', x => !x.due, 'muted']];
  const sorted = [...items].sort(teamByDue), fin = [...done].filter(x => x.due).sort((a, b) => doneAt(b).localeCompare(doneAt(a)));
  const chips = [['all', '전체', items.length], ...groups.map(([k, l, fn]) => [k, l, sorted.filter(fn).length]), ['done', '마감 완료', fin.length]];
  const shown = f === 'all' ? groups : groups.filter(g => g[0] === f);
@@ -504,7 +504,7 @@ function TeamAsks({asks, tasks, comments, me, busy, onCreate, onUpdate, onDelete
   </form>`}
   <div class="tb-ask-filter"><div class="dv-who" role="group" aria-label="요청 보기">${[['me', '나에게 온'], ['sent', '내가 보낸'], ['all', '열린 요청 전체'], ['done', '완료']].map(([k, l]) => html`<button type="button" key=${k} class=${cx('chip', k === 'me' && lists.me.length && 'late')} aria-pressed=${f === k} onClick=${() => setF(k)}>${l}<span>${lists[k].length}</span></button>`)}</div></div>
   ${!list.length ? html`<p class="tb-none pad">${f === 'me' ? '나에게 온 확인 요청이 없어요.' : f === 'sent' ? '내가 보낸 열린 요청이 없어요.' : f === 'done' ? '완료된 요청이 없어요.' : '열린 요청이 없어요.'}</p>` : list.map(a => { const cs = comments.filter(c => c.item_id === a.id).sort((x, y) => x.created_at.localeCompare(y.created_at)), d = a.reply_by ? dDay(a.reply_by) : null, mine = a.from_id === me.id, canDone = a.state === 'open' && (isForMe(a) || mine), showThread = thread[a.id] || (cs.length > 0 && cs.length <= 2); return html`<article class=${cx('tb-ask', a.state, 'type-' + a.ask_type)} key=${a.id}>
-   <div class="tb-ask-top"><span class=${'tb-ask-type ' + a.ask_type}>${ASK_TYPES[a.ask_type]}</span><strong>${a.title}</strong>${d && a.state === 'open' && html`<span class=${cx('dday', d.cls)}>회신 ${d.label === '오늘 마감' ? '오늘까지' : d.label}</span>`}</div>
+   <div class="tb-ask-top"><span class=${'tb-ask-type ' + a.ask_type}>${ASK_TYPES[a.ask_type]}</span><strong>${a.title}</strong>${d && a.state === 'open' && html`<span class=${cx('dday', d.cls)}>회신 ${d.label === '오늘' ? '오늘까지' : d.label}</span>`}</div>
    <div class="tb-ask-meta"><span>${a.from} → ${a.to}</span><span>${teamDay(inSeoul(a.created_at))} ${teamClock(a.created_at)}</span>${a.task_id && html`<button type="button" class="tag tb-ask-link" onClick=${() => onOpenTask(a.task_id)}>${I('Layers3', 12)}${a.task_title}</button>`}</div>
    ${a.body && html`<${TeamText} text=${a.body} class="tb-ask-text" />`}
    ${a.state === 'done' && html`<div class="tb-ask-done">${I('Check', 13)}<strong>${a.done_by}</strong> 확인 완료 · ${teamDay(inSeoul(a.done_at))} ${teamClock(a.done_at)}${a.answer ? html`<${TeamText} text=${a.answer} />` : ''}</div>`}
