@@ -3,7 +3,10 @@
 // A·B 보드와 달리 두 사람 공유가 아니라 팀 운영용이라 화면을 따로 둔다. 데이터는 같은 items/comments 컬렉션(board 'C').
 const TEAM_ISSUES = {blocked: '막힘', risk: '일정 위험', check: '확인 필요'};
 const TEAM_ISSUE_HINT = {blocked: '진행이 멈춰 있어요', risk: '마감을 못 맞출 수 있어요', check: '확인이 필요해요'};
-const TEAM_TABS = {status: '팀 현황', due: '마감', issues: '특이사항', done: '완료'};
+const TEAM_TABS = {status: '팀 현황', orders: '오더', due: '마감', issues: '확인 요청 및 특이사항', report: '오늘의 업무보고', done: '완료'};
+const ASK_TYPES = {confirm: '확인 요청', need: '자료 필요', feedback: '피드백 요청'};
+function normAsk(d) { return {id: d.id, ask_type: ASK_TYPES[d.ask_type] ? d.ask_type : 'confirm', title: String(d.title || ''), body: String(d.body || ''), from: String(d.from || ''), from_id: String(d.from_id || ''), to: String(d.to || '모두'), task_id: String(d.task_id || ''), task_title: String(d.task_title || ''), reply_by: DATE_RE.test(d.reply_by || '') ? d.reply_by : '', state: d.state === 'done' ? 'done' : 'open', done_by: String(d.done_by || ''), done_at: String(d.done_at || ''), answer: String(d.answer || ''), created_at: String(d.created_at || ''), updated_at: String(d.updated_at || '')}; }
+function normReport(d) { return {id: d.id, seat: String(d.seat || ''), name: String(d.name || ''), day: String(d.day || ''), lines: (Array.isArray(d.lines) ? d.lines : []).filter(l => l && String(l.text || '').trim()).map((l, i) => ({id: String(l.id || 'r' + i), text: String(l.text), task_id: String(l.task_id || ''), task_title: String(l.task_title || '')})), note: String(d.note || ''), links: teamLinks(d.links), updated_at: String(d.updated_at || '')}; }
 const teamDesigners = () => SEATS.filter(s => s.name !== ADMIN_NAME);
 const teamJoint = () => teamDesigners().map(s => s.name).join('·');
 // 담당: 디자이너 이름 | '함께'(디자이너 모두) | ''(미배정)
@@ -30,6 +33,7 @@ const teamLinkOf = x => ({id: x.id, status: x.status, progress: x.progress || 0,
 function TeamBoard() {
  const meKey = window.PS_SEAT || '', me = {id: meKey, name: (SEATS.find(s => s.key === meKey) || {}).name || ''};
  const isAdmin = me.name === ADMIN_NAME;
+ const [asks, setAsks] = useState([]), [reports, setReports] = useState([]);
  const [db, setDb] = useState(null), [items, setItems] = useState([]), [comments, setComments] = useState([]), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
  const [tab, setTab] = useState(() => { let v = 'status'; try { v = localStorage.getItem('ps.teamTab') || 'status'; } catch {} return TEAM_TABS[v] ? v : 'status'; });
  const [sel, setSel] = useState(null), [importOpen, setImportOpen] = useState(false), [who, setWho] = useState('all'), [menu, setMenu] = useState(false);
@@ -38,7 +42,7 @@ function TeamBoard() {
   let un = [], dead = false;
   (async () => {
    const d = await useCapability('db'); if (dead || !d) return; setDb(d);
-   un.push(d.collection('items').onSnapshot(s => { setItems(s.docs.map(x => normTeam({id: x.id, ...x.data()})).filter(x => x.kind === 'task')); setLoading(false); }, e => { console.error('team items', e); setLoading(false); toast.error(friendlyError(e)); }));
+   un.push(d.collection('items').onSnapshot(s => { const raw = s.docs.map(x => ({id: x.id, ...x.data()})); setItems(raw.filter(x => x.kind === 'task').map(normTeam)); setAsks(raw.filter(x => x.team_type === 'ask').map(normAsk)); setReports(raw.filter(x => x.team_type === 'report').map(normReport)); setLoading(false); }, e => { console.error('team items', e); setLoading(false); toast.error(friendlyError(e)); }));
    un.push(d.collection('comments').onSnapshot(s => setComments(s.docs.map(x => normComment({id: x.id, ...x.data()}))), e => console.error('team comments', e)));
   })();
   return () => { dead = true; un.forEach(f => { try { f(); } catch {} }); };
@@ -124,12 +128,26 @@ function TeamBoard() {
    else { try { await db.doc('items/' + target).update({c_link: null}); } catch (e) { console.error('unlink', e); } await db.doc('items/' + x.id).update({out_links: x.out_links.filter(o => o.id !== target), ...stamp()}); }
   }, '연결을 끊었어요.');
  }
+ async function createAsk(a) {
+  const now = nowIso();
+  await run(() => db.doc('items/' + uuid()).set({kind: 'daily', team_type: 'ask', ack: false, title: a.title, body: a.body || '', ask_type: a.ask_type, from: me.name, from_id: me.id, to: a.to, task_id: a.task_id || '', task_title: a.task_title || '', reply_by: a.reply_by || '', state: 'open', done_by: '', done_at: '', answer: '', priority: 'share', status: 'todo', day: today(), assignee: '', links: [], board: 'C', home: 'C', author_id: me.id, author_name: me.name, created_at: now, updated_at: now}), `${a.to === '모두' ? '모두' : a.to}에게 ${ASK_TYPES[a.ask_type]}을 남겼어요.`);
+ }
+ async function updateAsk(a, fields, ok) { await run(() => db.doc('items/' + a.id).update({...fields, updated_at: nowIso()}), ok); }
+ async function deleteAsk(a) { if (!confirm('이 요청을 지울까요?')) return; await run(async () => { for (const c of comments.filter(c => c.item_id === a.id)) await db.doc('comments/' + c.id).delete(); await db.doc('items/' + a.id).delete(); }, '요청을 지웠어요.'); }
+ // 오늘의 업무보고: 사람·날짜마다 문서 하나(C-rep-자리-날짜).
+ async function saveReport(day, fields) {
+  const ref = db.doc('items/C-rep-' + me.id + '-' + day), snap = await ref.get(), now = nowIso();
+  if (snap.exists) await ref.update({...fields, updated_at: now});
+  else await ref.set({kind: 'daily', team_type: 'report', ack: false, seat: me.id, name: me.name, day, title: `${me.name} 업무보고 ${day}`, lines: [], note: '', links: [], priority: 'share', status: 'todo', assignee: '', board: 'C', home: 'C', author_id: me.id, author_name: me.name, created_at: now, updated_at: now, ...fields});
+ }
+ async function reportAct(day, fn, ok) { const cur = reports.find(r => r.seat === me.id && r.day === day) || {lines: [], links: [], note: ''}; await run(() => saveReport(day, fn(cur)), ok); }
  async function importRows(rows, assignee) {
   await run(async () => { for (const r of rows) await create({title: r.title, body: r.body, due: r.due, priority: r.priority, assignee, topic_label: r.topic, src_board: 'A', src_id: r.id, src_title: r.title, src_body: r.body, src_checks: r.checklist, src_links: r.links, links: r.links, checklist: r.checklist}); }, `${rows.length}건을 오더로 불러왔어요.`);
   setImportOpen(false); setTab('status');
  }
 
  const open = items.filter(x => x.status !== 'done'), done = items.filter(x => x.status === 'done');
+ const asksForMe = asks.filter(a => a.state === 'open' && a.from_id !== me.id && (a.to === me.name || a.to === '모두'));
  const issues = open.filter(x => x.issue).sort((a, b) => b.issue_at.localeCompare(a.issue_at));
  const t = today(), t1 = offsetDate(t, 1);
  const kpi = {doing: open.filter(x => x.status === 'doing').length, soon: open.filter(x => x.due && x.due >= t && x.due <= t1).length, late: open.filter(teamLate).length, issue: issues.length, none: open.filter(x => !x.assignee).length};
@@ -144,11 +162,13 @@ function TeamBoard() {
    ${myBoards.length > 1 && html`<div class="board-switch" role="group" aria-label="보드 전환">${myBoards.map(b => html`<button type="button" key=${b} class=${cx('board-tab', b === 'C' && 'on')} aria-pressed=${b === 'C'} onClick=${() => { if (b !== 'C' && window.PS_SWITCH_BOARD) window.PS_SWITCH_BOARD(b); }}>${boardLabel(b, boardNames)}</button>`)}</div>`}
    <div class="header-actions"><div class="tb-account"><button type="button" class="header-profile" aria-haspopup="menu" aria-expanded=${menu} onClick=${() => setMenu(v => !v)}><span class="avatar">${me.name ? me.name.slice(0, 1) : I('UserRound', 15)}</span><strong>${me.name || '로그인'}</strong>${I('ChevronDown', 13)}</button>${menu && html`<div class="tb-menu" role="menu"><p>${window.PS_EMAIL || ''}</p><button type="button" role="menuitem" onClick=${() => window.PS_SIGNOUT && window.PS_SIGNOUT()}>${I('LogOut', 14)}로그아웃</button></div>`}</div></div></div></header>
   <main class="board-main team-main" id="top">
-   <div class="board-tabs"><${TabsList} class="top-tabs" label="디자인팀 보드 보기" value=${tab} onChange=${v => go(v)} tabs=${Object.entries(TEAM_TABS).map(([k, l]) => ({value: k, content: html`<${Fragment}>${l}${k === 'status' ? html`<span class="tab-count">${open.length}</span>` : k === 'issues' ? html`<span class=${cx('tab-count', issues.length && 'notification')}>${issues.length}</span>` : k === 'done' ? html`<span class="tab-count">${done.filter(x => !isArchived(x)).length}</span>` : ''}<//>`}))} /></div>
+   <div class="board-tabs"><${TabsList} class="top-tabs" label="디자인팀 보드 보기" value=${tab} onChange=${v => go(v)} tabs=${Object.entries(TEAM_TABS).map(([k, l]) => ({value: k, content: html`<${Fragment}>${l}${k === 'orders' ? html`<span class="tab-count">${open.length}</span>` : k === 'issues' ? html`<span class=${cx('tab-count', (asksForMe.length + issues.length) && 'notification')} title="나에게 온 확인 요청 + 열린 특이사항">${asksForMe.length + issues.length}</span>` : k === 'report' ? html`<span class="tab-count">${reports.filter(r => r.day === today() && r.lines.length).length}</span>` : k === 'done' ? html`<span class="tab-count">${done.filter(x => !isArchived(x)).length}</span>` : ''}<//>`}))} /></div>
    ${loading ? html`<div class="loading">${I('Loader2', 22, {class: 'spin'})}보드를 불러오고 있어요.</div>` : html`<div class="team-body">
     ${tab === 'status' && html`<${TeamStatus} items=${open} kpi=${kpi} issues=${issues} onGo=${go} isAdmin=${isAdmin} onPatch=${patch} onImport=${() => setImportOpen(true)} onCreate=${d => run(() => create(d), '업무를 추가했어요.')} onReorder=${reorder} who=${who} onWho=${setWho} ...${common} />`}
+    ${tab === 'orders' && html`<${TeamOrders} items=${open} who=${who} onWho=${setWho} isAdmin=${isAdmin} onCreate=${d => run(() => create(d), '오더를 등록했어요.')} onImport=${() => setImportOpen(true)} onPatch=${patch} ...${common} />`}
     ${tab === 'due' && html`<${TeamDue} items=${open} done=${done} ...${common} />`}
-    ${tab === 'issues' && html`<${TeamIssues} items=${issues} comments=${comments} all=${items} onPatch=${patch} ...${common} />`}
+    ${tab === 'issues' && html`<${Fragment}><${TeamAsks} asks=${asks} tasks=${open} comments=${comments} me=${me} busy=${busy} onCreate=${createAsk} onUpdate=${updateAsk} onDelete=${deleteAsk} onComment=${comment} onOpenTask=${setSel} /><${TeamIssues} items=${issues} comments=${comments} all=${items} onPatch=${patch} ...${common} /><//>`}
+    ${tab === 'report' && html`<${TeamReport} reports=${reports} tasks=${items} comments=${comments} me=${me} busy=${busy} onAct=${reportAct} onComment=${comment} onOpenTask=${setSel} />`}
     ${tab === 'done' && html`<${TeamDone} items=${done} onPatch=${patch} ...${common} />`}
    </div>`}
   </main>
@@ -199,16 +219,37 @@ function TeamAssignList({items, cmap, onOpen, isAdmin, onPatch, onImport, onCrea
   <div class="tb-assign-head"><div><strong>업무 리스트</strong><small>줄마다 담당을 눌러 바로 배정해요 · 왼쪽 손잡이를 끌어 순서를 바꿔요</small></div>${isAdmin && html`<button type="button" class="tb-import-btn" onClick=${onImport}>${I('Download', 15)}A 보드에서 불러오기</button>`}</div>
   <div class="tb-assign-tools"><div class="dv-who" role="group" aria-label="담당 필터">${filters.map(([v, l, n]) => html`<button type="button" key=${v} class="chip" aria-pressed=${filter === v} onClick=${() => setFilter(v)}>${l}<span>${n}</span></button>`)}</div>
   </div>
-  <form class="quick-task pl-add tb-add tb-assign-form" onSubmit=${add}><div class="quick-compose">${I('Plus', 18)}<input aria-label="업무 추가" placeholder="디자인팀에 맡길 일을 한 줄로 적고 Enter" maxLength="150" value=${title} onInput=${e => setTitle(e.target.value)} /><button class="quick-submit" disabled=${!title.trim() || busy} aria-label="업무 추가">${I('ArrowRight', 18)}</button></div>
-   <div class="quick-task-options">
-    <div class="chip-group" role="group" aria-label="담당"><span>담당</span>${[['', '미배정'], ...names.map(n => [n, n]), ['함께', '둘 다']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${pick === v} onClick=${() => setAssignee(v)}>${l}</button>`)}</div>
-    <div class="chip-group" role="group" aria-label="마감"><span>마감</span>${[['none', '없음'], ['today', '오늘'], ['tomorrow', '내일'], ['dayafter', '모레']].map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${dueMode === v} onClick=${() => setDueMode(v)}>${l}</button>`)}<input type="date" class="chip-date" aria-label="마감일 직접 선택" value=${dueMode === 'date' ? dueDate : ''} onInput=${e => { setDueDate(e.target.value); setDueMode(e.target.value ? 'date' : 'none'); }} /></div>
-    <div class="chip-group" role="group" aria-label="중요도"><span>중요도</span>${Object.entries(taskPriorities).map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${priority === v} onClick=${() => setPriority(v)}>${l}</button>`)}</div>
-   </div></form>
+
   <div class="tb-assign-list" data-sort-list>${!list.length ? html`<p class="tb-none pad">${items.length ? '해당하는 업무가 없어요.' : isAdmin ? '아직 업무가 없어요. A 보드에서 불러오거나 위에서 추가해 주세요.' : '아직 업무가 없어요.'}</p>` : list.map(x => { const d = dDay(x.due), st = checkStat(x); return html`<div class=${cx('tb-arow', !x.assignee && 'unassigned', x.issue && 'has-issue')} key=${x.id} data-sort-id=${x.id}>
    ${list.length > 1 && html`<${SortGrip} id=${x.id} label="끌어서 순서 바꾸기" onDrop=${onReorder} />`}<span class=${cx('dday', d.cls)}>${d.label}</span>
    <div class="tb-arow-main"><button type="button" class="tb-arow-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong></button><span class="tb-arow-meta">${x.src_board && html`<span class="tag tb-src">A${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${x.priority !== 'share' && html`<span class=${'tag priority-tag ' + x.priority}>${taskPriorities[x.priority]}</span>`}${x.issue && html`<span class=${'tag tb-issue ' + x.issue}>${TEAM_ISSUES[x.issue]}</span>`}<small>${[statuses[x.status], x.progress ? `${x.progress}%` : '', st.total ? `세부 ${st.done}/${st.total}` : '', cmap[x.id] ? `댓글 ${cmap[x.id]}` : ''].filter(Boolean).join(' · ')}</small></span></div>
    <div class="tb-assign-btns" role="group" aria-label="담당 정하기">${[...names.map(n => [n, n]), ['함께', '둘 다']].map(([v, l]) => html`<button type="button" key=${v} class=${cx('tb-abtn', x.assignee === v && 'on')} aria-pressed=${x.assignee === v} disabled=${busy} title=${x.assignee === v ? '한 번 더 누르면 미배정으로' : `${l}에게 배정`} onClick=${() => assign(x, v)}>${l}</button>`)}</div>
+  </div>`; })}</div>
+ </section>`;
+}
+
+function TeamOrders({items, who, onWho, isAdmin, cmap, onOpen, onCreate, onImport, onPatch, busy}) {
+ const [title, setTitle] = useState(''), [assignee, setAssignee] = useState(''), [dueMode, setDueMode] = useState('none'), [dueDate, setDueDate] = useState(''), [priority, setPriority] = useState('share');
+ const names = teamDesigners().map(s => s.name);
+ const dueOf = () => dueMode === 'today' ? today() : dueMode === 'tomorrow' ? offsetDate(today(), 1) : dueMode === 'dayafter' ? offsetDate(today(), 2) : dueMode === 'date' ? dueDate : '';
+ async function submit(e) { e.preventDefault(); const t = title.trim(); if (!t || busy) return; try { await onCreate({title: t.slice(0, 150), assignee, due: dueOf(), priority}); setTitle(''); } catch {} }
+ const list = (who === 'all' ? items : who === 'none' ? items.filter(x => !x.assignee) : items.filter(x => teamHas(x, who))).sort(teamByDue);
+ const filters = [['all', '전체', items.length], ...names.map(n => [n, n, items.filter(x => teamHas(x, n)).length]), ['none', '미배정', items.filter(x => !x.assignee).length]];
+ return html`<section class="tb-orders">
+  <form class="quick-task pl-add tb-add" onSubmit=${submit}><div class="quick-compose">${I('Plus', 18)}<input aria-label="오더 제목" placeholder="디자인팀에 맡길 일을 한 줄로 적고 Enter" maxLength="150" value=${title} onInput=${e => setTitle(e.target.value)} /><button class="quick-submit" disabled=${!title.trim() || busy} aria-label="오더 등록">${I('ArrowRight', 18)}</button></div>
+   <div class="quick-task-options">
+    <div class="chip-group" role="group" aria-label="담당"><span>담당</span>${[['', '미배정'], ...names.map(n => [n, n]), ['함께', '둘 다']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${assignee === v} onClick=${() => setAssignee(v)}>${l}</button>`)}</div>
+    <div class="chip-group" role="group" aria-label="마감"><span>마감</span>${[['none', '없음'], ['today', '오늘'], ['tomorrow', '내일'], ['dayafter', '모레']].map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${dueMode === v} onClick=${() => setDueMode(v)}>${l}</button>`)}<input type="date" class="chip-date" aria-label="마감일 직접 선택" value=${dueMode === 'date' ? dueDate : ''} onInput=${e => { setDueDate(e.target.value); setDueMode(e.target.value ? 'date' : 'none'); }} /></div>
+    <div class="chip-group" role="group" aria-label="중요도"><span>중요도</span>${Object.entries(taskPriorities).map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${priority === v} onClick=${() => setPriority(v)}>${l}</button>`)}</div>
+   </div></form>
+  <div class="tb-bar"><div class="dv-who" role="group" aria-label="담당 필터">${filters.map(([v, l, n]) => html`<button type="button" key=${v} class="chip" aria-pressed=${who === v} onClick=${() => onWho(v)}>${l}<span>${n}</span></button>`)}</div>${isAdmin && html`<button type="button" class="tb-import-btn" onClick=${onImport}>${I('Download', 15)}A 보드에서 불러오기</button>`}</div>
+  <div class="pl-group tb-list">${!list.length ? html`<p class="tb-none pad">${who === 'all' ? '아직 오더가 없어요. 위에서 적거나 A 보드에서 불러와 주세요.' : '해당하는 업무가 없어요.'}</p>` : list.map(x => { const d = dDay(x.due), st = checkStat(x); return html`<div class=${cx('tb-row', x.issue && 'has-issue', x.priority !== 'share' && 'prio-' + x.priority)} key=${x.id}>
+   <span class=${cx('dday', d.cls)}>${d.label}</span>
+   <div class="tb-row-main"><button type="button" class="pl-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong>${x.due ? html`<span class="pl-date">${shortDate(x.due)} 마감</span>` : ''}</button>${descLine(x) && html`<button type="button" class="pl-desc" onClick=${() => onOpen(x.id)}>${descLine(x)}</button>`}
+    <span class="pl-tags">${x.src_board && html`<span class="tag tb-src" title=${`A 보드 원본: ${x.src_title}`}>${I('Link2', 12)}A${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${x.issue && html`<span class=${'tag tb-issue ' + x.issue}>${I('AlertCircle', 12)}${TEAM_ISSUES[x.issue]}</span>`}${st.total > 0 && html`<span class="tag">${I('ListChecks', 12)}세부 ${st.done}/${st.total}</span>`}<button type="button" class=${cx('reply-chip', cmap[x.id] && 'has')} onClick=${() => onOpen(x.id)}>${I('MessageCircle', 12)}${cmap[x.id] ? `댓글 ${cmap[x.id]}` : '댓글'}</button></span></div>
+   <select class="tb-who" aria-label="담당" value=${x.assignee} disabled=${busy} onChange=${e => onPatch(x, {assignee: e.target.value}, `담당 ${teamWho(e.target.value)}`)}><option value="">미배정</option>${names.map(n => html`<option key=${n} value=${n}>${n}</option>`)}<option value="함께">둘 다</option></select>
+   <span class=${'tag priority-tag ' + x.priority}>${taskPriorities[x.priority]}</span>
+   <span class="tb-prog"><i><b style=${`width:${x.progress || 0}%`}></b></i><em>${x.progress || 0}%</em></span>
    <select class=${'tb-status-sel ' + x.status} aria-label="상태" value=${x.status} disabled=${busy} onChange=${e => onPatch(x, {status: e.target.value}, `상태 ${statuses[e.target.value]}`)}>${Object.entries(statuses).map(([v, l]) => html`<option key=${v} value=${v}>${l}</option>`)}</select>
   </div>`; })}</div>
  </section>`;
@@ -347,3 +388,74 @@ function TeamImport({existing, busy, onClose, onImport}) {
 // C 보드는 팀 운영 화면, A·B는 기존 공유 보드.
 function AppRoot() { return BOARD === 'C' ? html`<${TeamBoard} />` : html`<${Board} />`; }
 if (window.PS_MOUNT) window.PS_MOUNT(AppRoot, ShareView); else render(html`<${AppRoot} />`, document.getElementById('app'));
+
+// 확인 요청: 업무 사이에 필요한 확인·자료·피드백을 사람에게 요청하고, 받은 사람이 확인 완료로 닫는다.
+function TeamAsks({asks, tasks, comments, me, busy, onCreate, onUpdate, onDelete, onComment, onOpenTask}) {
+ const others = SEATS.filter(s => s.key !== me.id).map(s => s.name);
+ const [open, setOpen] = useState(false), [f, setF] = useState('me');
+ const [form, setForm] = useState({ask_type: 'confirm', to: others[0] || '모두', task_id: '', title: '', body: '', due: 'none', date: ''});
+ const [answer, setAnswer] = useState({}), [reply, setReply] = useState({}), [thread, setThread] = useState({});
+ const isForMe = a => a.from_id !== me.id && (a.to === me.name || a.to === '모두');
+ const lists = {me: asks.filter(a => a.state === 'open' && isForMe(a)), sent: asks.filter(a => a.state === 'open' && a.from_id === me.id), all: asks.filter(a => a.state === 'open'), done: asks.filter(a => a.state === 'done')};
+ const list = [...lists[f]].sort((a, b) => f === 'done' ? b.done_at.localeCompare(a.done_at) : (a.reply_by || '9999').localeCompare(b.reply_by || '9999') || b.created_at.localeCompare(a.created_at));
+ const dueOf = () => form.due === 'today' ? today() : form.due === 'tomorrow' ? offsetDate(today(), 1) : form.due === 'dayafter' ? offsetDate(today(), 2) : form.due === 'date' ? form.date : '';
+ async function submit(e) { e.preventDefault(); const t = form.title.trim(); if (!t || busy) return; const task = tasks.find(x => x.id === form.task_id); try { await onCreate({ask_type: form.ask_type, to: form.to, task_id: task ? task.id : '', task_title: task ? task.title : '', title: t.slice(0, 150), body: form.body.trim().slice(0, 3000), reply_by: dueOf()}); setForm(v => ({...v, title: '', body: '', task_id: '', due: 'none', date: ''})); setOpen(false); setF('sent'); } catch {} }
+ const set = (k, v) => setForm(x => ({...x, [k]: v}));
+ return html`<section class="pl-group tb-asks"><div class="pl-group-head tb-asks-head"><span>확인 요청</span><small>업무에 필요한 확인 · 자료 · 피드백을 사람에게 요청해요</small><button type="button" class="tb-import-btn" onClick=${() => setOpen(v => !v)}>${I(open ? 'X' : 'Plus', 15)}${open ? '닫기' : '확인 요청 남기기'}</button></div>
+  ${open && html`<form class="tb-ask-form" onSubmit=${submit}>
+   <div class="tb-fields">
+    <div><span>종류</span><div class="tb-chips">${Object.entries(ASK_TYPES).map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${form.ask_type === v} onClick=${() => set('ask_type', v)}>${l}</button>`)}</div></div>
+    <div><span>받는 사람</span><div class="tb-chips">${[...others, '모두'].map(n => html`<button type="button" key=${n} class="chip" aria-pressed=${form.to === n} onClick=${() => set('to', n)}>${n}</button>`)}</div></div>
+    <div><span>관련 업무</span><select class="tb-who tb-ask-task" value=${form.task_id} onChange=${e => set('task_id', e.target.value)}><option value="">선택 안 함</option>${[...tasks].sort(teamByDue).map(x => html`<option key=${x.id} value=${x.id}>${x.title}</option>`)}</select></div>
+    <div><span>회신 기한</span><div class="tb-chips">${[['none', '없음'], ['today', '오늘'], ['tomorrow', '내일'], ['dayafter', '모레']].map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${form.due === v} onClick=${() => set('due', v)}>${l}</button>`)}<input type="date" class="chip-date" value=${form.due === 'date' ? form.date : ''} onInput=${e => setForm(x => ({...x, date: e.target.value, due: e.target.value ? 'date' : 'none'}))} /></div></div>
+   </div>
+   <input class="tb-ask-title" maxLength="150" placeholder="무엇을 확인·요청할까요? (예: 메인 배너 시안 B안 확인 부탁)" value=${form.title} onInput=${e => set('title', e.target.value)} />
+   <textarea class="tb-ask-body" rows="3" maxLength="3000" placeholder="구체적으로 필요한 것 · 확인할 범위 · 참고 링크 (선택)" value=${form.body} onInput=${e => set('body', e.target.value)}></textarea>
+   <div class="tb-ask-actions"><button class="primary-button" disabled=${busy || !form.title.trim()}>${I('Send', 14)}요청 남기기</button></div>
+  </form>`}
+  <div class="tb-ask-filter"><div class="dv-who" role="group" aria-label="요청 보기">${[['me', '나에게 온'], ['sent', '내가 보낸'], ['all', '열린 요청 전체'], ['done', '완료']].map(([k, l]) => html`<button type="button" key=${k} class=${cx('chip', k === 'me' && lists.me.length && 'late')} aria-pressed=${f === k} onClick=${() => setF(k)}>${l}<span>${lists[k].length}</span></button>`)}</div></div>
+  ${!list.length ? html`<p class="tb-none pad">${f === 'me' ? '나에게 온 확인 요청이 없어요.' : f === 'sent' ? '내가 보낸 열린 요청이 없어요.' : f === 'done' ? '완료된 요청이 없어요.' : '열린 요청이 없어요.'}</p>` : list.map(a => { const cs = comments.filter(c => c.item_id === a.id).sort((x, y) => x.created_at.localeCompare(y.created_at)), d = a.reply_by ? dDay(a.reply_by) : null, mine = a.from_id === me.id, canDone = a.state === 'open' && (isForMe(a) || mine), showThread = thread[a.id] || (cs.length > 0 && cs.length <= 2); return html`<article class=${cx('tb-ask', a.state, 'type-' + a.ask_type)} key=${a.id}>
+   <div class="tb-ask-top"><span class=${'tb-ask-type ' + a.ask_type}>${ASK_TYPES[a.ask_type]}</span><strong>${a.title}</strong>${d && a.state === 'open' && html`<span class=${cx('dday', d.cls)}>회신 ${d.label === '오늘 마감' ? '오늘까지' : d.label}</span>`}</div>
+   <div class="tb-ask-meta"><span>${a.from} → ${a.to}</span><span>${teamDay(inSeoul(a.created_at))} ${teamClock(a.created_at)}</span>${a.task_id && html`<button type="button" class="tag tb-ask-link" onClick=${() => onOpenTask(a.task_id)}>${I('Layers3', 12)}${a.task_title}</button>`}</div>
+   ${a.body && html`<${TeamText} text=${a.body} class="tb-ask-text" />`}
+   ${a.state === 'done' && html`<div class="tb-ask-done">${I('Check', 13)}<strong>${a.done_by}</strong> 확인 완료 · ${teamDay(inSeoul(a.done_at))} ${teamClock(a.done_at)}${a.answer ? html`<${TeamText} text=${a.answer} />` : ''}</div>`}
+   ${showThread && cs.map(c => html`<div class="tb-ask-c" key=${c.id}><span class="avatar mini">${personName(c.author_name).slice(0, 1)}</span><div><b>${personName(c.author_name)}</b><small>${teamDay(inSeoul(c.created_at))} ${teamClock(c.created_at)}</small><${TeamText} text=${c.body} /></div></div>`)}
+   <div class="tb-ask-actions">
+    ${cs.length > 2 && html`<button type="button" class="text-button" onClick=${() => setThread(t => ({...t, [a.id]: !t[a.id]}))}>${I('MessageCircle', 13)}댓글 ${cs.length} ${thread[a.id] ? '접기' : '보기'}</button>`}
+    <form class="tb-ask-reply" onSubmit=${async e => { e.preventDefault(); const t = (reply[a.id] || '').trim(); if (!t) return; try { await onComment(a, t); setReply(r => ({...r, [a.id]: ''})); setThread(x => ({...x, [a.id]: true})); } catch {} }}><input maxLength="3000" placeholder="댓글 · 질문 · 링크" value=${reply[a.id] || ''} onInput=${e => { const v = e.target.value; setReply(r => ({...r, [a.id]: v})); }} /><button class="secondary-button" disabled=${busy || !(reply[a.id] || '').trim()}>남기기</button></form>
+    ${canDone && html`<span class="tb-ask-close"><input maxLength="300" placeholder="답변 (선택)" value=${answer[a.id] || ''} onInput=${e => { const v = e.target.value; setAnswer(r => ({...r, [a.id]: v})); }} /><button type="button" class="primary-button" disabled=${busy} onClick=${() => onUpdate(a, {state: 'done', done_by: me.name, done_at: nowIso(), answer: (answer[a.id] || '').trim()}, '확인 완료로 바꿨어요.')}>${I('Check', 14)}확인 완료</button></span>`}
+    ${a.state === 'done' && (mine || a.done_by === me.name) && html`<button type="button" class="text-button" disabled=${busy} onClick=${() => onUpdate(a, {state: 'open', done_by: '', done_at: '', answer: ''}, '다시 열었어요.')}>다시 열기</button>`}
+    ${mine && html`<button type="button" class="text-button tb-ask-del" disabled=${busy} onClick=${() => onDelete(a)}>${I('Trash2', 13)}지우기</button>`}
+   </div>
+  </article>`; })}
+ </section>`;
+}
+
+// 오늘의 업무보고: 사람별로 오늘 한 일 · 링크 · 메모를 남기고, 서로 댓글을 단다.
+function TeamReport({reports, tasks, comments, me, busy, onAct, onComment, onOpenTask}) {
+ const [day, setDay] = useState(today()), [text, setText] = useState(''), [taskId, setTaskId] = useState(''), [reply, setReply] = useState({});
+ const people = [...SEATS].sort((a, b) => Number(b.key === me.id) - Number(a.key === me.id) || Number(a.name === ADMIN_NAME) - Number(b.name === ADMIN_NAME));
+ const mineTasks = tasks.filter(x => teamHas(x, me.name) || (me.name === ADMIN_NAME && x.author_id === me.id));
+ const repOf = seat => reports.find(r => r.seat === seat && r.day === day);
+ const my = repOf(me.id) || {lines: [], links: [], note: ''};
+ const suggest = tasks.filter(x => inSeoul(x.updated_at) === day && x.updated_by === me.id && !my.lines.some(l => l.task_id === x.id)).slice(0, 6);
+ const lineOf = x => `${x.title}${x.status === 'done' ? ' · 완료' : x.progress ? ` · ${x.progress}%` : ''}`;
+ const addLine = (t, task) => onAct(day, cur => ({lines: [...cur.lines, {id: newCheckId(), text: t, task_id: task ? task.id : '', task_title: task ? task.title : ''}]}), '');
+ async function submit(e) { e.preventDefault(); const t = text.trim(); const task = tasks.find(x => x.id === taskId); if ((!t && !task) || busy) return; try { await addLine(t || lineOf(task), task); setText(''); setTaskId(''); } catch {} }
+ return html`<section class="tb-report">
+  <div class="tb-rep-bar"><button type="button" class="icon-button" aria-label="이전 날" onClick=${() => setDay(offsetDate(day, -1))}>${I('ChevronLeft', 16)}</button><strong>${teamDay(day)} 업무보고</strong><button type="button" class="icon-button" aria-label="다음 날" disabled=${day >= today()} onClick=${() => setDay(offsetDate(day, 1))}>${I('ChevronRight', 16)}</button>${day !== today() && html`<button type="button" class="text-button" onClick=${() => setDay(today())}>오늘로</button>`}<small>${reports.filter(r => r.day === day && r.lines.length).length}/${SEATS.length}명 작성</small></div>
+  <div class="tb-rep-grid">${people.map(s => { const r = repOf(s.key), isMe = s.key === me.id, cs = r ? comments.filter(c => c.item_id === r.id).sort((a, b) => a.created_at.localeCompare(b.created_at)) : []; if (!isMe && !r && s.name === ADMIN_NAME) return null; return html`<article class=${cx('tb-rep', isMe && 'mine')} key=${s.key}>
+   <div class="tb-person-head"><span class="avatar">${s.name.slice(0, 1)}</span><div><strong>${s.name}${isMe ? ' (나)' : ''}</strong><small>${r && r.lines.length ? `${r.lines.length}건 · ${teamClock(r.updated_at)} 수정` : '아직 작성 전'}</small></div></div>
+   <div class="tb-sub"><span>오늘 한 일</span></div>
+   ${r && r.lines.length ? html`<ul class="tb-rep-lines">${r.lines.map(l => html`<li key=${l.id}><span class="tb-rep-dot"></span><div><${TeamText} text=${l.text} />${l.task_id && html`<button type="button" class="tag tb-ask-link" onClick=${() => onOpenTask(l.task_id)}>${I('Layers3', 12)}${l.text.startsWith(l.task_title) ? '업무 열기' : l.task_title}</button>`}</div>${isMe && html`<button type="button" class="link-chip-x" aria-label="빼기" disabled=${busy} onClick=${() => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), '')}>${I('X', 12)}</button>`}</li>`)}</ul>` : html`<p class="tb-none">${isMe ? '아래 칸에 오늘 한 일을 적어 주세요.' : '아직 남긴 내용이 없어요.'}</p>`}
+   ${isMe && html`<${Fragment}>
+    ${suggest.length > 0 && html`<div class="tb-rep-suggest"><small>오늘 손댄 내 업무</small>${suggest.map(x => html`<button type="button" key=${x.id} class="chip" disabled=${busy} onClick=${() => addLine(lineOf(x), x)}>${I('Plus', 12)}${lineOf(x)}</button>`)}</div>`}
+    <form class="tb-rep-add" onSubmit=${submit}><input maxLength="300" placeholder="오늘 한 일을 한 줄로 적고 Enter" value=${text} onInput=${e => setText(e.target.value)} /><select class="tb-who" aria-label="관련 업무" value=${taskId} onChange=${e => setTaskId(e.target.value)}><option value="">관련 업무 (선택)</option>${[...mineTasks].sort(teamByDue).map(x => html`<option key=${x.id} value=${x.id}>${x.title}</option>`)}</select><button class="secondary-button" disabled=${busy || (!text.trim() && !taskId)}>추가</button></form>`}
+   <div class="tb-sub"><span>링크</span></div>
+   ${isMe ? html`<${LinkChips} links=${my.links} editable=${true} busy=${busy} max=${20} addLabel="링크 공유" idPrefix=${'rep-' + day} onAdd=${l => onAct(day, cur => ({links: [...cur.links, {id: newCheckId(), label: l.label, url: l.url, shared_by: me.name, shared_at: nowIso()}]}), '')} onRemove=${i => onAct(day, cur => ({links: cur.links.filter((_, k) => k !== i)}), '')} />` : r && r.links.length ? html`<${LinkChips} links=${r.links} editable=${false} />` : html`<p class="tb-none">공유한 링크가 없어요.</p>`}
+   <div class="tb-sub"><span>메모 · 내일 할 일</span></div>
+   ${isMe ? html`<${AutoText} class="tb-d-body" value=${my.note} label="메모" placeholder="특이사항, 내일 할 일 등 (선택)" maxLength="3000" disabled=${busy} onCommit=${v => onAct(day, () => ({note: v}), '')} />` : r && r.note ? html`<${TeamText} text=${r.note} />` : html`<p class="tb-none">메모가 없어요.</p>`}
+   ${r && html`<div class="tb-rep-comments"><div class="tb-sub"><span>댓글 ${cs.length || ''}</span></div>${cs.map(c => html`<div class="tb-ask-c" key=${c.id}><span class="avatar mini">${personName(c.author_name).slice(0, 1)}</span><div><b>${personName(c.author_name)}</b><small>${teamDay(inSeoul(c.created_at))} ${teamClock(c.created_at)}</small><${TeamText} text=${c.body} /></div></div>`)}<form class="tb-ask-reply" onSubmit=${async e => { e.preventDefault(); const t = (reply[r.id] || '').trim(); if (!t) return; try { await onComment(r, t); setReply(x => ({...x, [r.id]: ''})); } catch {} }}><input maxLength="3000" placeholder=${isMe ? '덧붙일 말' : `${s.name}님에게 댓글`} value=${reply[r.id] || ''} onInput=${e => { const v = e.target.value; setReply(x => ({...x, [r.id]: v})); }} /><button class="secondary-button" disabled=${busy || !(reply[r.id] || '').trim()}>남기기</button></form></div>`}
+  </article>`; })}</div>
+ </section>`;
+}
