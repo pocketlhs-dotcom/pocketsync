@@ -157,7 +157,7 @@
     const v = d.data() || {};
     const targets = [...(v.src_board === 'A' && v.src_id ? [v.src_id] : []), ...(Array.isArray(v.out_links) ? v.out_links.map(o => o && o.id).filter(Boolean) : [])];
     if (!targets.length) continue;
-    const who = v.assignee === '함께' ? BOARDS.C.seats.filter(k => k !== 'lhs').map(k => SEAT_NAMES[k]).join('·') : (v.assignee || '미배정');
+    const who = v.assignee === '모두' ? '셋 다' : v.assignee === '함께' ? BOARDS.C.seats.filter(k => k !== 'lhs').map(k => SEAT_NAMES[k]).join('·') : (v.assignee || '미배정');
     const link = {id: d.id, status: v.status || 'todo', progress: Number(v.progress) || 0, assignee: who, due: v.due || '', issue: v.issue || '', at: v.updated_at || ''};
     const key = JSON.stringify([link, targets]); if (seen[d.id] === key) continue;
     for (const t of targets) { try { await fs.doc('items/' + t).update({c_link: link}); } catch (e) { console.error('team link', e); } }

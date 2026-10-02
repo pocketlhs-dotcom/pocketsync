@@ -1875,8 +1875,10 @@ function normReport(d) { return {id: d.id, seat: String(d.seat || ''), name: Str
 const teamDesigners = () => SEATS.filter(s => s.name !== ADMIN_NAME);
 const teamJoint = () => teamDesigners().map(s => s.name).join('·');
 // 담당: 디자이너 이름 | '함께'(디자이너 모두) | ''(미배정)
-const teamWho = a => (a === '함께' ? teamJoint() : a || '미배정');
-const teamHas = (x, name) => x.assignee === name || (x.assignee === '함께' && teamDesigners().some(s => s.name === name));
+const teamWho = a => (a === '모두' ? '셋 다' : a === '함께' ? teamJoint() : a || '미배정');
+// '모두' = 셋 다(이현성 포함), '함께' = 예전 값(디자이너 둘)
+const teamHas = (x, name) => x.assignee === name || x.assignee === '모두' || (x.assignee === '함께' && teamDesigners().some(s => s.name === name));
+const teamNames = () => SEATS.map(s => s.name);
 const teamLinks = v => (Array.isArray(v) ? v : []).filter(l => l && isHttpUrl(String(l.url || ''))).slice(0, 20).map((l, i) => ({id: String(l.id || 'l' + i), label: String(l.label || '').slice(0, 80), url: String(l.url), shared_by: String(l.shared_by || ''), shared_at: String(l.shared_at || '')}));
 const TEAM_URL_RE = /(https?:\/\/[^\s<>()"']+[^\s<>()"'.,!?;:])/g;
 // 글 속 주소를 눌러 열 수 있게.
@@ -2029,8 +2031,8 @@ function TeamBoard() {
   <main class="board-main team-main" id="top">
    <div class="board-tabs"><${TabsList} class="top-tabs" label="디자인팀 보드 보기" value=${tab} onChange=${v => go(v)} tabs=${Object.entries(TEAM_TABS).map(([k, l]) => ({value: k, content: html`<${Fragment}>${l}${k === 'orders' ? html`<span class="tab-count">${open.length}</span>` : k === 'issues' ? html`<span class=${cx('tab-count', (asksForMe.length + issues.length) && 'notification')} title="나에게 온 확인 요청 + 열린 특이사항">${asksForMe.length + issues.length}</span>` : k === 'report' ? html`<span class="tab-count">${reports.filter(r => r.day === today() && r.lines.length).length}</span>` : k === 'done' ? html`<span class="tab-count">${done.filter(x => !isArchived(x)).length}</span>` : ''}<//>`}))} /></div>
    ${loading ? html`<div class="loading">${I('Loader2', 22, {class: 'spin'})}보드를 불러오고 있어요.</div>` : html`<div class="team-body">
-    ${tab === 'status' && html`<${TeamStatus} items=${open} kpi=${kpi} issues=${issues} onGo=${go} isAdmin=${isAdmin} onPatch=${patch} onImport=${() => setImportOpen(true)} onCreate=${d => run(() => create(d), '업무를 추가했어요.')} onReorder=${reorder} who=${who} onWho=${setWho} ...${common} />`}
-    ${tab === 'orders' && html`<${TeamOrders} items=${open} who=${who} onWho=${setWho} isAdmin=${isAdmin} onCreate=${d => run(() => create(d), '오더를 등록했어요.')} onImport=${() => setImportOpen(true)} onPatch=${patch} ...${common} />`}
+    ${tab === 'status' && html`<${TeamStatus} items=${open} kpi=${kpi} issues=${issues} onGo=${go} isAdmin=${isAdmin} onPatch=${patch} onImport=${() => setImportOpen(true)} onCreate=${d => run(() => create(d), '업무를 추가했어요.')} onReorder=${reorder} who=${who} onWho=${setWho} onChecklist=${checklistAct} ...${common} />`}
+    ${tab === 'orders' && html`<${TeamOrders} items=${open} who=${who} onWho=${setWho} isAdmin=${isAdmin} onCreate=${d => run(() => create(d), '오더를 등록했어요.')} onImport=${() => setImportOpen(true)} onPatch=${patch} onChecklist=${checklistAct} ...${common} />`}
     ${tab === 'due' && html`<${TeamDue} items=${open} done=${done} ...${common} />`}
     ${tab === 'issues' && html`<${Fragment}><${TeamAsks} asks=${asks} tasks=${open} comments=${comments} me=${me} busy=${busy} onCreate=${createAsk} onUpdate=${updateAsk} onDelete=${deleteAsk} onComment=${comment} onOpenTask=${setSel} /><${TeamIssues} items=${issues} comments=${comments} all=${items} onPatch=${patch} ...${common} /><//>`}
     ${tab === 'report' && html`<${TeamReport} reports=${reports} tasks=${items} comments=${comments} me=${me} busy=${busy} onAct=${reportAct} onComment=${comment} onOpenTask=${setSel} />`}
@@ -2044,6 +2046,13 @@ function TeamBoard() {
 }
 
 // 한 줄 업무(현황·마감·특이사항 공용).
+// D-day 칩을 누르면 바로 마감일을 바꾼다.
+function TeamDuePick({x, busy, onPatch}) {
+ const [open, setOpen] = useState(false), ref = useRef(null), d = dDay(x.due);
+ useEffect(() => { if (!open) return; const off = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }; const esc = e => { if (e.key === 'Escape') setOpen(false); }; document.addEventListener('pointerdown', off); document.addEventListener('keydown', esc); return () => { document.removeEventListener('pointerdown', off); document.removeEventListener('keydown', esc); }; }, [open]);
+ const set = v => { setOpen(false); if (v !== x.due) onPatch(x, {due: v}, v ? `마감 ${shortDate(v)}` : '마감 지움'); };
+ return html`<span class="tb-duepick" ref=${ref}><button type="button" class=${cx('dday', d.cls)} title=${x.due ? `마감 ${shortDate(x.due)} · 눌러서 바꾸기` : '마감일 정하기'} disabled=${busy} onClick=${() => setOpen(v => !v)}>${d.label}</button>${open && html`<div class="tb-duepop" role="dialog" aria-label="마감일 바꾸기">${[['', '없음'], [today(), '오늘'], [offsetDate(today(), 1), '내일'], [offsetDate(today(), 2), '모레'], [offsetDate(today(), 7), '일주일 뒤']].map(([v, l]) => html`<button type="button" key=${l} class=${cx('chip', x.due === v && 'on')} onClick=${() => set(v)}>${l}${v ? html`<small>${shortDate(v)}</small>` : ''}</button>`)}<input type="date" aria-label="날짜 직접 선택" value=${x.due} onChange=${e => set(e.target.value)} /></div>`}</span>`;
+}
 function TeamMini({x, cmap, onOpen, showWho = true, extra}) {
  const d = dDay(x.due);
  return html`<button type="button" class=${cx('tb-mini', x.status === 'doing' && 'doing', x.issue && 'has-issue')} onClick=${() => onOpen(x.id)}>
@@ -2055,27 +2064,28 @@ function TeamMini({x, cmap, onOpen, showWho = true, extra}) {
  </button>`;
 }
 
-function TeamStatus({items, kpi, issues, cmap, onOpen, onGo, isAdmin, onPatch, onImport, onCreate, onReorder, who, onWho, busy}) {
- const people = [...teamDesigners().map(s => ({key: s.key, name: s.name, list: items.filter(x => teamHas(x, s.name))}))];
+function TeamStatus({items, kpi, issues, cmap, onOpen, onGo, isAdmin, onPatch, onImport, onCreate, onReorder, who, onWho, onChecklist, busy}) {
+ const people = [...SEATS.map(s => ({key: s.key, name: s.name, list: items.filter(x => teamHas(x, s.name))}))];
  const tiles = [['진행 중', kpi.doing, () => onGo('status', 'all'), ''], ['오늘·내일 마감', kpi.soon, () => onGo('due'), kpi.soon ? 'warn' : ''], ['지난 마감', kpi.late, () => onGo('due'), kpi.late ? 'alert' : ''], ['특이사항', kpi.issue, () => onGo('issues'), kpi.issue ? 'alert' : ''], ['미배정', kpi.none, () => onGo('status', 'none'), kpi.none ? 'warn' : '']];
  return html`<section class="tb-status">
   <div class="tb-kpis">${tiles.map(([l, n, f, c]) => html`<button type="button" key=${l} class=${cx('tb-kpi', c)} onClick=${f}><small>${l}</small><strong>${n}</strong></button>`)}</div>
   ${issues.length > 0 && html`<div class="tb-alert">${I('AlertCircle', 16)}<strong>특이사항 ${issues.length}</strong><span>${issues[0].title} · ${TEAM_ISSUES[issues[0].issue]}${issues[0].issue_note ? ` · ${issues[0].issue_note}` : ''}</span><button type="button" class="text-button" onClick=${() => onGo('issues')}>모두 보기${I('ChevronRight', 13)}</button></div>`}
-  <div class="tb-split"><${TeamAssignList} items=${items} cmap=${cmap} onOpen=${onOpen} isAdmin=${isAdmin} onPatch=${onPatch} onImport=${onImport} onCreate=${onCreate} onReorder=${onReorder} filter=${who} onFilter=${onWho} busy=${busy} />
+  <div class="tb-split"><${TeamAssignList} items=${items} cmap=${cmap} onOpen=${onOpen} isAdmin=${isAdmin} onPatch=${onPatch} onImport=${onImport} onCreate=${onCreate} onReorder=${onReorder} filter=${who} onFilter=${onWho} onChecklist=${onChecklist} busy=${busy} />
   <div class="tb-people">${people.map(p => { const doing = p.list.filter(x => x.status === 'doing').sort(teamOrder), wait = p.list.filter(x => x.status !== 'doing').sort(teamOrder), late = p.list.filter(teamLate).length, avg = p.list.length ? Math.round(p.list.reduce((a, x) => a + (x.progress || 0), 0) / p.list.length) : 0; return html`<article class="tb-person" key=${p.key}>
    <div class="tb-person-head"><span class=${cx('avatar', p.key === 'none' && 'ghost')}>${p.key === 'none' ? '?' : p.name.slice(0, 1)}</span><div><strong>${p.name}</strong><small>진행 ${doing.length} · 대기 ${wait.length}${late ? html` · <b class="late">지연 ${late}</b>` : ''} · 평균 ${avg}%</small></div><button type="button" class="text-button" onClick=${() => onGo('status', p.key === 'none' ? 'none' : p.name)}>목록${I('ChevronRight', 13)}</button></div>
-   <div class="tb-sub"><span>지금 하는 일</span></div>${doing.length ? doing.map(x => html`<${TeamMini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} showWho=${x.assignee === '함께'} />`) : html`<p class="tb-none">진행 중인 업무가 없어요.</p>`}
-   ${wait.length > 0 && html`<${Fragment}><div class="tb-sub"><span>대기 · 보류</span></div>${wait.slice(0, 6).map(x => html`<${TeamMini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} showWho=${x.assignee === '함께'} />`)}${wait.length > 6 && html`<button type="button" class="tb-more" onClick=${() => onGo('status', p.key === 'none' ? 'none' : p.name)}>외 ${wait.length - 6}건 더 보기</button>`}<//>`}
+   <div class="tb-sub"><span>지금 하는 일</span></div>${doing.length ? doing.map(x => html`<${TeamMini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} showWho=${x.assignee === '함께' || x.assignee === '모두'} />`) : html`<p class="tb-none">진행 중인 업무가 없어요.</p>`}
+   ${wait.length > 0 && html`<${Fragment}><div class="tb-sub"><span>대기 · 보류</span></div>${wait.slice(0, 6).map(x => html`<${TeamMini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} showWho=${x.assignee === '함께' || x.assignee === '모두'} />`)}${wait.length > 6 && html`<button type="button" class="tb-more" onClick=${() => onGo('status', p.key === 'none' ? 'none' : p.name)}>외 ${wait.length - 6}건 더 보기</button>`}<//>`}
   </article>`; })}</div></div>
  </section>`;
 }
 
 // 팀 현황의 전체 업무 리스트: 불러온·등록한 업무를 쭉 보고 줄마다 바로 담당을 정한다.
-function TeamAssignList({items, cmap, onOpen, isAdmin, onPatch, onImport, onCreate, onReorder, filter, onFilter: setFilter, busy}) {
+function TeamAssignList({items, cmap, onOpen, isAdmin, onPatch, onImport, onCreate, onReorder, filter, onFilter: setFilter, onChecklist, busy}) {
+ const [checksOpen, setChecksOpen] = useState({});
  const [title, setTitle] = useState(''), [assignee, setAssignee] = useState(null), [dueMode, setDueMode] = useState('none'), [dueDate, setDueDate] = useState(''), [priority, setPriority] = useState('share');
  const pick = assignee !== null ? assignee : filter !== 'all' && filter !== 'none' ? filter : '';
  const dueOf = () => dueMode === 'today' ? today() : dueMode === 'tomorrow' ? offsetDate(today(), 1) : dueMode === 'dayafter' ? offsetDate(today(), 2) : dueMode === 'date' ? dueDate : '';
- const names = teamDesigners().map(s => s.name);
+ const names = teamNames();
  const list = (filter === 'all' ? items : filter === 'none' ? items.filter(x => !x.assignee) : items.filter(x => teamHas(x, filter))).sort(teamOrder);
  const filters = [['all', '전체', items.length], ['none', '미배정', items.filter(x => !x.assignee).length], ...names.map(n => [n, n, items.filter(x => teamHas(x, n)).length])];
  const assign = (x, v) => { const next = x.assignee === v ? '' : v; onPatch(x, {assignee: next}, next ? `담당 ${teamWho(next)}` : '담당 비움'); };
@@ -2086,16 +2096,18 @@ function TeamAssignList({items, cmap, onOpen, isAdmin, onPatch, onImport, onCrea
   </div>
 
   <div class="tb-assign-list" data-sort-list>${!list.length ? html`<p class="tb-none pad">${items.length ? '해당하는 업무가 없어요.' : isAdmin ? '아직 업무가 없어요. A 보드에서 불러오거나 위에서 추가해 주세요.' : '아직 업무가 없어요.'}</p>` : list.map(x => { const d = dDay(x.due), st = checkStat(x); return html`<div class=${cx('tb-arow', !x.assignee && 'unassigned', x.issue && 'has-issue')} key=${x.id} data-sort-id=${x.id}>
-   ${list.length > 1 && html`<${SortGrip} id=${x.id} label="끌어서 순서 바꾸기" onDrop=${onReorder} />`}<span class=${cx('dday', d.cls)}>${d.label}</span>
-   <div class="tb-arow-main"><button type="button" class="tb-arow-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong></button><span class="tb-arow-meta">${x.src_board && html`<span class="tag tb-src">A${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${x.priority !== 'share' && html`<span class=${'tag priority-tag ' + x.priority}>${taskPriorities[x.priority]}</span>`}${x.issue && html`<span class=${'tag tb-issue ' + x.issue}>${TEAM_ISSUES[x.issue]}</span>`}<small>${[statuses[x.status], x.progress ? `${x.progress}%` : '', st.total ? `세부 ${st.done}/${st.total}` : '', cmap[x.id] ? `댓글 ${cmap[x.id]}` : ''].filter(Boolean).join(' · ')}</small></span></div>
-   <div class="tb-assign-btns" role="group" aria-label="담당 정하기">${[...names.map(n => [n, n]), ['함께', '둘 다']].map(([v, l]) => html`<button type="button" key=${v} class=${cx('tb-abtn', x.assignee === v && 'on')} aria-pressed=${x.assignee === v} disabled=${busy} title=${x.assignee === v ? '한 번 더 누르면 미배정으로' : `${l}에게 배정`} onClick=${() => assign(x, v)}>${l}</button>`)}</div>
+   ${list.length > 1 && html`<${SortGrip} id=${x.id} label="끌어서 순서 바꾸기" onDrop=${onReorder} />`}<${TeamDuePick} x=${x} busy=${busy} onPatch=${onPatch} />
+   <div class="tb-arow-main"><button type="button" class="tb-arow-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong></button><span class="tb-arow-meta">${x.src_board && html`<span class="tag tb-src">A${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${x.priority !== 'share' && html`<span class=${'tag priority-tag ' + x.priority}>${taskPriorities[x.priority]}</span>`}${x.issue && html`<span class=${'tag tb-issue ' + x.issue}>${TEAM_ISSUES[x.issue]}</span>`}<small>${[statuses[x.status], x.progress ? `${x.progress}%` : '', cmap[x.id] ? `댓글 ${cmap[x.id]}` : ''].filter(Boolean).join(' · ')}</small><button type="button" class=${cx('tb-check-chip', checksOpen[x.id] && 'on', !st.total && 'empty')} aria-expanded=${!!checksOpen[x.id]} onClick=${() => setChecksOpen(o => ({...o, [x.id]: !o[x.id]}))}>${I('ListChecks', 12)}${st.total ? `세부 ${st.done}/${st.total}` : '세부 업무'}${I(checksOpen[x.id] ? 'ChevronUp' : 'ChevronDown', 12)}</button></span></div>
+   <div class="tb-assign-btns" role="group" aria-label="담당 정하기">${[...names.map(n => [n, n]), ['모두', '셋 다']].map(([v, l]) => html`<button type="button" key=${v} class=${cx('tb-abtn', x.assignee === v && 'on')} aria-pressed=${x.assignee === v} disabled=${busy} title=${x.assignee === v ? '한 번 더 누르면 미배정으로' : `${l}에게 배정`} onClick=${() => assign(x, v)}>${l}</button>`)}</div>
+   ${checksOpen[x.id] && html`<div class="tb-arow-checks"><${Checklist} item=${x} editable=${true} busy=${busy} onAct=${onChecklist} compact=${true} /></div>`}
   </div>`; })}</div>
  </section>`;
 }
 
-function TeamOrders({items, who, onWho, isAdmin, cmap, onOpen, onCreate, onImport, onPatch, busy}) {
+function TeamOrders({items, who, onWho, isAdmin, cmap, onOpen, onCreate, onImport, onPatch, onChecklist, busy}) {
+ const [checksOpen, setChecksOpen] = useState({});
  const [title, setTitle] = useState(''), [assignee, setAssignee] = useState(''), [dueMode, setDueMode] = useState('none'), [dueDate, setDueDate] = useState(''), [priority, setPriority] = useState('share');
- const names = teamDesigners().map(s => s.name);
+ const names = teamNames();
  const dueOf = () => dueMode === 'today' ? today() : dueMode === 'tomorrow' ? offsetDate(today(), 1) : dueMode === 'dayafter' ? offsetDate(today(), 2) : dueMode === 'date' ? dueDate : '';
  async function submit(e) { e.preventDefault(); const t = title.trim(); if (!t || busy) return; try { await onCreate({title: t.slice(0, 150), assignee, due: dueOf(), priority}); setTitle(''); } catch {} }
  const list = (who === 'all' ? items : who === 'none' ? items.filter(x => !x.assignee) : items.filter(x => teamHas(x, who))).sort(teamByDue);
@@ -2103,19 +2115,20 @@ function TeamOrders({items, who, onWho, isAdmin, cmap, onOpen, onCreate, onImpor
  return html`<section class="tb-orders">
   <form class="quick-task pl-add tb-add" onSubmit=${submit}><div class="quick-compose">${I('Plus', 18)}<input aria-label="오더 제목" placeholder="디자인팀에 맡길 일을 한 줄로 적고 Enter" maxLength="150" value=${title} onInput=${e => setTitle(e.target.value)} /><button class="quick-submit" disabled=${!title.trim() || busy} aria-label="오더 등록">${I('ArrowRight', 18)}</button></div>
    <div class="quick-task-options">
-    <div class="chip-group" role="group" aria-label="담당"><span>담당</span>${[['', '미배정'], ...names.map(n => [n, n]), ['함께', '둘 다']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${assignee === v} onClick=${() => setAssignee(v)}>${l}</button>`)}</div>
+    <div class="chip-group" role="group" aria-label="담당"><span>담당</span>${[['', '미배정'], ...names.map(n => [n, n]), ['모두', '셋 다']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${assignee === v} onClick=${() => setAssignee(v)}>${l}</button>`)}</div>
     <div class="chip-group" role="group" aria-label="마감"><span>마감</span>${[['none', '없음'], ['today', '오늘'], ['tomorrow', '내일'], ['dayafter', '모레']].map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${dueMode === v} onClick=${() => setDueMode(v)}>${l}</button>`)}<input type="date" class="chip-date" aria-label="마감일 직접 선택" value=${dueMode === 'date' ? dueDate : ''} onInput=${e => { setDueDate(e.target.value); setDueMode(e.target.value ? 'date' : 'none'); }} /></div>
     <div class="chip-group" role="group" aria-label="중요도"><span>중요도</span>${Object.entries(taskPriorities).map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${priority === v} onClick=${() => setPriority(v)}>${l}</button>`)}</div>
    </div></form>
   <div class="tb-bar"><div class="dv-who" role="group" aria-label="담당 필터">${filters.map(([v, l, n]) => html`<button type="button" key=${v} class="chip" aria-pressed=${who === v} onClick=${() => onWho(v)}>${l}<span>${n}</span></button>`)}</div>${isAdmin && html`<button type="button" class="tb-import-btn" onClick=${onImport}>${I('Download', 15)}A 보드에서 불러오기</button>`}</div>
   <div class="pl-group tb-list">${!list.length ? html`<p class="tb-none pad">${who === 'all' ? '아직 오더가 없어요. 위에서 적거나 A 보드에서 불러와 주세요.' : '해당하는 업무가 없어요.'}</p>` : list.map(x => { const d = dDay(x.due), st = checkStat(x); return html`<div class=${cx('tb-row', x.issue && 'has-issue', x.priority !== 'share' && 'prio-' + x.priority)} key=${x.id}>
-   <span class=${cx('dday', d.cls)}>${d.label}</span>
+   <${TeamDuePick} x=${x} busy=${busy} onPatch=${onPatch} />
    <div class="tb-row-main"><button type="button" class="pl-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong>${x.due ? html`<span class="pl-date">${shortDate(x.due)} 마감</span>` : ''}</button>${descLine(x) && html`<button type="button" class="pl-desc" onClick=${() => onOpen(x.id)}>${descLine(x)}</button>`}
-    <span class="pl-tags">${x.src_board && html`<span class="tag tb-src" title=${`A 보드 원본: ${x.src_title}`}>${I('Link2', 12)}A${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${x.issue && html`<span class=${'tag tb-issue ' + x.issue}>${I('AlertCircle', 12)}${TEAM_ISSUES[x.issue]}</span>`}${st.total > 0 && html`<span class="tag">${I('ListChecks', 12)}세부 ${st.done}/${st.total}</span>`}<button type="button" class=${cx('reply-chip', cmap[x.id] && 'has')} onClick=${() => onOpen(x.id)}>${I('MessageCircle', 12)}${cmap[x.id] ? `댓글 ${cmap[x.id]}` : '댓글'}</button></span></div>
-   <select class="tb-who" aria-label="담당" value=${x.assignee} disabled=${busy} onChange=${e => onPatch(x, {assignee: e.target.value}, `담당 ${teamWho(e.target.value)}`)}><option value="">미배정</option>${names.map(n => html`<option key=${n} value=${n}>${n}</option>`)}<option value="함께">둘 다</option></select>
+    <span class="pl-tags">${x.src_board && html`<span class="tag tb-src" title=${`A 보드 원본: ${x.src_title}`}>${I('Link2', 12)}A${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${x.issue && html`<span class=${'tag tb-issue ' + x.issue}>${I('AlertCircle', 12)}${TEAM_ISSUES[x.issue]}</span>`}<button type="button" class=${cx('tag tb-check-chip', checksOpen[x.id] && 'on', !st.total && 'empty')} aria-expanded=${!!checksOpen[x.id]} onClick=${() => setChecksOpen(o => ({...o, [x.id]: !o[x.id]}))}>${I('ListChecks', 12)}${st.total ? `세부 ${st.done}/${st.total}` : '세부 업무'}${I(checksOpen[x.id] ? 'ChevronUp' : 'ChevronDown', 12)}</button><button type="button" class=${cx('reply-chip', cmap[x.id] && 'has')} onClick=${() => onOpen(x.id)}>${I('MessageCircle', 12)}${cmap[x.id] ? `댓글 ${cmap[x.id]}` : '댓글'}</button></span></div>
+   <select class="tb-who" aria-label="담당" value=${x.assignee} disabled=${busy} onChange=${e => onPatch(x, {assignee: e.target.value}, `담당 ${teamWho(e.target.value)}`)}><option value="">미배정</option>${names.map(n => html`<option key=${n} value=${n}>${n}</option>`)}<option value="모두">셋 다</option>${x.assignee === '함께' ? html`<option value="함께">강승연·안은지</option>` : ''}</select>
    <span class=${'tag priority-tag ' + x.priority}>${taskPriorities[x.priority]}</span>
    <span class="tb-prog"><i><b style=${`width:${x.progress || 0}%`}></b></i><em>${x.progress || 0}%</em></span>
    <select class=${'tb-status-sel ' + x.status} aria-label="상태" value=${x.status} disabled=${busy} onChange=${e => onPatch(x, {status: e.target.value}, `상태 ${statuses[e.target.value]}`)}>${Object.entries(statuses).map(([v, l]) => html`<option key=${v} value=${v}>${l}</option>`)}</select>
+   ${checksOpen[x.id] && html`<div class="tb-arow-checks"><${Checklist} item=${x} editable=${true} busy=${busy} onAct=${onChecklist} compact=${true} /></div>`}
   </div>`; })}</div>
  </section>`;
 }
@@ -2158,7 +2171,7 @@ function TeamDetail({item: x, comments, me, isAdmin, busy, onClose, onPatch, onC
  useEffect(() => { if (x.src_board) onRefreshSource(x); }, [x.id]);
  const [issue, setIssue] = useState(x.issue), [note, setNote] = useState(x.issue_note), [text, setText] = useState(''), [editing, setEditing] = useState(null), [editText, setEditText] = useState('');
  useEffect(() => { setIssue(x.issue); setNote(x.issue_note); }, [x.id, x.issue, x.issue_note]);
- const names = teamDesigners().map(s => s.name), canDelete = isAdmin || x.author_id === me.id;
+ const names = teamNames(), canDelete = isAdmin || x.author_id === me.id;
  const saveIssue = () => onPatch(x, issue ? {issue, issue_note: note.trim().slice(0, 300), issue_at: nowIso(), issue_by: me.name} : {issue: '', issue_note: ''}, issue ? `특이사항 ${TEAM_ISSUES[issue]}` : '특이사항 해결');
  async function send(e) { e.preventDefault(); if (!text.trim()) return; try { await onComment(x, text); setText(''); } catch {} }
  const header = html`<div class="sheet-head tb-detail-head"><span class=${'tag ' + x.status}>${statuses[x.status]}</span>${x.src_board && html`<span class="tag tb-src">${I('Link2', 12)}A 보드에서 불러옴${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}</div>`;
@@ -2168,7 +2181,7 @@ function TeamDetail({item: x, comments, me, isAdmin, busy, onClose, onPatch, onC
    <button type="button" class="tb-full-btn" onClick=${() => setFull(true)}>${I('NotebookPen', 15)}업무 자세히 보기<small>${[x.body || x.src_body ? '내용' : '', x.checklist.length || x.src_checks.length ? `세부 업무 ${x.checklist.length + x.src_checks.length}` : '', x.links.length + x.src_links.length ? `링크 ${x.links.length + x.src_links.length}` : ''].filter(Boolean).join(' · ') || '내용 · 세부 업무 · 링크'}</small>${I('ChevronRight', 15)}</button>
    <${AutoText} class="tb-d-body" value=${x.body} label="설명" placeholder="설명이나 요청 사항을 적어 주세요 (레퍼런스, 사이즈, 톤 등)" maxLength="6000" disabled=${busy} onCommit=${v => onPatch(x, {body: v}, '내용 수정')} />
    <div class="tb-fields">
-    <div><span>담당</span><div class="tb-chips">${[['', '미배정'], ...names.map(n => [n, n]), ['함께', '둘 다']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${x.assignee === v} disabled=${busy} onClick=${() => x.assignee !== v && onPatch(x, {assignee: v}, `담당 ${teamWho(v)}`)}>${l}</button>`)}</div></div>
+    <div><span>담당</span><div class="tb-chips">${[['', '미배정'], ...names.map(n => [n, n]), ['모두', '셋 다']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${x.assignee === v} disabled=${busy} onClick=${() => x.assignee !== v && onPatch(x, {assignee: v}, `담당 ${teamWho(v)}`)}>${l}</button>`)}</div></div>
     <div><span>마감</span><div class="tb-chips">${[['', '없음'], [today(), '오늘'], [offsetDate(today(), 1), '내일'], [offsetDate(today(), 2), '모레']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${x.due === v} disabled=${busy} onClick=${() => x.due !== v && onPatch(x, {due: v}, v ? `마감 ${shortDate(v)}` : '마감 지움')}>${l}</button>`)}<input type="date" class="chip-date" aria-label="마감일" value=${x.due} disabled=${busy} onChange=${e => onPatch(x, {due: e.target.value}, e.target.value ? `마감 ${shortDate(e.target.value)}` : '마감 지움')} /><b class=${cx('dday', dDay(x.due).cls)}>${dDay(x.due).label}</b></div></div>
     <div><span>중요도</span><div class="tb-chips">${Object.entries(taskPriorities).map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${x.priority === v} disabled=${busy} onClick=${() => x.priority !== v && onPatch(x, {priority: v}, `중요도 ${l}`)}>${l}</button>`)}</div></div>
     <div><span>상태</span><div class="tb-chips">${Object.entries(statuses).map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${x.status === v} disabled=${busy} onClick=${() => x.status !== v && onPatch(x, {status: v}, `상태 ${l}`)}>${l}</button>`)}</div></div>
@@ -2238,13 +2251,13 @@ function TeamImport({existing, busy, onClose, onImport}) {
  const avail = pool.filter(r => !taken(r));
  const toggle = id => setPicked(p => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
  const chosen = state.rows.filter(r => picked.has(r.id) && !taken(r));
- const names = teamDesigners().map(s => s.name);
+ const names = teamNames();
  return html`<${Dialog} class="tb-import" title="A 보드에서 불러오기" description="A 보드 업무를 디자인팀 오더로 가져와요. 원본은 A에 그대로 남고, 디자인팀 진행 상황이 원본에 표시돼요." onClose=${onClose}>
   ${state.loading ? html`<div class="loading">${I('Loader2', 20, {class: 'spin'})}A 보드 업무를 읽는 중이에요.</div>` : state.error ? html`<p class="form-error">${state.error}</p>` : html`<${Fragment}>
    <div class="tb-imp-filter"><div class="dv-who" role="group" aria-label="카테고리">${[['all', '전체'], ...state.topics.map(t => [t.id, t.name]), ['none', '미분류']].map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${topic === v} onClick=${() => setTopic(v)}>${l}<span>${state.rows.filter(r => (showDone || r.status !== 'done') && (v === 'all' || (v === 'none' ? !r.topic : r.topic_id === v))).length}</span></button>`)}</div><label class="tb-imp-done"><input type="checkbox" checked=${showDone} onChange=${e => setShowDone(e.target.checked)} />완료 포함</label></div>
    <div class="tb-imp-head"><label><input type="checkbox" checked=${avail.length > 0 && avail.every(r => picked.has(r.id))} disabled=${!avail.length} onChange=${e => setPicked(p => { const n = new Set(p); avail.forEach(r => e.target.checked ? n.add(r.id) : n.delete(r.id)); return n; })} />보이는 업무 모두 선택</label><small>${pool.length}건 중 불러올 수 있는 ${avail.length}건</small></div>
    <ul class="tb-imp-list">${!pool.length && html`<li class="tb-none pad">해당하는 업무가 없어요.</li>`}${pool.map(r => html`<li key=${r.id} class=${cx(taken(r) && 'taken')}><label><input type="checkbox" checked=${picked.has(r.id) && !taken(r)} disabled=${taken(r)} onChange=${() => toggle(r.id)} /><span class="tb-imp-main"><strong>${r.title}</strong><small>${[r.topic || '미분류', r.assignee, statuses[r.status], r.due ? `${shortDate(r.due)} 마감` : '마감 없음'].join(' · ')}</small></span>${taken(r) ? html`<span class="tag tb-src">이미 불러옴</span>` : r.priority !== 'share' && html`<span class=${'tag priority-tag ' + r.priority}>${taskPriorities[r.priority]}</span>`}</label></li>`)}</ul>
-   <div class="tb-imp-foot"><div class="chip-group" role="group" aria-label="불러온 업무 담당"><span>담당</span>${[['', '미배정'], ...names.map(n => [n, n]), ['함께', '둘 다']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${assignee === v} onClick=${() => setAssignee(v)}>${l}</button>`)}</div>
+   <div class="tb-imp-foot"><div class="chip-group" role="group" aria-label="불러온 업무 담당"><span>담당</span>${[['', '미배정'], ...names.map(n => [n, n]), ['모두', '셋 다']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${assignee === v} onClick=${() => setAssignee(v)}>${l}</button>`)}</div>
     <div class="tb-imp-actions"><button type="button" class="secondary-button" disabled=${busy || !avail.length} onClick=${() => onImport(avail, assignee)}>보이는 업무 전체 불러오기 (${avail.length})</button><button type="button" class="primary-button" disabled=${busy || !chosen.length} onClick=${() => onImport(chosen, assignee)}>선택 불러오기 (${chosen.length})</button></div></div>
   <//>`}
  <//>`;

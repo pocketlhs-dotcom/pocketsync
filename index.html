@@ -1069,6 +1069,12 @@ button.dday-edit{cursor:pointer;border:0;font-family:inherit;transition:box-shad
 .tb-rep-add{display:flex;gap:6px;flex-wrap:wrap}.tb-rep-add select{height:32px;max-width:180px}.tb-rep-comments{border-top:1px solid #eef0f7;margin-top:6px;padding-top:4px}
 @media(max-width:640px){.tb-ask,.tb-ask-filter,.tb-ask-form{padding-left:14px;padding-right:14px}.tb-rep-grid{grid-template-columns:minmax(0,1fr)}.tb-rep-add select{max-width:none;flex-basis:100%}}
 .sheet.tb-detail{width:min(640px,100vw);max-width:640px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}.sheet.tb-detail>*{flex-shrink:0}
+.tb-check-chip{display:inline-flex!important;align-items:center;gap:4px;height:22px;padding:0 7px;border-radius:3px;border:1px solid #e1e5f0;background:#fff;color:#6b7591;font-size:12px;font-weight:600}.tb-check-chip:hover{border-color:#95a8eb;color:#315df8}.tb-check-chip.on{background:#e8edff;border-color:#95a8eb;color:#315df8}.tb-check-chip.empty{border-style:dashed;color:#a3a8b8}.tb-row-main .tb-check-chip{height:27px;padding:0 9px}
+.tb-arow-checks{grid-column:1/-1;padding:4px 0 2px 82px}.tb-row>.tb-arow-checks{padding-left:86px}.tb-arow-checks .checklist{margin:0}
+@media(max-width:900px){.tb-row>.tb-arow-checks{grid-column:1/-1;grid-row:auto;padding-left:0}}
+@media(max-width:640px){.tb-arow-checks{padding-left:0;grid-area:auto}}
+.tb-duepick{position:relative;justify-self:start;display:inline-flex}.tb-duepick>.dday{cursor:pointer;border:0;height:30px;padding:0 10px;border-radius:30px;font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;background:#edeff6;color:#9699a8;white-space:nowrap}.tb-row .tb-duepick>.dday{height:33px;padding:0 11px;font-size:13px}.tb-duepick>.dday:hover{box-shadow:0 0 0 2px #c9d4fb}.tb-duepick>.dday.late{background:#fff3ef;color:#d13737}.tb-duepick>.dday.today{background:#ffe9e1;color:#ff482b}.tb-duepick>.dday.soon{background:#fff3e2;color:#c27a1c}
+.tb-duepop{position:absolute;left:0;top:calc(100% + 6px);z-index:30;width:200px;background:#fff;border:1px solid #e1e4f3;border-radius:8px;box-shadow:0 12px 30px rgba(15,30,70,.16);padding:8px;display:flex;flex-direction:column;gap:4px}.tb-duepop .chip{display:flex;justify-content:space-between;align-items:center;height:32px;padding:0 10px;border-radius:5px;border:1px solid transparent;background:#fff;color:#2b3550;font-size:13.5px;font-weight:600;text-align:left}.tb-duepop .chip:hover{background:#f3f6ff}.tb-duepop .chip.on{background:#e8edff;color:#315df8}.tb-duepop .chip small{font-size:12px;color:#a7a7a7;font-weight:500}.tb-duepop input{height:32px;border:1px solid #e3e6ef;border-radius:5px;padding:0 8px;font-size:13px;margin-top:2px}
 </style>
 </head><body>
 <div id="app"></div>
@@ -1078,6 +1084,6 @@ button.dday-edit{cursor:pointer;border:0;font-family:inherit;transition:box-shad
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1790909411"></script>
-<script src="app.js?v=1790909411"></script>
+<script src="platform.js?v=1790909685"></script>
+<script src="app.js?v=1790909685"></script>
 </body></html>
