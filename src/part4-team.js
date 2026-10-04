@@ -69,6 +69,8 @@ function TeamBoard() {
  teamAvatars.map = avatars;
  const [db, setDb] = useState(null), [items, setItems] = useState([]), [comments, setComments] = useState([]), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
  const [tab, setTab] = useState(() => { let v = 'status'; try { v = localStorage.getItem('ps.teamTab') || 'status'; } catch {} return TEAM_TABS[v] ? v : 'status'; });
+ const [stab, setStab] = useState(() => { try { return localStorage.getItem('ps.teamStatusTab') || 'doing'; } catch { return 'doing'; } });
+ const pickStab = v => { setStab(v); try { localStorage.setItem('ps.teamStatusTab', v); } catch {} };
  const [handoff, setHandoff] = useState(null), [sel, setSel] = useState(null), [importOpen, setImportOpen] = useState(false), [who, setWho] = useState('all'), [menu, setMenu] = useState(false);
  useEffect(() => { try { localStorage.setItem('ps.teamTab', tab); } catch {} }, [tab]);
  useEffect(() => {
@@ -191,7 +193,7 @@ function TeamBoard() {
  async function reportAct(day, fn, ok) { const cur = reports.find(r => r.seat === me.id && r.day === day) || {lines: [], links: [], note: ''}; await run(() => saveReport(day, fn(cur)), ok); }
  async function importRows(rows, assignee) {
   await run(async () => { for (const r of rows) await create({title: r.title, body: r.body, due: r.due, priority: r.priority, assignee, topic_label: r.topic, src_board: 'A', src_id: r.id, src_title: r.title, src_body: r.body, src_checks: r.checklist, src_links: r.links, links: r.links, checklist: r.checklist, spec: r.checklist}); }, `${rows.length}건을 오더로 불러왔어요.`);
-  setImportOpen(false); setTab('status');
+  setImportOpen(false); setTab('status'); if (stab !== 'all') pickStab('todo');
  }
 
  const open = items.filter(x => x.status !== 'done'), done = items.filter(x => x.status === 'done');
@@ -212,7 +214,7 @@ function TeamBoard() {
   <main class="board-main team-main" id="top">
    <div class="board-tabs"><${TabsList} class="top-tabs" label="디자인팀 보드 보기" value=${tab} onChange=${v => go(v)} tabs=${Object.entries(TEAM_TABS).map(([k, l]) => ({value: k, content: html`<${Fragment}>${l}${k === 'orders' ? html`<span class="tab-count">${open.length}</span>` : k === 'issues' ? html`<span class=${cx('tab-count', (asksForMe.length + issues.length) && 'notification')} title="나에게 온 확인 요청 + 열린 특이사항">${asksForMe.length + issues.length}</span>` : k === 'report' ? html`<span class="tab-count">${reports.filter(r => r.day === today() && r.lines.length).length}</span>` : k === 'done' ? html`<span class="tab-count">${done.filter(x => !isArchived(x)).length}</span>` : ''}<//>`}))} /></div>
    ${loading ? html`<div class="loading">${I('Loader2', 22, {class: 'spin'})}보드를 불러오고 있어요.</div>` : html`<div class="team-body">
-    ${tab === 'status' && html`<${TeamStatus} items=${open} doneItems=${done.filter(x => !isArchived(x))} kpi=${kpi} issues=${issues} onGo=${go} isAdmin=${isAdmin} onPatch=${patch} onImport=${() => setImportOpen(true)} onCreate=${d => run(() => create(d), '업무를 추가했어요.')} onReorder=${reorder} who=${who} onWho=${setWho} onChecklist=${checklistAct} onAvatar=${setAvatar} ...${common} />`}
+    ${tab === 'status' && html`<${TeamStatus} stab=${stab} onStab=${pickStab} items=${open} doneItems=${done.filter(x => !isArchived(x))} kpi=${kpi} issues=${issues} onGo=${go} isAdmin=${isAdmin} onPatch=${patch} onImport=${() => setImportOpen(true)} onCreate=${d => run(() => create(d), '업무를 추가했어요.')} onReorder=${reorder} who=${who} onWho=${setWho} onChecklist=${checklistAct} onAvatar=${setAvatar} ...${common} />`}
     ${tab === 'orders' && html`<${TeamOrders} items=${open} who=${who} onWho=${setWho} isAdmin=${isAdmin} onCreate=${d => run(() => create(d), '오더를 등록했어요.')} onImport=${() => setImportOpen(true)} onPatch=${patch} onChecklist=${checklistAct} ...${common} />`}
     ${tab === 'due' && html`<${TeamDue} items=${open} done=${done} ...${common} />`}
     ${tab === 'issues' && html`<${Fragment}><${TeamAsks} asks=${asks} tasks=${open} comments=${comments} me=${me} busy=${busy} onCreate=${createAsk} onUpdate=${updateAsk} onDelete=${deleteAsk} onComment=${comment} onMark=${markComment} onOpenTask=${setSel} /><${TeamIssues} items=${issues} comments=${comments} all=${items} onPatch=${patch} ...${common} /><//>`}
@@ -259,12 +261,12 @@ function TeamMini({x, cmap, onOpen, showWho = true, extra, self = ''}) {
  </button>`;
 }
 
-function TeamStatus({items, doneItems = [], kpi, issues, cmap, onOpen, onGo, isAdmin, onPatch, onImport, onCreate, onReorder, who, onWho, onChecklist, onHandoff, busy, me, onAvatar}) {
+function TeamStatus({stab, onStab, items, doneItems = [], kpi, issues, cmap, onOpen, onGo, isAdmin, onPatch, onImport, onCreate, onReorder, who, onWho, onChecklist, onHandoff, busy, me, onAvatar}) {
  const people = [...SEATS.map(s => ({key: s.key, name: s.name, list: items.filter(x => teamHas(x, s.name))}))];
  const tiles = [['진행 중', kpi.doing, () => onGo('status', 'all'), ''], ['오늘·내일 마감', kpi.soon, () => onGo('due'), kpi.soon ? 'warn' : ''], ['지난 마감', kpi.late, () => onGo('due'), kpi.late ? 'alert' : ''], ['특이사항', kpi.issue, () => onGo('issues'), kpi.issue ? 'alert' : ''], ['미배정', kpi.none, () => onGo('status', 'none'), kpi.none ? 'warn' : '']];
  return html`<section class="tb-status">
   ${issues.length > 0 && html`<div class="tb-alert">${I('AlertCircle', 16)}<strong>특이사항 ${issues.length}</strong><span>${issues[0].title} · ${TEAM_ISSUES[issues[0].issue]}${issues[0].issue_note ? ` · ${issues[0].issue_note}` : ''}</span><button type="button" class="text-button" onClick=${() => onGo('issues')}>모두 보기${I('ChevronRight', 13)}</button></div>`}
-  <div class="tb-split"><${TeamAssignList} items=${items} doneItems=${doneItems} cmap=${cmap} onOpen=${onOpen} isAdmin=${isAdmin} onPatch=${onPatch} onImport=${onImport} onCreate=${onCreate} onReorder=${onReorder} filter=${who} onFilter=${onWho} onChecklist=${onChecklist} onHandoff=${onHandoff} busy=${busy} />
+  <div class="tb-split"><${TeamAssignList} stab=${stab} onStab=${onStab} items=${items} doneItems=${doneItems} cmap=${cmap} onOpen=${onOpen} isAdmin=${isAdmin} onPatch=${onPatch} onImport=${onImport} onCreate=${onCreate} onReorder=${onReorder} filter=${who} onFilter=${onWho} onChecklist=${onChecklist} onHandoff=${onHandoff} busy=${busy} />
   <div class="tb-people">${people.map(p => { const doing = p.list.filter(x => x.status === 'doing').sort(teamOrder), wait = p.list.filter(x => x.status !== 'doing').sort(teamOrder), late = p.list.filter(teamLate).length, avg = p.list.length ? Math.round(p.list.reduce((a, x) => a + (x.progress || 0), 0) / p.list.length) : 0; return html`<article class="tb-person" key=${p.key}>
    <div class="tb-person-head">${p.key === 'none' ? html`<span class="avatar ghost">?</span>` : html`<${Av} name=${p.name} editable=${me && (p.name === me.name || me.name === ADMIN_NAME)} busy=${busy} onPick=${f => onAvatar(f, p.name)} />`}<div><strong>${p.name}</strong><small>진행 ${doing.length} · 대기 ${wait.length}${late ? html` · <b class="late">지연 ${late}</b>` : ''} · 평균 ${avg}%</small></div><button type="button" class="text-button" onClick=${() => onGo('status', p.key === 'none' ? 'none' : p.name)}>목록${I('ChevronRight', 13)}</button></div>
    <div class="tb-sub"><span>지금 하는 일</span></div>${doing.length ? doing.map(x => html`<${TeamMini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} showWho=${false} self=${p.name} />`) : html`<p class="tb-none">진행 중인 업무가 없어요.</p>`}
@@ -274,14 +276,12 @@ function TeamStatus({items, doneItems = [], kpi, issues, cmap, onOpen, onGo, isA
 }
 
 // 팀 현황의 전체 업무 리스트: 불러온·등록한 업무를 쭉 보고 줄마다 바로 담당을 정한다.
-function TeamAssignList({items, doneItems = [], cmap, onOpen, isAdmin, onPatch, onImport, onCreate, onReorder, filter, onFilter: setFilter, onChecklist, onHandoff, busy}) {
+function TeamAssignList({stab, onStab: pickStab, items, doneItems = [], cmap, onOpen, isAdmin, onPatch, onImport, onCreate, onReorder, filter, onFilter: setFilter, onChecklist, onHandoff, busy}) {
  const [checksOpen, setChecksOpen] = useState({});
  const [title, setTitle] = useState(''), [assignee, setAssignee] = useState(null), [dueMode, setDueMode] = useState('none'), [dueDate, setDueDate] = useState(''), [priority, setPriority] = useState('share');
  const pick = assignee !== null ? assignee : filter !== 'all' && filter !== 'none' ? filter : '';
  const dueOf = () => dueMode === 'today' ? today() : dueMode === 'tomorrow' ? offsetDate(today(), 1) : dueMode === 'dayafter' ? offsetDate(today(), 2) : dueMode === 'date' ? dueDate : '';
  const names = teamNames();
- const [stab, setStab] = useState(() => { try { return localStorage.getItem('ps.teamStatusTab') || 'doing'; } catch { return 'doing'; } });
- const pickStab = v => { setStab(v); try { localStorage.setItem('ps.teamStatusTab', v); } catch {} };
  const byWho = arr => filter === 'all' ? arr : filter === 'none' ? arr.filter(x => !x.assignee) : arr.filter(x => teamHas(x, filter));
  const pool = [...items, ...doneItems];
  const inTab = (x, k) => k === 'all' ? x.status !== 'done' : x.status === k;
