@@ -333,6 +333,8 @@ function TeamAssignList({view = 'list', onView, stab, onStab: pickStab, items, d
  const pick = assignee !== null ? assignee : filter !== 'all' && filter !== 'none' ? filter : '';
  const dueOf = () => dueMode === 'today' ? today() : dueMode === 'tomorrow' ? offsetDate(today(), 1) : dueMode === 'dayafter' ? offsetDate(today(), 2) : dueMode === 'date' ? dueDate : '';
  const names = teamNames();
+ const unas = {key: 'none', label: '미배정', match: x => !teamList(x.assignee).length};
+ const tlGroups = filter === 'all' ? [...names.map(n => ({key: n, label: n, name: n, match: x => teamHas(x, n)})), {...unas, hideEmpty: true}] : filter === 'none' ? [unas] : [{key: filter, label: filter, name: filter, match: x => teamHas(x, filter)}];
  const byWho = arr => filter === 'all' ? arr : filter === 'none' ? arr.filter(x => !x.assignee) : arr.filter(x => teamHas(x, filter));
  const pool = [...items, ...doneItems];
  const inTab = (x, k) => k === 'all' ? x.status !== 'done' : x.status === k;
@@ -349,7 +351,7 @@ function TeamAssignList({view = 'list', onView, stab, onStab: pickStab, items, d
    ${view !== 'timeline' && html`<form class="tb-assign-add" onSubmit=${add}>${I('Plus', 15)}<input aria-label="업무 추가" maxLength="150" placeholder=${pick ? `${teamWho(pick)}에게 줄 업무 한 줄 추가 후 Enter` : '업무 한 줄 추가 후 Enter (담당은 줄에서 바로 정하기)'} value=${title} onInput=${e => setTitle(e.target.value)} /><button class="tb-assign-go" disabled=${!title.trim() || busy} aria-label="추가">${I('ArrowRight', 15)}</button></form>`}
   </div>
 
-  ${view === 'timeline' ? html`<${TeamTimeline} items=${items} filter=${filter} onOpen=${onOpen} onPatch=${onPatch} busy=${busy} />` : html`<${Fragment}><div class="tb-stabs" role="tablist" aria-label="상태별 보기">${STABS.map(([k, l]) => html`<button type="button" role="tab" key=${k} class=${cx('tb-stab', 'st-' + k, stab === k && 'on')} aria-selected=${stab === k} onClick=${() => pickStab(k)}><i></i>${l}<b>${byWho(pool.filter(x => inTab(x, k))).length}</b></button>`)}</div>
+  ${view === 'timeline' ? html`<${Timeline} items=${items} groups=${tlGroups} coText=${x => teamList(x.assignee).length > 1 ? `함께: ${teamWho(x.assignee)}` : ''} onOpen=${onOpen} onPatch=${onPatch} busy=${busy} />` : html`<${Fragment}><div class="tb-stabs" role="tablist" aria-label="상태별 보기">${STABS.map(([k, l]) => html`<button type="button" role="tab" key=${k} class=${cx('tb-stab', 'st-' + k, stab === k && 'on')} aria-selected=${stab === k} onClick=${() => pickStab(k)}><i></i>${l}<b>${byWho(pool.filter(x => inTab(x, k))).length}</b></button>`)}</div>
   <div class="tb-assign-list" data-sort-list>${!list.length ? html`<p class="tb-none pad">${pool.length ? `${(STABS.find(t => t[0] === stab) || [])[1] || ''} 업무가 없어요.` : isAdmin ? '아직 업무가 없어요. A 보드에서 불러오거나 위에서 추가해 주세요.' : '아직 업무가 없어요.'}</p>` : list.map(x => { const d = dDay(x.due), st = checkStat(x); return html`<div class=${cx('tb-arow', 'st-' + x.status, !x.assignee && x.status !== 'done' && 'unassigned', x.issue && 'has-issue')} key=${x.id} data-sort-id=${x.id}>
    ${list.length > 1 && stab !== 'done' && html`<${SortGrip} id=${x.id} label="끌어서 순서 바꾸기" onDrop=${onReorder} />`}<${TeamDuePick} x=${x} busy=${busy} onPatch=${onPatch} />
    <div class="tb-arow-main"><button type="button" class="tb-arow-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong></button><span class="tb-arow-meta"><${TeamStatusPick} x=${x} busy=${busy} onPatch=${onPatch} />${x.src_board && html`<span class="tag tb-src">A${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${x.priority !== 'share' && html`<span class=${'tag priority-tag ' + x.priority}>${taskPriorities[x.priority]}</span>`}${x.issue && html`<span class=${'tag tb-issue ' + x.issue}>${TEAM_ISSUES[x.issue]}</span>`}<small>${[teamStartLabel(x), x.progress ? `${x.progress}%` : '', cmap[x.id] ? `댓글 ${cmap[x.id]}` : ''].filter(Boolean).join(' · ')}</small><button type="button" class=${cx('tb-check-chip', checksOpen[x.id] && 'on', !st.total && 'empty')} aria-expanded=${!!checksOpen[x.id]} onClick=${() => setChecksOpen(o => ({...o, [x.id]: !o[x.id]}))}>${I('ListChecks', 12)}${st.total ? `세부 ${st.done}/${st.total}` : '세부 업무'}${I(checksOpen[x.id] ? 'ChevronUp' : 'ChevronDown', 12)}</button></span></div>
@@ -370,7 +372,8 @@ function teamStartOf(x) {
  const d = at ? seoulDate(new Date(at)) : '';
  return DATE_RE.test(d) ? d : '';
 }
-function TeamTimeline({items, filter, onOpen, onPatch, busy}) {
+// 보드 공용: groups = [{key, label, name(사진용) | icon, match(x), hideEmpty}], coText(x) = 공동 담당 안내(없으면 ''), whoText(x) = 담당 표시.
+function Timeline({items, groups: groupDefs, coText, whoText = x => teamWho(x.assignee), onOpen, onPatch, busy}) {
  const [range, setRangeState] = useState(() => { try { return localStorage.getItem('ps.teamTlRange') === '28' ? 28 : 14; } catch { return 14; } });
  const setRange = v => { setRangeState(v); try { localStorage.setItem('ps.teamTlRange', String(v)); } catch {} };
  const [offset, setOffset] = useState(0), [showShort, setShowShort] = useState(false), [drag, setDrag] = useState(null);
@@ -378,20 +381,18 @@ function TeamTimeline({items, filter, onOpen, onPatch, busy}) {
  const N = range, t = today(), base = offsetDate(mondayOf(t), offset * 7), last = offsetDate(base, N - 1), b0 = teamDayNum(base), tIdx = teamDayNum(t) - b0, nowPos = tIdx + 0.5;
  const days = Array.from({length: N}, (_, i) => offsetDate(base, i));
  const P = v => `${(v / N * 100).toFixed(3)}%`;
- const mine = x => filter === 'all' || (filter === 'none' ? !teamList(x.assignee).length : teamHas(x, filter));
+ const mine = x => groupDefs.some(g => g.match(x));
  const bars = [], missing = []; let short = 0, outside = 0;
  for (const x of items) {
   if (x.status === 'done' || !mine(x)) continue;
   const s = teamStartOf(x);
   if (!s || !x.due) { missing.push(x); continue; }
   const ei = teamDayNum(x.due) - b0, si = Math.min(teamDayNum(s) - b0, ei), len = ei - si + 1, late = teamLate(x);
-  if (!showShort && len < 3) { short++; continue; }
+  if (!showShort && len < 3 && !late) { short++; continue; }
   if ((late ? Math.max(ei, tIdx) : ei) < 0 || si > N - 1) { outside++; continue; }
   bars.push({x, s, si, ei, len, late});
  }
- const inG = (b, n) => n ? teamList(b.x.assignee).includes(n) : !teamList(b.x.assignee).length;
- const hasUnas = bars.some(b => inG(b, ''));
- const groups = (filter === 'all' ? [...teamNames(), ...(hasUnas ? [''] : [])] : [filter === 'none' ? '' : filter]).map(n => ({name: n, list: bars.filter(b => inG(b, n)).sort((a, b) => a.si - b.si || a.ei - b.ei)}));
+ const groups = groupDefs.map(g => ({...g, list: bars.filter(b => g.match(b.x)).sort((a, b) => a.si - b.si || a.ei - b.ei)})).filter(g => !(g.hideEmpty && !g.list.length));
  const geo = b => {
   const {x, si, ei, len, late} = b, L = Math.max(si, 0), R = Math.min(ei + 1, N), prog = x.progress || 0, fillAt = si + prog / 100 * len;
   const fill = R > L ? Math.min(Math.max((fillAt - L) / (R - L), 0), 1) * 100 : 0;
@@ -402,8 +403,8 @@ function TeamTimeline({items, filter, onOpen, onPatch, busy}) {
   return {L, R, fill, extL: late ? Math.max(ei + 1, 0) : 0, extR: late ? Math.min(tIdx + 1, N) : 0, tone: late ? 'late' : hot ? 'hot' : risk ? 'risk' : '', meta, clipL: si < 0, clipR: ei + 1 > N};
  };
  const metaOf = g => g.meta.map(([m, c], i) => html`${i ? ' · ' : ''}<span class=${c}>${m}</span>`);
- const coOf = x => teamList(x.assignee).length > 1 && html`<span class="tl-co" title=${`함께: ${teamWho(x.assignee)}`}>${I('Users', 12)}</span>`;
- const tipOf = b => `${b.x.title}\n${shortDate(b.s)} – ${shortDate(b.x.due)} (${b.len}일) · ${teamWho(b.x.assignee)} · ${statuses[b.x.status]} ${b.x.progress || 0}%`;
+ const coOf = x => { const ct = coText ? coText(x) : ''; return ct ? html`<span class="tl-co" title=${ct}>${I('Users', 12)}</span>` : ''; };
+ const tipOf = b => `${b.x.title}\n${shortDate(b.s)} – ${shortDate(b.x.due)} (${b.len}일) · ${whoText(b.x)} · ${statuses[b.x.status]} ${b.x.progress || 0}%`;
  const fitIn = N === 14 ? 3 : 5, room = N === 14 ? 2 : 4;
  // 끌어서 일정 조정: 막대 가운데 = 시작일·마감 함께 이동, 왼쪽 끝 = 시작일, 오른쪽 끝 = 마감. 하루 단위로 맞춰진다.
  const dragDates = (b, mode, d) => { let s = b.s, e = b.x.due; if (mode === 'move') { s = offsetDate(s, d); e = offsetDate(e, d); } else if (mode === 'start') { s = offsetDate(s, d); if (s > e) s = e; } else { e = offsetDate(e, d); if (e < s) e = s; } return {s, e}; };
@@ -454,7 +455,7 @@ function TeamTimeline({items, filter, onOpen, onPatch, busy}) {
    <span class="tl-mdates">${shortDate(b.s)} – ${shortDate(x.due)} · ${b.len}일</span>
   </button>`;
  };
- const whoOf = g => html`<div class="tl-who">${g.name ? html`<${Av} name=${g.name} mini=${true} />` : html`<span class="avatar mini ghost">?</span>`}<span><strong>${g.name || '미배정'}</strong><small>${g.list.length}건</small></span></div>`;
+ const whoOf = g => html`<div class="tl-who">${g.name ? html`<${Av} name=${g.name} mini=${true} />` : g.icon ? html`<span class="avatar mini tl-gicon">${I(g.icon, 14)}</span>` : html`<span class="avatar mini ghost">?</span>`}<span><strong>${g.label}</strong><small>${g.list.length}건</small></span></div>`;
  const md = d => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8))}일`;
  const label = `${md(base)} – ${last.slice(5, 7) === base.slice(5, 7) ? `${Number(last.slice(8))}일` : md(last)}`;
  const cols = `grid-template-columns:repeat(${N},minmax(0,1fr))`;
@@ -467,9 +468,9 @@ function TeamTimeline({items, filter, onOpen, onPatch, busy}) {
   <div class="tl-desk"><div class="tl-chart">
    <div class="tl-grid" style=${cols}>${days.map(d => html`<i key=${d} class=${cx(we(d) && 'we')}></i>`)}${tIdx >= 0 && tIdx < N && html`<b class="tl-now" style=${`left:${P(nowPos)}`}></b>`}</div>
    <div class="tl-row tl-head"><span></span><div class="tl-days" style=${cols}>${days.map((d, i) => html`<span key=${d} class=${cx(i === tIdx && 'now', we(d) && 'we')}>${i === 0 || d.endsWith('-01') ? `${Number(d.slice(5, 7))}/${Number(d.slice(8))}` : Number(d.slice(8))}<small>${i === tIdx ? '오늘' : '일월화수목금토'[teamWeekday(d)]}</small></span>`)}</div></div>
-   ${groups.map(g => html`<div class="tl-row tl-group" key=${g.name || 'none'}>${whoOf(g)}<div class="tl-lanes">${g.list.length ? g.list.map(lane) : html`<p class="tl-empty">이 기간 업무 없음</p>`}</div></div>`)}
+   ${groups.map(g => html`<div class="tl-row tl-group" key=${g.key}>${whoOf(g)}<div class="tl-lanes">${g.list.length ? g.list.map(lane) : html`<p class="tl-empty">이 기간 업무 없음</p>`}</div></div>`)}
   </div></div>
-  <div class="tl-mob">${groups.map(g => html`<div class="tl-mgroup" key=${g.name || 'none'}>${whoOf(g)}${g.list.length ? g.list.map(mrow) : html`<p class="tl-empty">이 기간 업무 없음</p>`}</div>`)}</div>
+  <div class="tl-mob">${groups.map(g => html`<div class="tl-mgroup" key=${g.key}>${whoOf(g)}${g.list.length ? g.list.map(mrow) : html`<p class="tl-empty">이 기간 업무 없음</p>`}</div>`)}</div>
   <div class="tl-foot">
    <div class="tl-legend"><span><i class="sw fill"></i>채움 끝 = 진행률만큼 온 날</span><span><i class="sw now"></i>오늘</span><span><i class="sw todo"></i>예정</span><span><i class="sw hot"></i>급함 · 오늘·내일 마감</span><span><i class="sw late"></i>마감 지남</span><span><i class="sw risk"></i>지연 위험</span><span class="tl-hint">막대를 끌어 일정 이동 · 양 끝을 끌어 시작일·마감 조정</span>${outside > 0 && html`<span class="tl-outside">이 기간 밖 ${outside}건</span>`}</div>
    ${missing.length > 0 && html`<div class="tl-missing"><span>시작일이나 마감이 없어 빠진 업무 ${missing.length}건</span>${missing.slice(0, 8).map(x => html`<button type="button" class="chip" key=${x.id} title="눌러서 시작일·마감 정하기" onClick=${() => onOpen(x.id)}>${x.title}</button>`)}${missing.length > 8 && html`<small>외 ${missing.length - 8}건</small>`}</div>`}
