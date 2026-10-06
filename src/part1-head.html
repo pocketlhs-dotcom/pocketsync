@@ -1251,4 +1251,21 @@ button.tb-meet-item.open:hover{border-color:#a3bbf5;background:#f6f9ff}
 .ab-stabs{padding:0;margin:2px 0 18px}
 .record-main .row-status{flex-shrink:0;display:inline-flex;align-items:center}
 .account-menu .avatar-pick{cursor:pointer}
+/* 공통 요소 통일(C 보드 기준): 제목 남색, 카드 모서리 7px·테두리, 상태 색, 주 버튼 색. 화면 구성은 그대로. */
+h1{color:#0b1c5c}
+.section-heading h2,.weekly-heading h2{color:#0b1c5c;font-weight:700}
+.record-summary>strong{color:#141a2e;font-weight:650}
+.record-list,.side-panel,.quick-compose,.kanban-card,.attention-bar,.schedule-card{border-radius:7px}
+.record-list,.side-panel,.kanban-card,.schedule-card{border-color:#e1e4f3}
+.section-heading .count{border-radius:3px;background:#f1f3f8;color:#8f95ab;font-weight:700}
+.tag.doing{background:#e8edff;color:#315df8}
+.tag.todo{background:#f1f3f8;color:#6b7591}
+.tag.hold{background:#fff3e2;color:#b9771f}
+.tag.done{background:#e9f6ef;color:#3f8c66}
+.pl-status.doing{background:#e8edff;color:#315df8}
+.pl-status.todo{background:#f1f3f8;color:#6b7591}
+.pl-status.hold{background:#fff3e2;color:#b9771f}
+.primary-button,.quick-submit:not(:disabled),.slot-ok:not(:disabled){background:#315df8}
+.primary-button:hover,.quick-submit:hover:not(:disabled){background:#2550e0}
+.ownership-tabs,.view-toggle{border-radius:5px!important}
 </style>

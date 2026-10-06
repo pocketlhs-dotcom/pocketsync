@@ -41,7 +41,7 @@ const priorities = {share: '그냥 공유', urgent: '급함', critical: '아주�
 const taskPriorities = {share: '보통', urgent: '급함', critical: '아주급함'};
 const priorityLabel = item => item.kind === 'task' ? (taskPriorities[item.priority] || '') : item.kind === 'daily' ? (item.ack ? (item.priority === 'share' ? '확인 요청' : priorities[item.priority]) : '') : '';
 const KIND_HINTS = {event: '시간이 정해진 약속이면 일정. 두 사람의 하루에 나란히 놓여요.', daily: '상대에게 전하는 말이면 전할 말. 사정, 부탁, 오늘 있었던 일 같은 것들이에요. 꼭 읽어야 하면 확인 요청을 켜요.', task: '끝까지 챙겨야 할 일이면 업무. 상태·담당·마감일을 두고 보드에서 옮겨요. 전할 말이 일이 되면 종류를 업무로 바꾸면 돼요.'};
-const statuses = {todo: '예정', doing: '진행 중', hold: '잠시 보류', done: '완료'};
+const statuses = {todo: '예정', doing: '진행 중', hold: '보류', done: '완료'};
 const memberOptions = {'함께': '함께', '이현성': '이현성', '권중선': '권중선'};
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
