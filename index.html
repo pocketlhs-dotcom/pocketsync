@@ -1240,9 +1240,6 @@ body.tl-resizing,body.tl-resizing *{cursor:ew-resize!important}
 .tb-meet-none{font-size:13px;color:#a3aec0;margin-right:4px}
 .tb-meet-x{display:inline-grid;place-items:center;width:18px;height:18px;margin:0 -4px 0 2px;border:0;border-radius:3px;background:transparent;color:#a3aec0}
 .tb-meet-x:hover{background:#f1f3f8;color:#bf5b52}
-.tb-meet .slot-add.tb-meet-slot{flex:0 0 auto;border:0;min-height:0;height:30px;padding:0 6px 0 0;background:transparent;font-size:13px}
-.tb-meet .slot-add.tb-meet-slot>.slot-plus{width:24px;height:24px;border-radius:5px}
-.tb-meet .slot-add.tb-meet-slot:hover{background:transparent}
 .tb-meet .slot-form.tb-meet-form{flex:none;width:100%;box-sizing:border-box;border:0;border-radius:5px;min-height:0}
 .board-panel>.tb-meet{margin-bottom:20px}
 button.tb-meet-item.open{cursor:pointer;font:inherit;font-size:13px}
@@ -1269,6 +1266,25 @@ h1{color:#0b1c5c}
 .primary-button,.quick-submit:not(:disabled),.slot-ok:not(:disabled){background:#315df8}
 .primary-button:hover,.quick-submit:hover:not(:disabled){background:#2550e0}
 .ownership-tabs,.view-toggle{border-radius:5px!important}
+.tb-meet .strip{margin:0}
+.tb-meet .strip-track{margin-bottom:0}
+.tb-meet .strip-labels{padding-top:20px}
+.tb-meet-rows{display:flex;flex-direction:column;margin:0 -8px}
+.tb-meet .agenda-row{flex:none;width:100%;box-sizing:border-box;min-height:44px;padding:8px;border-top:1px solid #eef2f8;border-radius:0}
+.tb-meet .agenda-row:first-child{border-top:0}
+.tb-meet-row{display:flex;align-items:center;gap:10px;text-align:left;background:#fff}
+button.tb-meet-row{cursor:pointer;font:inherit}
+button.tb-meet-row:hover{background:#f8faff}
+.tb-meet-row .agenda-title{font-size:14px;color:#141a2e;font-weight:600}
+.tb-meet-row.now{background:#f2f6ff;box-shadow:inset 3px 0 0 #315df8}
+.tb-meet-row.past .agenda-time>strong,.tb-meet-row.past .agenda-time>small,.tb-meet-row.past .agenda-title{color:#a9b3c4}
+.tb-meet-row.private .agenda-title{color:#9aa6b8;font-weight:500}
+.tb-meet-with{font-size:12px;font-weight:500;color:#9aa6b8;flex-shrink:0}
+.tb-meet-row .tb-meet-state{margin-left:0;flex-shrink:0}
+.tb-meet-row .tb-meet-x{margin-left:auto;width:26px;height:26px}
+.tb-meet .slot-add.tb-meet-slot{background:transparent}
+.tb-meet .slot-add.tb-meet-slot:hover{background:#f6f9ff}
+.tb-meet-rows>.tb-meet-empty{padding:10px 8px 4px}
 </style>
 </head><body>
 <div id="app"></div>
@@ -1278,6 +1294,6 @@ h1{color:#0b1c5c}
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1791251980"></script>
-<script src="app.js?v=1791251980"></script>
+<script src="platform.js?v=1791252398"></script>
+<script src="app.js?v=1791252398"></script>
 </body></html>
