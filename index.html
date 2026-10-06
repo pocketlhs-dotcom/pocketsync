@@ -1292,6 +1292,19 @@ button.tb-meet-row:hover{background:#f8faff}
 .tb-meet-row.editable:hover .tb-meet-pen,.tb-meet-row.editable:focus-visible .tb-meet-pen{opacity:1}
 .tb-meet-pen+.tb-meet-x{margin-left:0}
 @media(hover:none){.tb-meet-pen{opacity:1}}
+/* 로그인·불러오기 카드: 가운데 정렬, 로고 마크 없이 글자만, 디자인 시스템(남색·모서리 7px) */
+.login-gate{min-height:calc(100vh - 220px);align-items:center;padding:24px 0}
+.gate-card{width:min(400px,100%);box-sizing:border-box;border-radius:7px;border-color:#e1e4f3;padding:36px 32px 32px;gap:12px;text-align:center;box-shadow:0 8px 24px #0b1c5c0f}
+.gate-brand{align-self:center;justify-content:center;font-size:24px;color:#0b1c5c;margin-bottom:6px}
+.gate-brand>span:last-child>span{color:#8a9cbd}
+.gate-card h2{color:#0b1c5c;font-weight:700}
+.gate-card>p{margin:0;word-break:keep-all}
+.gate-card .form-error{text-align:center}
+.google-signin,.gate-card>#ps-switch{align-self:center;margin-top:6px}
+.gate-loading{align-self:center;display:inline-flex;align-items:center;gap:10px;padding:2px 0;margin:0;color:#6d809e}
+.gate-loading::before{content:'';width:15px;height:15px;border-radius:50%;border:2px solid #dfe6f5;border-top-color:#315df8;animation:gate-spin .8s linear infinite;flex-shrink:0}
+@keyframes gate-spin{to{transform:rotate(360deg)}}
+@media(max-width:640px){.login-gate{min-height:calc(100vh - 180px)}.gate-card{padding:30px 20px 26px}}
 </style>
 </head><body>
 <div id="app"></div>
@@ -1301,6 +1314,6 @@ button.tb-meet-row:hover{background:#f8faff}
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1791253698"></script>
-<script src="app.js?v=1791253698"></script>
+<script src="platform.js?v=1791254016"></script>
+<script src="app.js?v=1791254016"></script>
 </body></html>
