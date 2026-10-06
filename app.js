@@ -2230,8 +2230,10 @@ function TeamTimeline({items, filter, onOpen, onPatch, busy}) {
   const {x, si, ei, len, late} = b, L = Math.max(si, 0), R = Math.min(ei + 1, N), prog = x.progress || 0, fillAt = si + prog / 100 * len;
   const fill = R > L ? Math.min(Math.max((fillAt - L) / (R - L), 0), 1) * 100 : 0;
   const risk = !late && x.status !== 'hold' && nowPos > si && nowPos < ei + 1 && nowPos - fillAt >= 1;
-  const meta = [late ? [`마감 ${teamDayNum(t) - teamDayNum(x.due)}일 지남`, 'tl-red'] : [dDay(x.due).label, ''], [x.status === 'hold' ? '보류' : x.status === 'todo' && !prog ? '예정' : `${prog}%`, ''], ...(risk ? [[x.status === 'todo' ? '착수 지남' : '지연 위험', 'tl-amber']] : [])];
-  return {L, R, fill, extL: late ? Math.max(ei + 1, 0) : 0, extR: late ? Math.min(tIdx + 1, N) : 0, tone: late ? 'late' : risk ? 'risk' : x.status, meta, clipL: si < 0, clipR: ei + 1 > N};
+  // 급함: 중요도 급함·아주급함이거나 마감이 오늘·내일(보류 제외). 빨강 계열로 표시하고, 마감 지남은 더 진한 빨강 + 점선.
+  const soon = !late && teamDayNum(x.due) - teamDayNum(t) <= 1, pri = x.priority === 'urgent' || x.priority === 'critical', hot = !late && x.status !== 'hold' && (pri || soon);
+  const meta = [late ? [`마감 ${teamDayNum(t) - teamDayNum(x.due)}일 지남`, 'tl-red'] : [dDay(x.due).label, soon ? 'tl-red' : ''], [x.status === 'hold' ? '보류' : x.status === 'todo' && !prog ? '예정' : `${prog}%`, ''], ...(pri ? [[taskPriorities[x.priority], 'tl-red']] : []), ...(risk ? [[x.status === 'todo' ? '착수 지남' : '지연 위험', 'tl-amber']] : [])];
+  return {L, R, fill, extL: late ? Math.max(ei + 1, 0) : 0, extR: late ? Math.min(tIdx + 1, N) : 0, tone: late ? 'late' : hot ? 'hot' : risk ? 'risk' : '', meta, clipL: si < 0, clipR: ei + 1 > N};
  };
  const metaOf = g => g.meta.map(([m, c], i) => html`${i ? ' · ' : ''}<span class=${c}>${m}</span>`);
  const coOf = x => teamList(x.assignee).length > 1 && html`<span class="tl-co" title=${`함께: ${teamWho(x.assignee)}`}>${I('Users', 12)}</span>`;
@@ -2273,14 +2275,14 @@ function TeamTimeline({items, filter, onOpen, onPatch, busy}) {
   const open = () => { if (justDragged.current) { justDragged.current = false; return; } onOpen(x.id); };
   const canDrag = !!onPatch;
   return html`<div class="tl-lane" key=${x.id}>
-   ${g.R > g.L && html`<button type="button" class=${cx('tl-bar', 'tl-' + g.tone, dg && 'dragging', canDrag && 'can-drag')} style=${`left:${P(g.L)};width:${P(g.R - g.L)}`} title=${dg ? '' : tipOf(b) + (canDrag ? '\n끌어서 일정 이동 · 양 끝을 끌어 시작일·마감 조정' : '')} onClick=${open} onPointerDown=${e => startDrag(e, orig)}>${canDrag && !g.clipL && html`<i class="tl-h l" data-edge="start"></i>`}${g.fill > 0 && html`<i class="tl-fill" style=${`width:${g.fill.toFixed(1)}%`}></i>`}${inside && html`<span class="tl-t">${g.clipL && html`<em>‹ ${shortDate(b.s)}</em>`}${coOf(x)}${x.title}</span>`}${inside && !outRight && !dg && html`<span class="tl-r">${metaOf(g)}${g.clipR && html`<em> ${shortDate(x.due)} ›</em>`}</span>`}${canDrag && !g.clipR && html`<i class="tl-h r" data-edge="end"></i>`}</button>`}
+   ${g.R > g.L && html`<button type="button" class=${cx('tl-bar', 'tl-' + x.status, g.tone && 'tl-' + g.tone, dg && 'dragging', canDrag && 'can-drag')} style=${`left:${P(g.L)};width:${P(g.R - g.L)}`} title=${dg ? '' : tipOf(b) + (canDrag ? '\n끌어서 일정 이동 · 양 끝을 끌어 시작일·마감 조정' : '')} onClick=${open} onPointerDown=${e => startDrag(e, orig)}>${canDrag && !g.clipL && html`<i class="tl-h l" data-edge="start"></i>`}${g.fill > 0 && html`<i class="tl-fill" style=${`width:${g.fill.toFixed(1)}%`}></i>`}${inside && html`<span class="tl-t">${g.clipL && html`<em>‹ ${shortDate(b.s)}</em>`}${coOf(x)}${x.title}</span>`}${inside && !outRight && !dg && html`<span class="tl-r">${metaOf(g)}${g.clipR && html`<em> ${shortDate(x.due)} ›</em>`}</span>`}${canDrag && !g.clipR && html`<i class="tl-h r" data-edge="end"></i>`}</button>`}
    ${g.extR > g.extL && html`<span class="tl-ext" style=${`left:${P(g.extL)};width:${P(g.extR - g.extL)}`}></span>`}
    ${dg ? html`<span class="tl-drag-tip" style=${outRight ? `left:calc(${P(end)} + 6px)` : `right:calc(${P(N - startVis)} + 6px)`}>${shortDate(b.s)} – ${shortDate(x.due)} · ${b.len}일</span>` : outRight ? html`<button type="button" class="tl-out" style=${`left:${P(end)}`} title=${tipOf(b)} onClick=${open}>${!inside && html`<b>${coOf(x)}${x.title}</b> · `}${metaOf(g)}</button>` : !inside && html`<button type="button" class="tl-out left" style=${`right:${P(N - startVis)}`} title=${tipOf(b)} onClick=${open}><b>${coOf(x)}${x.title}</b> · ${metaOf(g)}</button>`}
   </div>`;
  };
  const mrow = b => {
   const g = geo(b), x = b.x;
-  return html`<button type="button" class=${cx('tl-mrow', 'tl-' + g.tone)} key=${x.id} onClick=${() => onOpen(x.id)}>
+  return html`<button type="button" class=${cx('tl-mrow', 'tl-' + x.status, g.tone && 'tl-' + g.tone)} key=${x.id} onClick=${() => onOpen(x.id)}>
    <span class="tl-mtop"><strong>${coOf(x)}${x.title}</strong><small>${metaOf(g)}</small></span>
    <span class="tl-mtrack">${g.R > g.L && html`<i class="tl-mbar" style=${`left:${P(g.L)};width:${P(g.R - g.L)}`}><b style=${`width:${g.fill.toFixed(1)}%`}></b></i>`}${g.extR > g.extL && html`<i class="tl-mext" style=${`left:${P(g.extL)};width:${P(g.extR - g.extL)}`}></i>`}${tIdx >= 0 && tIdx < N && html`<i class="tl-mnow" style=${`left:${P(nowPos)}`}></i>`}</span>
    <span class="tl-mdates">${shortDate(b.s)} – ${shortDate(x.due)} · ${b.len}일</span>
@@ -2303,7 +2305,7 @@ function TeamTimeline({items, filter, onOpen, onPatch, busy}) {
   </div></div>
   <div class="tl-mob">${groups.map(g => html`<div class="tl-mgroup" key=${g.name || 'none'}>${whoOf(g)}${g.list.length ? g.list.map(mrow) : html`<p class="tl-empty">이 기간 업무 없음</p>`}</div>`)}</div>
   <div class="tl-foot">
-   <div class="tl-legend"><span><i class="sw fill"></i>채움 끝 = 진행률만큼 온 날</span><span><i class="sw now"></i>오늘</span><span><i class="sw todo"></i>예정</span><span><i class="sw risk"></i>지연 위험</span><span><i class="sw late"></i>마감 지남</span><span class="tl-hint">막대를 끌어 일정 이동 · 양 끝을 끌어 시작일·마감 조정</span>${outside > 0 && html`<span class="tl-outside">이 기간 밖 ${outside}건</span>`}</div>
+   <div class="tl-legend"><span><i class="sw fill"></i>채움 끝 = 진행률만큼 온 날</span><span><i class="sw now"></i>오늘</span><span><i class="sw todo"></i>예정</span><span><i class="sw hot"></i>급함 · 오늘·내일 마감</span><span><i class="sw late"></i>마감 지남</span><span><i class="sw risk"></i>지연 위험</span><span class="tl-hint">막대를 끌어 일정 이동 · 양 끝을 끌어 시작일·마감 조정</span>${outside > 0 && html`<span class="tl-outside">이 기간 밖 ${outside}건</span>`}</div>
    ${missing.length > 0 && html`<div class="tl-missing"><span>시작일이나 마감이 없어 빠진 업무 ${missing.length}건</span>${missing.slice(0, 8).map(x => html`<button type="button" class="chip" key=${x.id} title="눌러서 시작일·마감 정하기" onClick=${() => onOpen(x.id)}>${x.title}</button>`)}${missing.length > 8 && html`<small>외 ${missing.length - 8}건</small>`}</div>`}
   </div>
  </div>`;
