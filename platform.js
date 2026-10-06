@@ -179,7 +179,7 @@
     const who = SEAT_NAMES[v.assignee] || String(v.assignee || '');
     if (who !== me && who !== '함께') continue;
     const priv = v.category === 'personal';
-    days[v.day].push({start: v.start || '', end: v.end || '', title: priv ? '개인 일정' : String(v.title || '').slice(0, 80), private: priv, with: who === '함께' ? (v.board === 'B' ? SEAT_NAMES.jgj : v.board === 'A' ? SEAT_NAMES.kjs : '') : ''});
+    days[v.day].push({id: d.id, c: !!v.from_c, start: v.start || '', end: v.end || '', title: priv ? '개인 일정' : String(v.title || '').slice(0, 80), private: priv, with: who === '함께' ? (v.board === 'B' ? SEAT_NAMES.jgj : v.board === 'A' ? SEAT_NAMES.kjs : '') : ''});
    }
    for (const k of Object.keys(days)) days[k].sort((a, b) => (a.start || '').localeCompare(b.start || ''));
    const key = JSON.stringify(days); if (key === last) return;

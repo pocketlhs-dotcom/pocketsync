@@ -158,6 +158,15 @@ function TeamBoard() {
  // 댓글 확인·좋아요: 누른 사람 이름을 남긴다(다시 누르면 취소).
  async function markComment(c, kind) { const cur = (c.marks && c.marks[kind]) || [], next = cur.includes(me.name) ? cur.filter(n => n !== me.name) : [...cur, me.name]; try { await db.doc('comments/' + c.id).update({marks: {...(c.marks || {}), [kind]: next}}); } catch (e) { toast.error(friendlyError(e)); } }
  async function setAvatar(file, who = me.name) { const seat = SEATS.find(x => x.name === who) || me; try { const url = file ? await shrinkImage(file) : ''; await run(() => db.doc('avatars/C~' + seat.key).set({seat: seat.key, name: seat.name, url, board: 'C', updated_at: nowIso(), set_by: me.name}), `${seat.name === me.name ? '' : seat.name + ' '}프로필 사진을 ${file ? '바꿨어요' : '지웠어요'}.`); } catch (e) { if (e && e.message && !e.code) toast.error(e.message); } }
+ // 오늘의 미팅 추가: 이현성 혼자 일정(board 'all', A 보드 일정과 같은 형식)으로 저장한다. 이현성 화면의 일정 요약(watchLeeMeetings)이 C 문서에 옮겨 적는다.
+ async function addMeeting(m) {
+  if (!isAdmin) return; const id = uuid(), now = nowIso();
+  const start = TIME_RE.test(m.start || '') ? m.start : '', end = start ? (TIME_RE.test(m.end || '') && m.end > start ? m.end : `${String(Math.min(23, Number(start.slice(0, 2)) + 1)).padStart(2, '0')}:${start.slice(3)}`) : '';
+  const doc = {kind: 'event', title: String(m.title || '').trim().slice(0, 150), body: '', category: 'work', priority: 'share', ack: false, status: 'todo', day: today(), due: '', assignee: ADMIN_NAME, start, end, links: [], topic_id: '', topic_label: '', topic_map: {}, pinned: false, pinned_by: '', pinned_at: '', reply_by: '', progress: 0, ref_id: '', prio_no: 0, req: '', req_reply: '', req_at: '', checklist: [], share_all: false, plan_day: '', collab: '', collab_note: '', collab_by: '', collab_at: '', collab_reply: '', collab_reply_at: '', board: 'all', home: 'A', author_id: me.id, author_name: me.name, created_at: now, updated_at: now, updated_by: me.id, updated_by_name: me.name, last_change: '디자인팀 보드에서 미팅 추가', done_at: '', demo: 0, from_c: true};
+  if (!doc.title) return;
+  await run(() => db.doc('items/' + id).set(doc), '미팅을 넣었어요. A·B 보드 일정에도 보여요.');
+ }
+ async function removeMeeting(m) { if (!isAdmin || !m.id || !confirm(`‘${m.title}’ 미팅을 지울까요? A·B 보드 일정에서도 지워져요.`)) return; await run(() => db.doc('items/' + m.id).delete(), '미팅을 지웠어요.'); }
  async function editComment(c, body) { const t = String(body || '').trim(); if (!t) return; await run(() => db.doc('comments/' + c.id).update({body: t.slice(0, 3000), edited_at: nowIso()})); }
  async function deleteComment(c) { if (!confirm('댓글을 지울까요?')) return; await run(() => db.doc('comments/' + c.id).delete()); }
  async function addLink(x, link) { const cur = teamLinks(x.links); if (cur.length >= 20) throw new Error('링크는 20개까지 넣을 수 있어요.'); await patch(x, {links: [...cur, {id: newCheckId(), label: link.label, url: link.url, shared_by: me.name, shared_at: nowIso()}]}, '링크 추가'); }
@@ -216,7 +225,7 @@ function TeamBoard() {
   <main class="board-main team-main" id="top">
    <div class="board-tabs"><${TabsList} class="top-tabs" label="디자인팀 보드 보기" value=${tab} onChange=${v => go(v)} tabs=${Object.entries(TEAM_TABS).map(([k, l]) => ({value: k, content: html`<${Fragment}>${l}${k === 'orders' ? html`<span class="tab-count">${open.length}</span>` : k === 'issues' ? html`<span class=${cx('tab-count', (asksForMe.length + issues.length) && 'notification')} title="나에게 온 확인 요청 + 열린 특이사항">${asksForMe.length + issues.length}</span>` : k === 'report' ? html`<span class="tab-count">${reports.filter(r => r.day === today() && r.lines.length).length}</span>` : k === 'done' ? html`<span class="tab-count">${done.filter(x => !isArchived(x)).length}</span>` : ''}<//>`}))} /></div>
    ${loading ? html`<div class="loading">${I('Loader2', 22, {class: 'spin'})}보드를 불러오고 있어요.</div>` : html`<div class="team-body">
-    ${tab === 'status' && html`<${TeamStatus} meet=${meet} stab=${stab} onStab=${pickStab} items=${open} doneItems=${done.filter(x => !isArchived(x))} kpi=${kpi} issues=${issues} onGo=${go} isAdmin=${isAdmin} onPatch=${patch} onImport=${() => setImportOpen(true)} onCreate=${d => run(() => create(d), '업무를 추가했어요.')} onReorder=${reorder} who=${who} onWho=${setWho} onChecklist=${checklistAct} onAvatar=${setAvatar} ...${common} />`}
+    ${tab === 'status' && html`<${TeamStatus} meet=${meet} onMeetAdd=${addMeeting} onMeetRemove=${removeMeeting} stab=${stab} onStab=${pickStab} items=${open} doneItems=${done.filter(x => !isArchived(x))} kpi=${kpi} issues=${issues} onGo=${go} isAdmin=${isAdmin} onPatch=${patch} onImport=${() => setImportOpen(true)} onCreate=${d => run(() => create(d), '업무를 추가했어요.')} onReorder=${reorder} who=${who} onWho=${setWho} onChecklist=${checklistAct} onAvatar=${setAvatar} ...${common} />`}
     ${tab === 'orders' && html`<${TeamOrders} items=${open} who=${who} onWho=${setWho} isAdmin=${isAdmin} onCreate=${d => run(() => create(d), '오더를 등록했어요.')} onImport=${() => setImportOpen(true)} onPatch=${patch} onChecklist=${checklistAct} ...${common} />`}
     ${tab === 'due' && html`<${TeamDue} items=${open} done=${done} ...${common} />`}
     ${tab === 'issues' && html`<${Fragment}><${TeamAsks} asks=${asks} tasks=${open} comments=${comments} me=${me} busy=${busy} onCreate=${createAsk} onUpdate=${updateAsk} onDelete=${deleteAsk} onComment=${comment} onMark=${markComment} onOpenTask=${setSel} /><${TeamIssues} items=${issues} comments=${comments} all=${items} onPatch=${patch} ...${common} /><//>`}
@@ -263,14 +272,14 @@ function TeamMini({x, cmap, onOpen, showWho = true, extra, self = ''}) {
  </button>`;
 }
 
-function TeamStatus({meet = null, stab, onStab, items, doneItems = [], kpi, issues, cmap, onOpen, onGo, isAdmin, onPatch, onImport, onCreate, onReorder, who, onWho, onChecklist, onHandoff, busy, me, onAvatar}) {
+function TeamStatus({meet = null, onMeetAdd, onMeetRemove, stab, onStab, items, doneItems = [], kpi, issues, cmap, onOpen, onGo, isAdmin, onPatch, onImport, onCreate, onReorder, who, onWho, onChecklist, onHandoff, busy, me, onAvatar}) {
  const [view, setViewState] = useState(() => { try { return localStorage.getItem('ps.teamView') === 'timeline' ? 'timeline' : 'list'; } catch { return 'list'; } });
  const setView = v => { setViewState(v); try { localStorage.setItem('ps.teamView', v); } catch {} };
  const people = [...SEATS.map(s => ({key: s.key, name: s.name, list: items.filter(x => teamHas(x, s.name))}))];
  const tiles = [['진행 중', kpi.doing, () => onGo('status', 'all'), ''], ['오늘·내일 마감', kpi.soon, () => onGo('due'), kpi.soon ? 'warn' : ''], ['지난 마감', kpi.late, () => onGo('due'), kpi.late ? 'alert' : ''], ['특이사항', kpi.issue, () => onGo('issues'), kpi.issue ? 'alert' : ''], ['미배정', kpi.none, () => onGo('status', 'none'), kpi.none ? 'warn' : '']];
  return html`<section class="tb-status">
   ${issues.length > 0 && html`<div class="tb-alert">${I('AlertCircle', 16)}<strong>특이사항 ${issues.length}</strong><span>${issues[0].title} · ${TEAM_ISSUES[issues[0].issue]}${issues[0].issue_note ? ` · ${issues[0].issue_note}` : ''}</span><button type="button" class="text-button" onClick=${() => onGo('issues')}>모두 보기${I('ChevronRight', 13)}</button></div>`}
-  <div class=${cx('tb-split', view === 'timeline' && 'tl-on')}><div class="tb-left"><${TeamMeetings} doc=${meet} /><${TeamAssignList} view=${view} onView=${setView} stab=${stab} onStab=${onStab} items=${items} doneItems=${doneItems} cmap=${cmap} onOpen=${onOpen} isAdmin=${isAdmin} onPatch=${onPatch} onImport=${onImport} onCreate=${onCreate} onReorder=${onReorder} filter=${who} onFilter=${onWho} onChecklist=${onChecklist} onHandoff=${onHandoff} busy=${busy} /></div>
+  <div class=${cx('tb-split', view === 'timeline' && 'tl-on')}><div class="tb-left"><${TeamMeetings} doc=${meet} isAdmin=${isAdmin} busy=${busy} onAdd=${onMeetAdd} onRemove=${onMeetRemove} /><${TeamAssignList} view=${view} onView=${setView} stab=${stab} onStab=${onStab} items=${items} doneItems=${doneItems} cmap=${cmap} onOpen=${onOpen} isAdmin=${isAdmin} onPatch=${onPatch} onImport=${onImport} onCreate=${onCreate} onReorder=${onReorder} filter=${who} onFilter=${onWho} onChecklist=${onChecklist} onHandoff=${onHandoff} busy=${busy} /></div>
   <div class="tb-people">${people.map(p => { const doing = p.list.filter(x => x.status === 'doing').sort(teamOrder), wait = p.list.filter(x => x.status !== 'doing').sort(teamOrder), late = p.list.filter(teamLate).length, avg = p.list.length ? Math.round(p.list.reduce((a, x) => a + (x.progress || 0), 0) / p.list.length) : 0; return html`<article class="tb-person" key=${p.key}>
    <div class="tb-person-head">${p.key === 'none' ? html`<span class="avatar ghost">?</span>` : html`<${Av} name=${p.name} editable=${me && (p.name === me.name || me.name === ADMIN_NAME)} busy=${busy} onPick=${f => onAvatar(f, p.name)} />`}<div><strong>${p.name}</strong><small>진행 ${doing.length} · 대기 ${wait.length}${late ? html` · <b class="late">지연 ${late}</b>` : ''} · 평균 ${avg}%</small></div><button type="button" class="text-button" onClick=${() => onGo('status', p.key === 'none' ? 'none' : p.name)}>목록${I('ChevronRight', 13)}</button></div>
    <div class="tb-sub"><span>지금 하는 일</span></div>${doing.length ? doing.map(x => html`<${TeamMini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} showWho=${false} self=${p.name} />`) : html`<p class="tb-none">진행 중인 업무가 없어요.</p>`}
@@ -280,17 +289,40 @@ function TeamStatus({meet = null, stab, onStab, items, doneItems = [], kpi, issu
 }
 
 // 오늘의 미팅: 이현성 일정(A·B 보드)을 이현성 화면에서 요약해 둔 문서(items/C-meet-lhs)를 업무 리스트 위에 얇게 보여준다.
-function TeamMeetings({doc}) {
- const [, tick] = useState(0);
+// 이현성은 여기서 바로 미팅을 넣을 수 있다(오늘의 공유 일정 칸과 같은 입력 방식, 이현성 혼자 일정으로 저장되어 A·B 보드 일정에도 같이 보인다). 여기서 넣은 미팅은 x로 지운다.
+// A·B 보드에서도 같은 틀로 쓴다(그 보드에서 보이는 이현성 일정으로 만든 doc, 누르면 일정 상세).
+const josaWa = n => { const c = String(n || '').charCodeAt(String(n || '').length - 1) - 0xAC00; return c >= 0 && c <= 11171 && c % 28 === 0 ? '와' : '과'; };
+function TeamMeetings({doc, isAdmin = false, busy = false, onAdd, onRemove, onOpen}) {
+ const [, tick] = useState(0), [slot, setSlot] = useState(null), titleRef = useRef(null);
  useEffect(() => { const h = setInterval(() => tick(n => n + 1), 60000); return () => clearInterval(h); }, []);
  const t = today(), raw = doc && doc.days && Array.isArray(doc.days[t]) ? doc.days[t] : [];
- const list = raw.filter(m => m && typeof m === 'object').map(m => ({start: TIME_RE.test(m.start || '') ? m.start : '', end: TIME_RE.test(m.end || '') ? m.end : '', title: String(m.title || ''), private: !!m.private, with: String(m.with || '')}));
+ const list = raw.filter(m => m && typeof m === 'object').map(m => ({id: String(m.id || ''), c: !!m.c, start: TIME_RE.test(m.start || '') ? m.start : '', end: TIME_RE.test(m.end || '') ? m.end : '', title: String(m.title || ''), private: !!m.private, with: String(m.with || '')}));
  const now = new Intl.DateTimeFormat('en-GB', {timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false}).format(new Date());
  const on = m => !!m.start && m.start <= now && (m.end || m.start) > now, past = m => !!m.start && (m.end || m.start) <= now;
  const cur = list.find(on), next = list.find(m => m.start && m.start > now);
+ const canAdd = isAdmin && !!onAdd;
+ // 처음 시간: 다음 정각(최대 21시). 오늘 미팅이 그보다 늦게 끝나면 그 끝 시간부터.
+ const open = () => {
+  const base = fromMin(Math.min(21 * 60, (Math.floor(toMin(now) / 60) + 1) * 60)), ends = list.filter(m => m.end).map(m => m.end).sort(), lastEnd = ends[ends.length - 1];
+  const st = lastEnd && toMin(lastEnd) > toMin(base) && toMin(lastEnd) < 21 * 60 ? lastEnd : base;
+  setSlot({start: st, end: fromMin(Math.min(toMin(st) + 60, 1439)), title: ''});
+  setTimeout(() => { if (titleRef.current) titleRef.current.focus(); }, 0);
+ };
+ async function submit(e) {
+  e.preventDefault(); if (!slot || busy) return;
+  const title = slot.title.trim(); if (!title) { if (titleRef.current) titleRef.current.focus(); return; }
+  if (slot.start && slot.end && toMin(slot.end) <= toMin(slot.start)) { toast.error('끝나는 시간을 시작 시간보다 뒤로 맞춰 주세요.'); return; }
+  try { await onAdd({title: title.slice(0, 150), start: slot.start, end: slot.start ? slot.end : ''}); setSlot(null); } catch {}
+ }
+ const none = !doc ? '이현성 일정이 아직 공유되지 않았어요.' : '오늘 잡힌 미팅이 없어요.';
  return html`<section class="tb-meet" aria-label="오늘의 미팅">
   <div class="tb-meet-head">${I('CalendarClock', 16)}<strong>오늘의 미팅</strong><small>이현성 · ${Number(t.slice(5, 7))}월 ${Number(t.slice(8))}일 (${'일월화수목금토'[new Date(t + 'T12:00:00Z').getUTCDay()]})</small>${cur ? html`<span class="tb-meet-state now">지금 미팅 중</span>` : next ? html`<span class="tb-meet-state">다음 ${next.start}</span>` : ''}</div>
-  ${!doc ? html`<p class="tb-meet-empty">이현성 일정이 아직 공유되지 않았어요.</p>` : list.length ? html`<div class="tb-meet-list">${list.map((m, i) => html`<span key=${i} class=${cx('tb-meet-item', on(m) && 'now', past(m) && 'past', m.private && 'private')}><b>${m.start ? `${m.start}${m.end ? '–' + m.end : ''}` : '종일'}</b><span>${m.title}</span>${m.with ? html`<small>${m.with}과</small>` : ''}</span>`)}</div>` : html`<p class="tb-meet-empty">오늘 잡힌 미팅이 없어요.</p>`}
+  ${list.length || canAdd ? html`<div class="tb-meet-list">${list.map((m, i) => { const inner = html`<b>${m.start ? `${m.start}${m.end ? '–' + m.end : ''}` : '종일'}</b><span>${m.title}</span>${m.with ? html`<small>${m.with}${josaWa(m.with)}</small>` : ''}`, cls = cx('tb-meet-item', on(m) && 'now', past(m) && 'past', m.private && 'private'); return onOpen && m.id ? html`<button type="button" key=${m.id} class=${cls + ' open'} title="일정 열기" onClick=${() => onOpen(m.id)}>${inner}</button>` : html`<span key=${m.id || i} class=${cls}>${inner}${canAdd && m.c && m.id && onRemove && html`<button type="button" class="tb-meet-x" aria-label=${`${m.title} 지우기`} title="지우기" disabled=${busy} onClick=${() => onRemove(m)}>${I('X', 12)}</button>`}</span>`; })}${!list.length && !slot && html`<span class="tb-meet-none">${none}</span>`}${canAdd && !slot && html`<button type="button" class="agenda-row slot-add tb-meet-slot" onClick=${open}><span class="slot-plus">${I('Plus', 14)}</span><span>미팅 추가</span></button>`}</div>` : html`<p class="tb-meet-empty">${none}</p>`}
+  ${canAdd && slot && html`<form class="agenda-row slot-form tb-meet-form" aria-label="미팅 바로 추가" onSubmit=${submit} onKeyDown=${e => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); setSlot(null); } }} onFocusOut=${e => { const f = e.currentTarget; setTimeout(() => { if (f.isConnected && !f.contains(document.activeElement)) setSlot(x => (x && !x.title.trim() ? null : x)); }, 0); }}>
+   <span class="slot-times"><input type="time" aria-label="시작 시간" value=${slot.start} onChange=${e => { const v = e.target.value; setSlot(x => { if (!x) return x; if (!TIME_RE.test(v)) return {...x, start: v}; const dur = TIME_RE.test(x.start) && TIME_RE.test(x.end) ? Math.max(15, toMin(x.end) - toMin(x.start)) : 60; return {...x, start: v, end: fromMin(Math.min(toMin(v) + dur, 1439))}; }); }} /><span>–</span><input type="time" aria-label="끝 시간" value=${slot.end} onChange=${e => { const v = e.target.value; setSlot(x => x && {...x, end: v}); }} /></span>
+   <input ref=${titleRef} class="slot-title" aria-label="미팅 제목" placeholder="어떤 미팅인가요? Enter로 저장" maxLength="150" value=${slot.title} onInput=${e => { const v = e.target.value; setSlot(x => x && {...x, title: v}); }} />
+   <button class="slot-ok" aria-label="저장" title="저장" disabled=${busy || !slot.title.trim()}>${I('Check', 14)}</button><button type="button" class="slot-cancel" aria-label="취소" title="취소" onClick=${() => setSlot(null)}>${I('X', 14)}</button>
+  </form>`}
  </section>`;
 }
 
