@@ -1206,6 +1206,17 @@ select.check-by{appearance:none;-webkit-appearance:none;border:1px solid transpa
 .tl-mext{position:absolute;top:0;bottom:0;box-sizing:border-box;border:1px dashed #d99a92;border-left:0}
 .tl-mnow{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:#416cf0}
 .tl-mdates{font-size:11.5px;color:#9aa6b8}}
+.tl-bar.can-drag{cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.tl-bar.dragging{cursor:grabbing;box-shadow:0 3px 10px #0b1c5c2e;z-index:3}
+.tl-h{position:absolute;top:0;bottom:0;width:9px;cursor:ew-resize;z-index:2}
+.tl-h.l{left:0}.tl-h.r{right:0}
+.tl-h::after{content:'';position:absolute;top:4px;bottom:4px;left:3px;width:3px;border-radius:2px;background:#8ea6e0;opacity:0;transition:opacity .15s}
+.tl-bar:hover .tl-h::after,.tl-bar.dragging .tl-h::after{opacity:1}
+.tl-drag-tip{position:absolute;top:5px;height:20px;line-height:20px;padding:0 8px;border-radius:3px;background:#0b1c5c;color:#fff;font-size:12px;font-weight:600;white-space:nowrap;z-index:4;pointer-events:none}
+body.tl-dragging,body.tl-dragging *{cursor:grabbing!important;user-select:none!important;-webkit-user-select:none!important}
+body.tl-resizing,body.tl-resizing *{cursor:ew-resize!important}
+.tl-legend .tl-hint{color:#a3aec0}
+@media(max-width:640px){.tl-legend .tl-hint{display:none}}
 </style>
 </head><body>
 <div id="app"></div>
@@ -1215,6 +1226,6 @@ select.check-by{appearance:none;-webkit-appearance:none;border:1px solid transpa
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1791248830"></script>
-<script src="app.js?v=1791248830"></script>
+<script src="platform.js?v=1791249407"></script>
+<script src="app.js?v=1791249407"></script>
 </body></html>

@@ -2183,7 +2183,7 @@ function TeamAssignList({view = 'list', onView, stab, onStab: pickStab, items, d
    ${view !== 'timeline' && html`<form class="tb-assign-add" onSubmit=${add}>${I('Plus', 15)}<input aria-label="업무 추가" maxLength="150" placeholder=${pick ? `${teamWho(pick)}에게 줄 업무 한 줄 추가 후 Enter` : '업무 한 줄 추가 후 Enter (담당은 줄에서 바로 정하기)'} value=${title} onInput=${e => setTitle(e.target.value)} /><button class="tb-assign-go" disabled=${!title.trim() || busy} aria-label="추가">${I('ArrowRight', 15)}</button></form>`}
   </div>
 
-  ${view === 'timeline' ? html`<${TeamTimeline} items=${items} filter=${filter} onOpen=${onOpen} />` : html`<${Fragment}><div class="tb-stabs" role="tablist" aria-label="상태별 보기">${STABS.map(([k, l]) => html`<button type="button" role="tab" key=${k} class=${cx('tb-stab', 'st-' + k, stab === k && 'on')} aria-selected=${stab === k} onClick=${() => pickStab(k)}><i></i>${l}<b>${byWho(pool.filter(x => inTab(x, k))).length}</b></button>`)}</div>
+  ${view === 'timeline' ? html`<${TeamTimeline} items=${items} filter=${filter} onOpen=${onOpen} onPatch=${onPatch} busy=${busy} />` : html`<${Fragment}><div class="tb-stabs" role="tablist" aria-label="상태별 보기">${STABS.map(([k, l]) => html`<button type="button" role="tab" key=${k} class=${cx('tb-stab', 'st-' + k, stab === k && 'on')} aria-selected=${stab === k} onClick=${() => pickStab(k)}><i></i>${l}<b>${byWho(pool.filter(x => inTab(x, k))).length}</b></button>`)}</div>
   <div class="tb-assign-list" data-sort-list>${!list.length ? html`<p class="tb-none pad">${pool.length ? `${(STABS.find(t => t[0] === stab) || [])[1] || ''} 업무가 없어요.` : isAdmin ? '아직 업무가 없어요. A 보드에서 불러오거나 위에서 추가해 주세요.' : '아직 업무가 없어요.'}</p>` : list.map(x => { const d = dDay(x.due), st = checkStat(x); return html`<div class=${cx('tb-arow', 'st-' + x.status, !x.assignee && x.status !== 'done' && 'unassigned', x.issue && 'has-issue')} key=${x.id} data-sort-id=${x.id}>
    ${list.length > 1 && stab !== 'done' && html`<${SortGrip} id=${x.id} label="끌어서 순서 바꾸기" onDrop=${onReorder} />`}<${TeamDuePick} x=${x} busy=${busy} onPatch=${onPatch} />
    <div class="tb-arow-main"><button type="button" class="tb-arow-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong></button><span class="tb-arow-meta"><${TeamStatusPick} x=${x} busy=${busy} onPatch=${onPatch} />${x.src_board && html`<span class="tag tb-src">A${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${x.priority !== 'share' && html`<span class=${'tag priority-tag ' + x.priority}>${taskPriorities[x.priority]}</span>`}${x.issue && html`<span class=${'tag tb-issue ' + x.issue}>${TEAM_ISSUES[x.issue]}</span>`}<small>${[teamStartLabel(x), x.progress ? `${x.progress}%` : '', cmap[x.id] ? `댓글 ${cmap[x.id]}` : ''].filter(Boolean).join(' · ')}</small><button type="button" class=${cx('tb-check-chip', checksOpen[x.id] && 'on', !st.total && 'empty')} aria-expanded=${!!checksOpen[x.id]} onClick=${() => setChecksOpen(o => ({...o, [x.id]: !o[x.id]}))}>${I('ListChecks', 12)}${st.total ? `세부 ${st.done}/${st.total}` : '세부 업무'}${I(checksOpen[x.id] ? 'ChevronUp' : 'ChevronDown', 12)}</button></span></div>
@@ -2204,10 +2204,11 @@ function teamStartOf(x) {
  const d = at ? seoulDate(new Date(at)) : '';
  return DATE_RE.test(d) ? d : '';
 }
-function TeamTimeline({items, filter, onOpen}) {
+function TeamTimeline({items, filter, onOpen, onPatch, busy}) {
  const [range, setRangeState] = useState(() => { try { return localStorage.getItem('ps.teamTlRange') === '28' ? 28 : 14; } catch { return 14; } });
  const setRange = v => { setRangeState(v); try { localStorage.setItem('ps.teamTlRange', String(v)); } catch {} };
- const [offset, setOffset] = useState(0), [showShort, setShowShort] = useState(false);
+ const [offset, setOffset] = useState(0), [showShort, setShowShort] = useState(false), [drag, setDrag] = useState(null);
+ const justDragged = useRef(false);
  const N = range, t = today(), base = offsetDate(mondayOf(t), offset * 7), last = offsetDate(base, N - 1), b0 = teamDayNum(base), tIdx = teamDayNum(t) - b0, nowPos = tIdx + 0.5;
  const days = Array.from({length: N}, (_, i) => offsetDate(base, i));
  const P = v => `${(v / N * 100).toFixed(3)}%`;
@@ -2236,12 +2237,45 @@ function TeamTimeline({items, filter, onOpen}) {
  const coOf = x => teamList(x.assignee).length > 1 && html`<span class="tl-co" title=${`함께: ${teamWho(x.assignee)}`}>${I('Users', 12)}</span>`;
  const tipOf = b => `${b.x.title}\n${shortDate(b.s)} – ${shortDate(b.x.due)} (${b.len}일) · ${teamWho(b.x.assignee)} · ${statuses[b.x.status]} ${b.x.progress || 0}%`;
  const fitIn = N === 14 ? 3 : 5, room = N === 14 ? 2 : 4;
- const lane = b => {
-  const g = geo(b), x = b.x, inside = g.R - g.L >= fitIn, end = Math.max(g.R, g.extR), startVis = g.R > g.L ? g.L : g.extL, outRight = N - end >= room, open = () => onOpen(x.id);
+ // 끌어서 일정 조정: 막대 가운데 = 시작일·마감 함께 이동, 왼쪽 끝 = 시작일, 오른쪽 끝 = 마감. 하루 단위로 맞춰진다.
+ const dragDates = (b, mode, d) => { let s = b.s, e = b.x.due; if (mode === 'move') { s = offsetDate(s, d); e = offsetDate(e, d); } else if (mode === 'start') { s = offsetDate(s, d); if (s > e) s = e; } else { e = offsetDate(e, d); if (e < s) e = s; } return {s, e}; };
+ const dragBar = (b, mode, d) => { const {s, e} = dragDates(b, mode, d), si = teamDayNum(s) - b0, ei = teamDayNum(e) - b0; return {...b, s, si, ei, len: ei - si + 1, late: e < t, x: {...b.x, due: e}}; };
+ const startDrag = (ev, b) => {
+  if (ev.button !== 0 || !onPatch || busy) return;
+  const laneEl = ev.currentTarget.closest('.tl-lane'), edge = ev.target.closest && ev.target.closest('[data-edge]');
+  if (!laneEl) return;
+  const r = {id: b.x.id, b, mode: edge ? edge.dataset.edge : 'move', x0: ev.clientX, px: laneEl.getBoundingClientRect().width / N, moved: false, shown: false, d: 0};
+  const stop = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); document.body.classList.remove('tl-dragging', 'tl-resizing'); };
+  const move = e => {
+   const dx = e.clientX - r.x0;
+   if (!r.moved && Math.abs(dx) < 4) return;
+   if (!r.moved) { r.moved = true; document.body.classList.add('tl-dragging'); if (r.mode !== 'move') document.body.classList.add('tl-resizing'); }
+   let d = Math.round(dx / r.px);
+   if (r.mode === 'move') d = Math.max(-r.b.ei, Math.min(N - 1 - r.b.si, d));
+   if (d !== r.d || !r.shown) { r.d = d; r.shown = true; setDrag({id: r.id, mode: r.mode, d}); }
+  };
+  const up = async () => {
+   stop();
+   if (!r.moved) return;
+   justDragged.current = true; setTimeout(() => { justDragged.current = false; }, 0);
+   if (!r.d) { setDrag(null); return; }
+   const {s, e} = dragDates(r.b, r.mode, r.d);
+   const fields = r.mode === 'move' ? {start_on: s, due: e} : r.mode === 'start' ? {start_on: s} : {due: e};
+   const text = r.mode === 'move' ? `일정 이동 ${shortDate(s)} – ${shortDate(e)}` : r.mode === 'start' ? `${r.b.x.status === 'todo' ? '착수 예정' : '시작일'} ${shortDate(s)}` : `마감 ${shortDate(e)}`;
+   try { await onPatch(r.b.x, fields, text); } catch {} finally { setDrag(null); }
+  };
+  const cancel = () => { stop(); setDrag(null); };
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cancel);
+ };
+ const lane = orig => {
+  const dg = drag && drag.id === orig.x.id ? drag : null, b = dg ? dragBar(orig, dg.mode, dg.d) : orig;
+  const g = geo(b), x = b.x, inside = g.R - g.L >= fitIn, end = Math.max(g.R, g.extR), startVis = g.R > g.L ? g.L : g.extL, outRight = N - end >= room;
+  const open = () => { if (justDragged.current) { justDragged.current = false; return; } onOpen(x.id); };
+  const canDrag = !!onPatch;
   return html`<div class="tl-lane" key=${x.id}>
-   ${g.R > g.L && html`<button type="button" class=${cx('tl-bar', 'tl-' + g.tone)} style=${`left:${P(g.L)};width:${P(g.R - g.L)}`} title=${tipOf(b)} onClick=${open}>${g.fill > 0 && html`<i class="tl-fill" style=${`width:${g.fill.toFixed(1)}%`}></i>`}${inside && html`<span class="tl-t">${g.clipL && html`<em>‹ ${shortDate(b.s)}</em>`}${coOf(x)}${x.title}</span>`}${inside && !outRight && html`<span class="tl-r">${metaOf(g)}${g.clipR && html`<em> ${shortDate(x.due)} ›</em>`}</span>`}</button>`}
+   ${g.R > g.L && html`<button type="button" class=${cx('tl-bar', 'tl-' + g.tone, dg && 'dragging', canDrag && 'can-drag')} style=${`left:${P(g.L)};width:${P(g.R - g.L)}`} title=${dg ? '' : tipOf(b) + (canDrag ? '\n끌어서 일정 이동 · 양 끝을 끌어 시작일·마감 조정' : '')} onClick=${open} onPointerDown=${e => startDrag(e, orig)}>${canDrag && !g.clipL && html`<i class="tl-h l" data-edge="start"></i>`}${g.fill > 0 && html`<i class="tl-fill" style=${`width:${g.fill.toFixed(1)}%`}></i>`}${inside && html`<span class="tl-t">${g.clipL && html`<em>‹ ${shortDate(b.s)}</em>`}${coOf(x)}${x.title}</span>`}${inside && !outRight && !dg && html`<span class="tl-r">${metaOf(g)}${g.clipR && html`<em> ${shortDate(x.due)} ›</em>`}</span>`}${canDrag && !g.clipR && html`<i class="tl-h r" data-edge="end"></i>`}</button>`}
    ${g.extR > g.extL && html`<span class="tl-ext" style=${`left:${P(g.extL)};width:${P(g.extR - g.extL)}`}></span>`}
-   ${outRight ? html`<button type="button" class="tl-out" style=${`left:${P(end)}`} title=${tipOf(b)} onClick=${open}>${!inside && html`<b>${coOf(x)}${x.title}</b> · `}${metaOf(g)}</button>` : !inside && html`<button type="button" class="tl-out left" style=${`right:${P(N - startVis)}`} title=${tipOf(b)} onClick=${open}><b>${coOf(x)}${x.title}</b> · ${metaOf(g)}</button>`}
+   ${dg ? html`<span class="tl-drag-tip" style=${outRight ? `left:calc(${P(end)} + 6px)` : `right:calc(${P(N - startVis)} + 6px)`}>${shortDate(b.s)} – ${shortDate(x.due)} · ${b.len}일</span>` : outRight ? html`<button type="button" class="tl-out" style=${`left:${P(end)}`} title=${tipOf(b)} onClick=${open}>${!inside && html`<b>${coOf(x)}${x.title}</b> · `}${metaOf(g)}</button>` : !inside && html`<button type="button" class="tl-out left" style=${`right:${P(N - startVis)}`} title=${tipOf(b)} onClick=${open}><b>${coOf(x)}${x.title}</b> · ${metaOf(g)}</button>`}
   </div>`;
  };
  const mrow = b => {
@@ -2269,7 +2303,7 @@ function TeamTimeline({items, filter, onOpen}) {
   </div></div>
   <div class="tl-mob">${groups.map(g => html`<div class="tl-mgroup" key=${g.name || 'none'}>${whoOf(g)}${g.list.length ? g.list.map(mrow) : html`<p class="tl-empty">이 기간 업무 없음</p>`}</div>`)}</div>
   <div class="tl-foot">
-   <div class="tl-legend"><span><i class="sw fill"></i>채움 끝 = 진행률만큼 온 날</span><span><i class="sw now"></i>오늘</span><span><i class="sw todo"></i>예정</span><span><i class="sw risk"></i>지연 위험</span><span><i class="sw late"></i>마감 지남</span>${outside > 0 && html`<span class="tl-outside">이 기간 밖 ${outside}건</span>`}</div>
+   <div class="tl-legend"><span><i class="sw fill"></i>채움 끝 = 진행률만큼 온 날</span><span><i class="sw now"></i>오늘</span><span><i class="sw todo"></i>예정</span><span><i class="sw risk"></i>지연 위험</span><span><i class="sw late"></i>마감 지남</span><span class="tl-hint">막대를 끌어 일정 이동 · 양 끝을 끌어 시작일·마감 조정</span>${outside > 0 && html`<span class="tl-outside">이 기간 밖 ${outside}건</span>`}</div>
    ${missing.length > 0 && html`<div class="tl-missing"><span>시작일이나 마감이 없어 빠진 업무 ${missing.length}건</span>${missing.slice(0, 8).map(x => html`<button type="button" class="chip" key=${x.id} title="눌러서 시작일·마감 정하기" onClick=${() => onOpen(x.id)}>${x.title}</button>`)}${missing.length > 8 && html`<small>외 ${missing.length - 8}건</small>`}</div>`}
   </div>
  </div>`;
