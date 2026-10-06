@@ -755,6 +755,24 @@ function TeamAsks({asks, tasks, comments, me, busy, onCreate, onUpdate, onDelete
 }
 
 // 오늘의 업무보고: 사람별로 오늘 한 일 · 링크 · 메모를 남기고, 서로 댓글을 단다.
+// 메모 칸 높이 조절: 아래 가장자리 손잡이를 끌어 늘이고 줄인다(키보드 위·아래 화살표도). 고른 높이는 사람마다 기억, 두 번 누르면 기본으로.
+function MemoBox({hKey, field = '', children}) {
+ const DEF = 120, MIN = 80, MAX = 640, key = 'ps.memoH.' + hKey;
+ const [h, setH] = useState(() => { try { const v = Number(localStorage.getItem(key)); return v >= MIN && v <= MAX ? v : DEF; } catch { return DEF; } });
+ const refit = () => requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+ const save = v => { try { if (v === DEF) localStorage.removeItem(key); else localStorage.setItem(key, String(v)); } catch {} };
+ const set = v => { const n = Math.max(MIN, Math.min(MAX, Math.round(v))); setH(n); refit(); return n; };
+ const start = e => {
+  if (e.button !== 0) return; e.preventDefault();
+  const y0 = e.clientY, h0 = h; let last = h0;
+  const move = ev => { last = set(h0 + ev.clientY - y0); };
+  const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); document.body.classList.remove('memo-resizing'); save(last); };
+  document.body.classList.add('memo-resizing');
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+ };
+ return html`<div class="tb-memo-box" data-memo=${field || undefined} style=${`--memo-h:${h}px`}>${children}<div class="tb-memo-grip" role="separator" aria-orientation="horizontal" aria-label="메모 칸 높이 조절" aria-valuenow=${h} aria-valuemin=${MIN} aria-valuemax=${MAX} tabIndex="0" title="끌어서 칸 높이 조절 · 두 번 누르면 기본 높이" onPointerDown=${start} onDblClick=${() => save(set(DEF))} onKeyDown=${e => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); save(set(h + (e.key === 'ArrowDown' ? 20 : -20))); } }}><i></i></div></div>`;
+}
+
 function TeamReport({reports, tasks, comments, me, busy, onAct, onComment, onMark, onOpenTask, onAvatar}) {
  const [pickOpen, setPickOpen] = useState(false);
  const [day, setDay] = useState(today()), [text, setText] = useState(''), [taskId, setTaskId] = useState(''), [reply, setReply] = useState({});
@@ -766,21 +784,32 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onComment, onMar
  const lineOf = x => `${x.title}${x.status === 'done' ? ' · 완료' : x.progress ? ` · ${x.progress}%` : ''}`;
  const addLine = (t, task) => onAct(day, cur => ({lines: [...cur.lines, {id: newCheckId(), text: t, task_id: task ? task.id : '', task_title: task ? task.title : ''}]}), '');
  async function submit(e) { e.preventDefault(); const t = text.trim(); if (!t || busy) return; try { await addLine(t, null); setText(''); } catch {} }
+ // 저장하기: 지금 칸에 적혀 있는 것(한 줄 입력 중인 오늘 한 일, 두 메모)을 한 번에 저장한다. 버튼을 눌러도 입력 칸 포커스가 빠지지 않게 해 두 번 저장되며 겹치지 않게 한다.
+ async function saveAll(card) {
+  const memo = k => { const el = card && card.querySelector(`[data-memo="${k}"] textarea`); return el ? String(el.value || '').trim().slice(0, 3000) : null; };
+  const note = memo('note'), next = memo('next'), t = text.trim();
+  try {
+   await onAct(day, cur => ({...(note !== null ? {note} : {}), ...(next !== null ? {next} : {}), ...(t ? {lines: [...cur.lines, {id: newCheckId(), text: t.slice(0, 300), task_id: '', task_title: ''}]} : {})}), '업무보고를 저장했어요.');
+   if (t) setText('');
+   const a = document.activeElement; if (a && card && card.contains(a) && a.blur) a.blur();
+  } catch {}
+ }
  return html`<section class="tb-report">
   <div class="tb-rep-bar"><button type="button" class="icon-button" aria-label="이전 날" onClick=${() => setDay(offsetDate(day, -1))}>${I('ChevronLeft', 16)}</button><strong>${teamDay(day)} 업무보고</strong><button type="button" class="icon-button" aria-label="다음 날" disabled=${day >= today()} onClick=${() => setDay(offsetDate(day, 1))}>${I('ChevronRight', 16)}</button>${day !== today() && html`<button type="button" class="text-button" onClick=${() => setDay(today())}>오늘로</button>`}<small>${reports.filter(r => r.day === day && r.lines.length).length}/${SEATS.length}명 작성</small></div>
   <div class="tb-rep-grid">${people.map(s => { const r = repOf(s.key), isMe = s.key === me.id, cs = r ? comments.filter(c => c.item_id === r.id).sort((a, b) => a.created_at.localeCompare(b.created_at)) : []; if (!isMe && !r && s.name === ADMIN_NAME) return null; return html`<article class=${cx('tb-rep', isMe && 'mine')} key=${s.key}>
    <div class="tb-person-head"><${Av} name=${s.name} editable=${isMe || me.name === ADMIN_NAME} busy=${busy} onPick=${f => onAvatar(f, s.name)} /><div><strong>${s.name}${isMe ? ' (나)' : ''}</strong><small>${r && (r.lines.length || r.note || r.next || r.links.length) ? `${r.lines.length ? `${r.lines.length}건 · ` : '메모 · '}${teamClock(r.updated_at)} 수정` : '아직 작성 전'}</small></div></div>
    <div class="tb-sub"><span>오늘 한 일</span></div>
-   ${r && r.lines.length ? html`<ul class="tb-rep-lines">${r.lines.map(l => html`<li key=${l.id}><span class="tb-rep-dot"></span><div><${TeamText} text=${l.text} />${l.task_id && html`<button type="button" class="tag tb-ask-link" onClick=${() => onOpenTask(l.task_id)}>${I('Layers3', 12)}${l.text.startsWith(l.task_title) ? '업무 열기' : l.task_title}</button>`}</div>${isMe && html`<button type="button" class="link-chip-x" aria-label="빼기" disabled=${busy} onClick=${() => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), '')}>${I('X', 12)}</button>`}</li>`)}</ul>` : html`<p class="tb-none">${isMe ? '아래 칸에 오늘 한 일을 적어 주세요.' : '아직 남긴 내용이 없어요.'}</p>`}
+   ${r && r.lines.length ? html`<ul class="tb-rep-lines">${r.lines.map(l => html`<li key=${l.id}><span class="tb-rep-dot"></span><div><${TeamText} text=${l.text} />${l.task_id && html`<button type="button" class="tag tb-ask-link" onClick=${() => onOpenTask(l.task_id)}>${I('Layers3', 12)}${l.text.startsWith(l.task_title) ? '업무 열기' : l.task_title}</button>`}</div>${isMe && html`<button type="button" class="link-chip-x" aria-label="빼기" disabled=${busy} onClick=${() => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), '')}>${I('X', 12)}</button>`}</li>`)}</ul>` : !isMe && html`<p class="tb-none">아직 남긴 내용이 없어요.</p>`}
    ${isMe && html`<${Fragment}>
     <form class="tb-rep-add" onSubmit=${submit}><input maxLength="300" placeholder="오늘 한 일을 한 줄로 적고 Enter" value=${text} onInput=${e => setText(e.target.value)} /><button class="secondary-button" disabled=${busy || !text.trim()}>추가</button></form>
     ${suggest.length > 0 && html`<div class="tb-rep-suggest"><span>${I('Sparkles', 13)}오늘 손댄 업무 ${suggest.length}건</span><button type="button" class="text-button" disabled=${busy} onClick=${() => onAct(day, cur => ({lines: [...cur.lines, ...suggest.map(x => ({id: newCheckId(), text: lineOf(x), task_id: x.id, task_title: x.title}))]}), '')}>한 번에 넣기</button><button type="button" class="text-button" onClick=${() => setPickOpen(v => !v)}>${pickOpen ? '접기' : '골라 넣기'}</button>${pickOpen && html`<div class="tb-rep-picks">${suggest.map(x => html`<button type="button" key=${x.id} class="chip" disabled=${busy} onClick=${() => addLine(lineOf(x), x)}>${I('Plus', 11)}${lineOf(x)}</button>`)}</div>`}</div>`}`}
    <div class="tb-sub"><span>링크</span></div>
    ${isMe ? html`<${LinkChips} links=${my.links} editable=${true} busy=${busy} max=${20} addLabel="링크 공유" idPrefix=${'rep-' + day} onAdd=${l => onAct(day, cur => ({links: [...cur.links, {id: newCheckId(), label: l.label, url: l.url, shared_by: me.name, shared_at: nowIso()}]}), '')} onRemove=${i => onAct(day, cur => ({links: cur.links.filter((_, k) => k !== i)}), '')} />` : r && r.links.length ? html`<${LinkChips} links=${r.links} editable=${false} />` : html`<p class="tb-none">공유한 링크가 없어요.</p>`}
    <div class="tb-sub"><span>오늘 업무 메모</span></div>
-   ${isMe ? html`<${AutoText} class="tb-d-body tb-rep-memo" value=${my.note} label="오늘 업무 메모" placeholder="오늘 진행한 업무의 특이사항, 공유할 내용 (선택)" maxLength="3000" disabled=${busy} onCommit=${v => onAct(day, () => ({note: v}), '')} />` : r && r.note ? html`<${TeamText} text=${r.note} />` : html`<p class="tb-none">메모가 없어요.</p>`}
+   ${isMe ? html`<${MemoBox} hKey="rep-note" field="note"><${AutoText} class="tb-d-body tb-rep-memo" value=${my.note} label="오늘 업무 메모" placeholder="오늘 진행한 업무의 특이사항, 공유할 내용 (선택)" maxLength="3000" disabled=${busy} onCommit=${v => onAct(day, () => ({note: v}), '')} /><//>` : r && r.note ? html`<${TeamText} text=${r.note} />` : html`<p class="tb-none">메모가 없어요.</p>`}
    <div class="tb-sub"><span>내일 할 일 메모</span></div>
-   ${isMe ? html`<${AutoText} class="tb-d-body tb-rep-memo" value=${my.next} label="내일 할 일 메모" placeholder="내일 이어서 할 일, 미리 준비할 것 (선택)" maxLength="3000" disabled=${busy} onCommit=${v => onAct(day, () => ({next: v}), '')} />` : r && r.next ? html`<${TeamText} text=${r.next} />` : html`<p class="tb-none">적은 내용이 없어요.</p>`}
+   ${isMe ? html`<${MemoBox} hKey="rep-next" field="next"><${AutoText} class="tb-d-body tb-rep-memo" value=${my.next} label="내일 할 일 메모" placeholder="내일 이어서 할 일, 미리 준비할 것 (선택)" maxLength="3000" disabled=${busy} onCommit=${v => onAct(day, () => ({next: v}), '')} /><//>` : r && r.next ? html`<${TeamText} text=${r.next} />` : html`<p class="tb-none">적은 내용이 없어요.</p>`}
+   ${isMe && html`<div class="tb-rep-save"><small>${r && r.updated_at ? `${teamClock(r.updated_at)} 저장됨` : '아직 저장 전'}</small><button type="button" class="primary-button tb-rep-save-btn" onMouseDown=${e => e.preventDefault()} onClick=${e => saveAll(e.currentTarget.closest('article'))}>${I('Check', 15)}저장하기</button></div>`}
    ${r && html`<div class="tb-rep-comments"><div class="tb-sub"><span>댓글 ${cs.length || ''}</span></div>${cs.map(c => html`<div class="tb-ask-c" key=${c.id}><${Av} name=${personName(c.author_name)} mini /><div><b>${personName(c.author_name)}</b><small>${teamDay(inSeoul(c.created_at))} ${teamClock(c.created_at)}</small><${TeamText} text=${c.body} /><${TeamMarks} c=${c} me=${me} onMark=${onMark} /></div></div>`)}<form class="tb-ask-reply" onSubmit=${async e => { e.preventDefault(); const t = (reply[r.id] || '').trim(); if (!t) return; try { await onComment(r, t); setReply(x => ({...x, [r.id]: ''})); } catch {} }}><input maxLength="3000" placeholder=${isMe ? '덧붙일 말' : `${s.name}님에게 댓글`} value=${reply[r.id] || ''} onInput=${e => { const v = e.target.value; setReply(x => ({...x, [r.id]: v})); }} /><button class="secondary-button" disabled=${busy || !(reply[r.id] || '').trim()}>남기기</button></form></div>`}
   </article>`; })}</div>
  </section>`;

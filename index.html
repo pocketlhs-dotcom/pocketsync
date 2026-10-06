@@ -1306,6 +1306,18 @@ button.tb-meet-row:hover{background:#f8faff}
 @keyframes gate-spin{to{transform:rotate(360deg)}}
 @media(max-width:640px){.login-gate{min-height:calc(100vh - 180px)}.gate-card{padding:30px 20px 26px}}
 .tb-d-body.tb-rep-memo{min-height:120px;line-height:1.6}
+.tb-memo-box{position:relative;padding-bottom:6px}
+.tb-memo-box .tb-d-body.tb-rep-memo{min-height:var(--memo-h,120px);display:block}
+.tb-memo-grip{position:absolute;left:0;right:0;bottom:-2px;height:14px;cursor:ns-resize;display:flex;align-items:center;justify-content:center;touch-action:none;z-index:1;outline:none}
+.tb-memo-grip i{display:block;width:40px;height:4px;border-radius:2px;background:#d3dae8;transition:background .15s,width .15s}
+.tb-memo-box:hover .tb-memo-grip i{background:#aab9da}
+.tb-memo-grip:hover i,.tb-memo-grip:focus-visible i,body.memo-resizing .tb-memo-grip i{background:#315df8;width:56px}
+body.memo-resizing,body.memo-resizing *{cursor:ns-resize!important;user-select:none!important;-webkit-user-select:none!important}
+.tb-rep-suggest>span+.text-button{margin-left:auto}
+.tb-rep-suggest>.tb-rep-picks{flex-basis:100%}
+.tb-rep-save{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:6px;padding-top:14px;border-top:1px solid #eef1f7}
+.tb-rep-save small{font-size:12px;color:#9aa6b8}
+.tb-rep-save-btn{min-height:38px!important;padding:0 18px!important;font-size:14px!important}
 </style>
 </head><body>
 <div id="app"></div>
@@ -1315,6 +1327,6 @@ button.tb-meet-row:hover{background:#f8faff}
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1791254157"></script>
-<script src="app.js?v=1791254157"></script>
+<script src="platform.js?v=1791254402"></script>
+<script src="app.js?v=1791254402"></script>
 </body></html>
