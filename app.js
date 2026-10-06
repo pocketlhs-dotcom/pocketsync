@@ -2173,7 +2173,7 @@ function TeamAssignList({stab, onStab: pickStab, items, doneItems = [], cmap, on
  const assign = async (x, v) => { const next = teamToggle(x.assignee, v); await onPatch(x, {assignee: next}, next ? `담당 ${teamWho(next)}` : '담당 비움'); if (x.assignee && onHandoff) onHandoff(x, x.assignee, next); };
  async function add(e) { e.preventDefault(); const t = title.trim(); if (!t || busy) return; try { await onCreate({title: t.slice(0, 150), assignee: pick, due: dueOf(), priority}); setTitle(''); if (stab !== 'todo' && stab !== 'all') pickStab('todo'); } catch {} }
  return html`<section class="tb-assign">
-  <div class="tb-assign-head"><div><strong>업무 리스트</strong><small>줄마다 담당을 눌러 바로 배정해요 · 새로 만든 업무는 맨 위 · 왼쪽 손잡이를 끌어 순서를 바꿔요</small></div>${isAdmin && html`<button type="button" class="tb-import-btn" onClick=${onImport}>${I('Download', 15)}A 보드에서 불러오기</button>`}</div>
+  <div class="tb-assign-head"><div><strong>업무 리스트</strong></div>${isAdmin && html`<button type="button" class="tb-import-btn" onClick=${onImport}>${I('Download', 15)}A 보드에서 불러오기</button>`}</div>
   <div class="tb-assign-tools"><div class="dv-who" role="group" aria-label="담당 필터">${filters.map(([v, l, n]) => html`<button type="button" key=${v} class="chip" aria-pressed=${filter === v} onClick=${() => setFilter(v)}>${l}<span>${n}</span></button>`)}</div>
    <form class="tb-assign-add" onSubmit=${add}>${I('Plus', 15)}<input aria-label="업무 추가" maxLength="150" placeholder=${pick ? `${teamWho(pick)}에게 줄 업무 한 줄 추가 후 Enter` : '업무 한 줄 추가 후 Enter (담당은 줄에서 바로 정하기)'} value=${title} onInput=${e => setTitle(e.target.value)} /><button class="tb-assign-go" disabled=${!title.trim() || busy} aria-label="추가">${I('ArrowRight', 15)}</button></form>
   </div>
