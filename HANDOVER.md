@@ -38,6 +38,7 @@
 - db 래퍼: 저장할 때 `board` 필드를 자동으로 넣고, 목록은 `where('board','in',VISIBLE)`로 읽습니다. `visibleFor`: A·B = [보드, 'all'], C = ['C'](디자이너는 'all'을 보지 못함).
 - 이전 루틴: lhs·kjs 로그인 때만 실행(meta/boards_v2, meta/checkin_v2). lhs만 개발 카테고리 공유(meta/share_dev_v1). B 첫 사용 시 카테고리 시드(meta/seed_B).
 - C와 A·B 연결 동기화: 이현성 클라이언트에서만 `watchTeamLinks`가 C 업무를 구독해 A·B 원본 문서에 `c_link`(상태·진행률·담당·마감·특이사항)를 씁니다(캐시 localStorage `ps.clink`). 디자이너는 A·B에 쓸 수 없기 때문입니다.
+- 오늘의 미팅 동기화: 이현성 클라이언트에서만 `watchLeeMeetings`가 A·B·'all'의 일정(kind event)을 구독해, 오늘부터 7일치 이현성 일정(혼자·함께)을 C 문서 `items/C-meet-lhs`(team_type 'meeting', days{날짜:[{id,c,start,end,title,private,with}]})로 요약합니다. 개인 일정은 제목을 '개인 일정'으로 바꿔 적습니다. 캐시 localStorage `ps.cmeet`.
 - 실시간 구독만 씁니다(주기 재조회 없음, 무료 읽기 한도 보호).
 
 ## Firestore 규칙 요약 (firestore.rules.example)
@@ -47,9 +48,11 @@
 - 사람 추가 절차: (1) 이메일(소문자)의 SHA-256을 `src/seat-hashes.json`에 자리 id로 추가 (2) `SEAT_NAMES`·`BOARDS`·`SEAT_BOARDS` 수정 (3) 빌드·push (4) 이현성이 콘솔 규칙 `boards()`에 실제 이메일을 넣고 게시.
 
 ## 데이터
-- 컬렉션: topics(카테고리), items(기록), comments, acks, reactions, profiles, members, checkins(오늘의 나), presence(지금 상태), seen(새 소식), daynotes, shares(외부 공유), avatars(C 프로필 이미지). 모든 문서에 `board`('A'|'B'|'C'|'all').
+- 컬렉션: topics(카테고리), items(기록), comments, acks, reactions, profiles, members, checkins(오늘의 나), presence(지금 상태), seen(새 소식), daynotes, shares(외부 공유), avatars(프로필 사진: 문서 id `보드~자리`, 이현성은 `all~lhs`(A·B)와 `C~lhs`를 함께 씀, 128px JPEG data URL). 모든 문서에 `board`('A'|'B'|'C'|'all').
 - items.kind: event(일정) / daily(전할 말) / task(업무).
-- 업무 공통 필드: status, assignee, due, priority, progress, checklist[{id,text,pct,done,by,at}], prio_no(수동 순서, 0=없음), links, done_at. A·B 원본이 C와 연결되면 `c_link`.
+- 업무 공통 필드: status, assignee, due, start_on(시작일), priority, progress, checklist[{id,text,pct,done,by,at}], prio_no(수동 순서, 0=없음), links, done_at. A·B 원본이 C와 연결되면 `c_link`.
+- start_on: A·B도 normItem·validateItem에 포함(빠지면 A·B 저장 때 지워짐). 진행 중으로 바뀔 때 비었거나 미래면 그날로 자동 기록(A·B ops.patch, C patch).
+- 오늘의 미팅에서 넣은 일정: kind event, assignee 이현성, board 'all'(A·B 공통), C에서 넣으면 `from_c: true`(C 띠에서 x로 지움).
 - 댓글 `marks`: {check:[이름], like:[이름]} (확인·좋아요, 누른 사람 표시).
 - C 전용
   - 담당 여러 명은 이름을 '·'로 연결. '모두' = 셋 다, 예전 '함께' = 디자이너 둘, '' = 미배정.
@@ -66,6 +69,10 @@
 - 그 밖: 오늘의 나, 지금 상태, 새 소식, 컴퓨터 알림, 검색, 외부 공유 링크(보드 전체 / 업무 현황), 카테고리를 다른 보드에 보기 전용으로 공유.
 - C와 연결된 업무에는 "디자인팀 진행 중 60%" 태그(CLinkTag, 특이사항 있으면 느낌표).
 - 마감 빠른 선택의 '모레'는 +2일. D-day 당일 표기는 '오늘'.
+- 함께하는 일: 보드(칸반)·목록·타임라인 전환(localStorage `ps.taskView`). 타임라인은 C와 같은 `Timeline` 컴포넌트로, 묶음은 위쪽 탭(협업=함께 / 사람 혼자 / 전체)을 따름. 목록은 상태 탭(진행 중·예정·보류·완료·남은 일 전체, `ps.taskStab`).
+- 기록 줄의 업무 상태는 C와 같은 상태 배지(`TeamStatusPick`)로 바로 변경. 상세에 '시작일' 칸.
+- 서로의 스케줄·함께하는 일 맨 위에 '오늘의 미팅'(이현성 일정, 그 보드에서 보이는 혼자·함께 일정, 누르면 상세). 이현성은 '+ 미팅 추가'로 바로 입력.
+- 프로필 사진: 계정 메뉴에서 넣기·바꾸기·지우기. 아바타가 나오는 곳 모두 `PersonAv`(part2)로 사진 표시.
 
 ### C 디자인팀 보드 (src/part4-team.js)
 - 탭: 팀 현황 / 오더 / 마감 / 확인 요청 및 특이사항 / 오늘의 업무보고 / 완료.
@@ -78,14 +85,16 @@
 - 상세: 담당(여러 명·미배정·셋 다), 마감, 중요도, 상태, 착수 예정(예정 상태일 때), 진행률, 특이사항, 링크, 세부 업무, 댓글(확인·좋아요, 수정·삭제), 업무 기록 타임라인(같은 사람의 10분 안 연속 변경은 합침).
 - '업무 자세히 보기': 내용(바로 수정), 요청 세부 업무(spec), A 원본(다를 때만), 링크 모음.
 - 이현성만 보는 것: '다른 보드 연결'(접힘) — A·B로 보내기, 연결 끊기. 디자이너는 'A 보드 원본: 제목' 한 줄만.
+- 팀 현황 업무 리스트 위 '오늘의 미팅': `items/C-meet-lhs`를 보여주고, 이현성은 '+ 미팅 추가'(오늘의 공유 일정 칸과 같은 입력 줄)로 바로 입력. 지금 진행 중이면 '지금 미팅 중'.
 - 인수인계 메모 기능은 10-02에 삭제(세부 업무 실무자 표시로 대체). 예전 메모는 업무 기록의 '메모' 버튼으로만 보입니다.
 
 ## 사용자 선호·결정
 - 보고: "요청사항 - 결과" 형식, 진행 피드백 최소, 이모지 금지. 결정이 갈리면 물어보고 진행.
 - 디자인: 작은 컨트롤 모서리 3px 통일, 상태 색 점 쓰지 않음, Pretendard 폰트, lucide 아이콘.
+- A·B·C 공통 요소(10-06): 제목 남색 #0b1c5c, 카드 모서리 7px·테두리 #e1e4f3, 상태 색(진행 중 #315df8/#e8edff, 예정 회색, 보류 #b9771f/#fff3e2, 완료 #3f8c66/#e9f6ef), 주 버튼 #315df8, 상태 이름 '보류'. 화면 구성은 보드마다 유지.
 - 상단 헤더 #0B1C5C, 로고 마크(p) 없이 글자만. 보드 전환 묶음 배경 #020a2b·모서리 5px, 탭 3px. 파비콘 `favicon.svg`(+ `favicon-32.png`, `apple-touch-icon.png`).
 - C 운영: 오더 탭은 팀 현황과 합치지 않고 유지, 요약 숫자(KPI) 칸 제거, 업무보고는 한 줄 입력 + "오늘 손댄 업무" 넣기, 업무 리스트 담당 버튼에 '셋 다' 없음.
-- 프로필 이미지는 C 보드만(A·B는 요청 시).
+- 프로필 사진은 A·B·C 모두(10-06).
 
 ## 검증 방법
 - Playwright + Chromium으로 가짜 Firebase(메모리 Firestore·Auth)를 끼워 데스크톱 1440 / 모바일 390에서 열어 확인해 왔습니다.
