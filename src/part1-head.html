@@ -1284,4 +1284,11 @@ button.tb-meet-row:hover{background:#f8faff}
 .tb-meet .slot-add.tb-meet-slot{background:transparent}
 .tb-meet .slot-add.tb-meet-slot:hover{background:#f6f9ff}
 .tb-meet-rows>.tb-meet-empty{padding:10px 8px 4px}
+.tb-meet-row.editable{cursor:pointer}
+.tb-meet-row.editable:hover{background:#f8faff}
+.tb-meet-row.editable:focus-visible{outline:2px solid #9bb2fd;outline-offset:-2px}
+.tb-meet-pen{margin-left:auto;display:inline-grid;place-items:center;width:26px;height:26px;color:#a3aec0;opacity:0;transition:opacity .15s}
+.tb-meet-row.editable:hover .tb-meet-pen,.tb-meet-row.editable:focus-visible .tb-meet-pen{opacity:1}
+.tb-meet-pen+.tb-meet-x{margin-left:0}
+@media(hover:none){.tb-meet-pen{opacity:1}}
 </style>

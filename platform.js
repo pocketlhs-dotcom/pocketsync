@@ -167,7 +167,7 @@
   }, e => console.error('team links', e));
  }
 
- // 이현성 일정 → 디자인팀 보드 '오늘의 미팅'. 디자이너는 A·B('all' 포함)를 읽을 수 없어서, 이현성 화면이 열려 있을 때
+ // 이현성 일정 → 디자인팀 보드 '오늘 미팅'. 디자이너는 A·B('all' 포함)를 읽을 수 없어서, 이현성 화면이 열려 있을 때
  // 오늘부터 7일치 이현성 일정(혼자·함께)을 C 문서 하나(items/C-meet-lhs)로 요약해 둔다. 개인 일정은 제목을 숨긴다.
  function watchLeeMeetings() {
   const fmt = new Intl.DateTimeFormat('en-CA', {timeZone: 'Asia/Seoul'}), dayAt = n => fmt.format(new Date(Date.now() + n * 864e5)), me = SEAT_NAMES.lhs;

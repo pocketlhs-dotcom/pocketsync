@@ -687,7 +687,7 @@ function Board() {
  async function react(target, day, kind, forAt, note = '') { try { await mutate((db, ctx) => ops.react(db, ctx, target, day, kind, forAt, note), `${REACTIONS[kind]} 하고 전했어요.`, ['reactions']); } catch {} }
 
  const showKind = view === 'weekly' || (view === 'today' && kindFilter === 'all');
- // 오늘의 미팅(이현성 일정): C 보드와 같은 틀. 이 보드에서 보이는 이현성 혼자 일정 + 이 보드의 함께 일정. 개인 일정은 다른 사람에게 제목을 숨긴다.
+ // 오늘 미팅(이현성 일정): C 보드와 같은 틀. 이 보드에서 보이는 이현성 혼자 일정 + 이 보드의 함께 일정. 개인 일정은 다른 사람에게 제목을 숨긴다.
  const leePartner = (SEATS.find(x => x.name !== ADMIN_NAME) || {}).name || '';
  const leeMeetDoc = {days: {[today()]: items.filter(e => e.kind === 'event' && e.day === today() && [ADMIN_NAME, '함께'].includes(personName(e.assignee))).sort((a, b) => (a.start || '').localeCompare(b.start || '')).map(e => ({id: e.id, start: e.start, end: e.end, title: displayTitle(e, me.id), private: e.category === 'personal', with: personName(e.assignee) === '함께' ? (myName === leePartner ? '나' : leePartner) : ''}))}};
  const addLeeMeeting = m => mutate((db, ctx) => ops.create(db, ctx, {kind: 'event', title: m.title, start: m.start, end: m.end, assignee: ADMIN_NAME, category: 'work', day: today(), topic_id: ''}), '미팅을 넣었어요. 다른 보드에서도 보여요.', ['items']);
