@@ -32,7 +32,6 @@ function TeamMarks({c, me, onMark}) {
  return html`<div class="tb-marks"><button type="button" class=${cx('tb-mark check', mine('check') && 'on')} title=${m.check.length ? `확인: ${m.check.join(', ')}` : '확인했어요'} onClick=${() => onMark(c, 'check')}>${I('Check', 12)}${m.check.length ? m.check.length : '확인'}</button><button type="button" class=${cx('tb-mark like', mine('like') && 'on')} title=${m.like.length ? `좋아요: ${m.like.join(', ')}` : '좋아요'} onClick=${() => onMark(c, 'like')}>${I('Heart', 12)}${m.like.length || ''}</button>${who && html`<small>${who}</small>`}</div>`;
 }
 // 프로필 사진: avatars 컬렉션(C~자리, board 'C')에 128px로 줄인 이미지를 저장한다.
-const teamAvatars = {map: {}};
 function Av({name, mini = false, editable = false, onPick, busy = false}) {
  const url = teamAvatars.map[name] || '', inner = url ? html`<img src=${url} alt="" />` : String(name || '?').slice(0, 1);
  if (!editable) return html`<span class=${cx('avatar', mini && 'mini', url && 'has-img')}>${inner}</span>`;
@@ -157,7 +156,7 @@ function TeamBoard() {
  async function comment(x, body) { const t = String(body || '').trim(); if (!t) return; await run(() => db.doc('comments/' + uuid()).set({item_id: x.id, author_id: me.id, author_name: me.name, body: t.slice(0, 3000), links: [], created_at: nowIso()})); }
  // 댓글 확인·좋아요: 누른 사람 이름을 남긴다(다시 누르면 취소).
  async function markComment(c, kind) { const cur = (c.marks && c.marks[kind]) || [], next = cur.includes(me.name) ? cur.filter(n => n !== me.name) : [...cur, me.name]; try { await db.doc('comments/' + c.id).update({marks: {...(c.marks || {}), [kind]: next}}); } catch (e) { toast.error(friendlyError(e)); } }
- async function setAvatar(file, who = me.name) { const seat = SEATS.find(x => x.name === who) || me; try { const url = file ? await shrinkImage(file) : ''; await run(() => db.doc('avatars/C~' + seat.key).set({seat: seat.key, name: seat.name, url, board: 'C', updated_at: nowIso(), set_by: me.name}), `${seat.name === me.name ? '' : seat.name + ' '}프로필 사진을 ${file ? '바꿨어요' : '지웠어요'}.`); } catch (e) { if (e && e.message && !e.code) toast.error(e.message); } }
+ async function setAvatar(file, who = me.name) { const seat = SEATS.find(x => x.name === who) || me; try { const url = file ? await shrinkImage(file) : ''; await run(async () => { const doc = {seat: seat.key, name: seat.name, url, updated_at: nowIso(), set_by: me.name}; await db.doc('avatars/C~' + seat.key).set({...doc, board: 'C'}); if (seat.key === 'lhs') { try { await db.doc('avatars/all~lhs').set({...doc, board: 'all'}); } catch (e) { console.error('avatar all', e); } } }, `${seat.name === me.name ? '' : seat.name + ' '}프로필 사진을 ${file ? '바꿨어요' : '지웠어요'}.`); } catch (e) { if (e && e.message && !e.code) toast.error(e.message); } }
  // 오늘의 미팅 추가: 이현성 혼자 일정(board 'all', A 보드 일정과 같은 형식)으로 저장한다. 이현성 화면의 일정 요약(watchLeeMeetings)이 C 문서에 옮겨 적는다.
  async function addMeeting(m) {
   if (!isAdmin) return; const id = uuid(), now = nowIso();

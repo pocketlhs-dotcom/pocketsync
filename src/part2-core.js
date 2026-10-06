@@ -336,6 +336,9 @@ function LinkFields({value, onChange, idPrefix = 'link'}) {
 function LinkEntry({link, onContext, compact = false}) {
  return html`<div class=${cx('shared-link', compact && 'compact')}><a class="shared-link-title" href=${safeLink(link.url)} target="_blank" rel="noreferrer"><span class="link-icon">${I('Link2', 16)}</span><strong>${linkName(link)}</strong>${I('ArrowUpRight', 15)}</a><p class="link-context" title=${link.context}>${link.context}</p><div class="link-attribution"><span>${!link.exactTime ? '항목 작성 ' : ''}${link.author}</span><${Stamp} at=${link.at} prefix=${link.exactTime ? '' : '항목 생성 '} /></div>${!link.exactTime && !compact && html`<small class="legacy-note">이전 링크는 추가 시각이 기록되지 않아 항목 생성 시각을 표시합니다.</small>`}${onContext && html`<button type="button" class="context-button" onClick=${onContext}>${link.item_title}${I('ChevronRight', 13)}</button>`}</div>`;
 }
+// 프로필 사진: 보드마다 avatars 컬렉션(이름 → 128px 이미지)을 받아 채운다. 사진이 없으면 이름 첫 글자.
+const teamAvatars = {map: {}};
+function PersonAv({name, mini = false, cls = ''}) { const n = String(name || ''), url = teamAvatars.map[n] || ''; return html`<span class=${cx('avatar', mini && 'mini', cls, url && 'has-img')}>${url ? html`<img src=${url} alt="" />` : n.slice(0, 1) || '?'}</span>`; }
 function RecordRow({item, comments, busy, onOpen, onStatus, onEditField, topicName, canWrite, meId, showKind = false, fresh = false, confirmReq = null, onConfirm, replyTag = null, onChecklist = null}) {
  const [checksOpen, setChecksOpen] = useState(false);
  const masked = isMasked(item, meId), title = displayTitle(item, meId), body = masked ? '' : item.body, editable = canWrite && !masked;
