@@ -167,6 +167,29 @@
   }, e => console.error('team links', e));
  }
 
+ // 이현성 일정 → 디자인팀 보드 '오늘의 미팅'. 디자이너는 A·B('all' 포함)를 읽을 수 없어서, 이현성 화면이 열려 있을 때
+ // 오늘부터 7일치 이현성 일정(혼자·함께)을 C 문서 하나(items/C-meet-lhs)로 요약해 둔다. 개인 일정은 제목을 숨긴다.
+ function watchLeeMeetings() {
+  const fmt = new Intl.DateTimeFormat('en-CA', {timeZone: 'Asia/Seoul'}), dayAt = n => fmt.format(new Date(Date.now() + n * 864e5)), me = SEAT_NAMES.lhs;
+  let last = ''; try { last = localStorage.getItem('ps.cmeet') || ''; } catch (e) {}
+  const onRows = async s => {
+   const days = {}; for (let i = 0; i < 7; i++) days[dayAt(i)] = [];
+   for (const d of s.docs) {
+    const v = d.data() || {}; if (v.kind !== 'event' || !days[v.day]) continue;
+    const who = SEAT_NAMES[v.assignee] || String(v.assignee || '');
+    if (who !== me && who !== '함께') continue;
+    const priv = v.category === 'personal';
+    days[v.day].push({start: v.start || '', end: v.end || '', title: priv ? '개인 일정' : String(v.title || '').slice(0, 80), private: priv, with: who === '함께' ? (v.board === 'B' ? SEAT_NAMES.jgj : v.board === 'A' ? SEAT_NAMES.kjs : '') : ''});
+   }
+   for (const k of Object.keys(days)) days[k].sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+   const key = JSON.stringify(days); if (key === last) return;
+   try { await fs.doc('items/C-meet-lhs').set({kind: 'team_meeting', team_type: 'meeting', board: 'C', home: 'C', owner: 'lhs', days, updated_at: new Date().toISOString()}); last = key; try { localStorage.setItem('ps.cmeet', key); } catch (e) {} } catch (e) { console.error('lee meetings', e); }
+  };
+  const base = fs.collection('items').where('board', 'in', ['A', 'B', 'all']);
+  // 색인이 없다는 오류가 나면 일정만 고르는 조건을 빼고 받아서 화면에서 거른다.
+  base.where('kind', '==', 'event').onSnapshot(onRows, e => { console.error('lee meetings', e); if (e && e.code === 'failed-precondition') base.onSnapshot(onRows, er => console.error('lee meetings', er)); });
+ }
+
  async function sha256(text) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -265,7 +288,7 @@
     return;
    }
    mounted = true;
-   if (seat === 'lhs') watchTeamLinks();
+   if (seat === 'lhs') { watchTeamLinks(); watchLeeMeetings(); }
    root().innerHTML = '';
    preact.render(preact.h(Board, null), root());
   });
