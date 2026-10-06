@@ -14,7 +14,7 @@
 - `src/icons.js` 아이콘 데이터
 - `src/part2-core.js` 데이터 규칙·공용 컴포넌트
 - `src/part3-app.js` A·B 보드 화면
-- `src/part4-team.js` C 디자인팀 보드 화면, 보드별 진입점
+- `src/part4-team.js` C 디자인팀 보드 화면, A·B의 디자인팀 탭(보기 전용), 보드별 진입점
 - `src/platform-firebase.js` Firebase 연결·로그인·보드 구분
 - `src/seat-hashes.json` 허용 이메일의 SHA-256 → 자리
 - `vendor/` Preact 10.29.8, htm 3.1.1, Firebase 10.14.1 (compat)

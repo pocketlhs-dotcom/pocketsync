@@ -14,15 +14,18 @@ service cloud.firestore {
         : me() == 'EMAIL_AEJ' ? ['C'] : [];
     }
     function member() { return signedIn() && boards().size() > 0; }
+    // 디자인팀(C) 보기 전용: A·B 보드 사람(권중선 · 정규진)은 C의 업무 · 댓글 · 사진을 읽고, C 댓글(확인 · 좋아요 포함)만 쓸 수 있습니다.
+    function cReader() { return !('C' in boards()); }
+    function cView(col) { return cReader() && col in ['items', 'comments', 'avatars']; }
     // 외부 공유 링크: 주소(토큰)를 아는 사람은 그 문서 하나만 읽을 수 있습니다.
     match /shares/{token} {
       allow get: if true;
     }
     match /{col}/{id} {
-      allow read: if member() && (resource == null || resource.data.board in boards());
-      allow create: if member() && request.resource.data.board in boards();
-      allow update: if member() && resource.data.board in boards() && request.resource.data.board in boards();
-      allow delete: if member() && resource.data.board in boards();
+      allow read: if member() && (resource == null || resource.data.board in boards() || (resource.data.board == 'C' && cView(col)));
+      allow create: if member() && (request.resource.data.board in boards() || (col == 'comments' && request.resource.data.board == 'C' && cReader()));
+      allow update: if member() && ((resource.data.board in boards() && request.resource.data.board in boards()) || (col == 'comments' && resource.data.board == 'C' && request.resource.data.board == 'C' && cReader()));
+      allow delete: if member() && (resource.data.board in boards() || (col == 'comments' && resource.data.board == 'C' && cReader()));
     }
   }
 }

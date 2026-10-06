@@ -149,6 +149,16 @@
   const [its, tops] = await Promise.all([fs.collection('items').where('board', 'in', [b, 'all']).get(), fs.collection('topics').where('board', '==', b).get()]);
   return {items: its.docs.map(d => ({id: d.id, ...d.data()})), topics: tops.docs.map(d => ({id: d.id, ...d.data()}))};
  };
+ // A·B 보드 '디자인팀' 탭: C 업무 · 댓글 · 사진을 구독한다(보기 전용, 댓글만 쓴다). 탭을 처음 열 때 한 번 붙고 페이지를 닫을 때까지 유지.
+ // 권중선 · 정규진은 Firestore 규칙의 cReader가 있어야 읽을 수 있다. 없으면 permission-denied로 onErr가 불린다.
+ window.PS_C_SEATS = BOARDS.C.seats.map(k => ({key: k, name: SEAT_NAMES[k]}));
+ window.PS_WATCH_C = (cb, onErr) => {
+  const st = {items: [], comments: [], avatars: []}, got = {}, push = () => { if (got.items && got.comments && got.avatars) cb({...st}); };
+  let failed = false;
+  const sub = (col, key) => fs.collection(col).where('board', '==', 'C').onSnapshot(s => { st[key] = s.docs.map(d => ({id: d.id, ...d.data()})); got[key] = true; push(); }, e => { console.error('watch C', col, e); if (key === 'avatars') { got.avatars = true; push(); return; } if (!failed) { failed = true; if (onErr) onErr(e); } });
+  const us = [sub('items', 'items'), sub('comments', 'comments'), sub('avatars', 'avatars')];
+  return () => us.forEach(u => { try { u(); } catch (e) {} });
+ };
  // 이현성이 어느 보드를 열어 두든: C 오더의 진행 상황을 A 원본(c_link)에 옮겨 적는다. 디자이너는 A에 쓸 수 없어서 이현성 쪽에서 맞춘다.
  function watchTeamLinks() {
   let seen = {}; try { seen = JSON.parse(localStorage.getItem('ps.clink') || '{}') || {}; } catch (e) {}
