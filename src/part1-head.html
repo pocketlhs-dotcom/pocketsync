@@ -1616,4 +1616,22 @@ body.memo-resizing,body.memo-resizing *{cursor:ns-resize!important;user-select:n
 .dv-stats{flex-wrap:wrap;align-items:center}
 @media(max-width:640px){.ab-notices .pl-group-head>small{flex:1 1 100%;order:3}.ab-notices .pl-group-head>.tb-import-btn,.ab-notices .pl-group-head>.ab-pins{margin-left:auto}.dv-stats>.dv-tools{flex-basis:100%;margin-left:0!important}}
 @media(max-width:940px) and (min-width:641px){.presence-peek{display:none}.header-profile>strong{display:none}}
+/* 상세 아래 속성(10-07): C 칩 줄처럼 '이름 | 내용' 한 줄씩 */
+.prop-grid.ab-props{display:flex;flex-direction:column;gap:10px;margin:0 0 20px;padding:0 0 18px;border-bottom:1px solid #eef0f7}
+.ab-props>.prop{display:grid;grid-template-columns:56px minmax(0,1fr);align-items:start;gap:10px;flex-direction:row}
+.ab-props>.prop>dt{font-size:13px;font-weight:700;color:#a7a7a7;line-height:1.35;padding-top:7px;white-space:nowrap}
+.ab-props>.prop>dd{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;min-height:32px;min-width:0}
+.ab-props .prop-value{min-height:30px;font-size:13.5px;color:#1d2a44}
+.ab-props .prop-hint{font-size:12px;color:#a3aabd;line-height:1.5}
+.ab-props .prop-chip,.ab-props .prop-field{height:30px;border-radius:3px;border-color:#ededed;font-size:13px}
+.ab-props .prop-toggle{height:30px;padding:0 10px;border-radius:3px;font-size:13px;font-weight:600}
+.ab-props .prop-row{min-height:30px;gap:6px 8px}
+.ab-props .clink-prop{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;min-height:30px}
+.ab-props .clink-prop>.tag{font-size:12.5px;padding:3px 8px}
+.ab-props .confirm-box{flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.ab-props .confirm-box>.confirm-req,.ab-props .confirm-box>.confirm-form{flex:1 1 100%}
+.ab-props .confirm-start{flex:none}
+.ab-props .collab-box{padding:9px 12px;border-radius:5px}
+.ab-props .collab-box>p{font-size:13px}
+@media(max-width:640px){.ab-props>.prop{grid-template-columns:minmax(0,1fr);gap:4px}.ab-props>.prop>dt{padding-top:0}}
 </style>
