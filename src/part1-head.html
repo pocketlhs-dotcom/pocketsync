@@ -1651,4 +1651,79 @@ p.ab-clink-hint{display:block}
 .ab-props .clink-prop>.prop-hint{flex-basis:100%}
 @media(max-width:640px){.ab-clink{padding:10px 12px}.ab-clink-fields>div{grid-template-columns:minmax(0,1fr)!important}.ab-clink-pick{max-width:none}}
 .tb-rep-save>small.tb-rep-pending{color:#c27a1c;font-weight:600;margin-right:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 링크 폭 가득(10-07): 흰 바탕 · 진한 이름 · 파란 아이콘(A·B 업무 상세 · C 업무보고 공통) */
+.link-chips.wide .link-chip{background:#fff;border-color:#e1e4f3;color:#1d2a44}
+.link-chips.wide .link-chip:hover{border-color:#a9b8ef;background:#f8faff}
+.link-chips.wide .link-chip>a{color:#1d2a44}
+.link-chips.wide .link-chip>a>svg:first-child{color:#315df8}
+.link-chips.wide .link-chip>a:hover>span{color:#315df8}
+.link-chips.wide .link-host{color:#8a93ab}
+.link-chips.wide .link-go{color:#a3aec4}
+.link-chips.wide .link-chip:hover .link-go{color:#315df8}
+.link-chips.wide .link-chip-x{color:#a3aec4}
+.link-chips.wide .link-chip.add{background:#fff;border-color:#d6dcec;color:#6b7591;font-weight:600}
+.link-chips.wide .link-chip.add:hover{border-color:#95a8eb;color:#315df8;background:#f5f7ff}
+.detail-head .link-chips.wide{margin-top:12px}
+/* C 링크모음(10-07) */
+.lk-view{display:flex;flex-direction:column;gap:14px}
+.lk-bar{align-items:center}
+.lk-tools{display:flex;align-items:center;gap:8px;margin-left:auto}
+.lk-search{display:flex;align-items:center;gap:6px;height:34px;padding:0 10px;border:1px solid #dfe3ef;border-radius:5px;background:#fff;color:#8f95ab;width:260px;box-sizing:border-box}
+.lk-search:focus-within{border-color:#95a8eb;box-shadow:0 0 0 3px #e8edff}
+.lk-search input{flex:1;min-width:0;border:0!important;outline:0;box-shadow:none!important;padding:0!important;height:auto;font-size:13.5px;background:transparent}
+.lk-group .pl-group-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lk-group-head>small{margin-left:auto!important;flex-basis:auto!important}
+.lk-task-title{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;color:#0b1c5c;text-align:left;min-width:0}
+.lk-task-title:hover{color:#315df8}
+.lk-list{list-style:none;margin:0;padding:0}
+.lk-row{display:flex;flex-direction:column;gap:6px;padding:12px 24px;border-top:1px solid #eef0f7}
+.lk-list>.lk-row:first-child{border-top:0}
+.lk-link{display:flex;align-items:center;gap:10px;min-width:0;color:#1d2a44}
+.lk-ico{display:grid;place-items:center;width:30px;height:30px;border-radius:6px;background:#eef2ff;color:#315df8;flex-shrink:0}
+.lk-name{display:flex;flex-direction:column;min-width:0;flex:1}
+.lk-name>strong{font-size:14.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lk-name>small{font-size:12px;color:#8a93ab;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lk-go{display:inline-flex;color:#a3aec4;font-style:normal;flex-shrink:0}
+.lk-link:hover .lk-name>strong,.lk-link:hover .lk-go{color:#315df8}
+.lk-info{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;padding-left:40px}
+.lk-ctx{display:inline-flex;align-items:center;gap:4px;max-width:280px;height:24px;padding:0 8px;border-radius:3px;background:#f3f5fa;color:#5f6b85;font-size:12px;font-weight:600;min-width:0}
+.lk-ctx>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lk-ctx.task{background:#eef2ff;color:#315df8}
+.lk-ctx.task:hover{background:#e3e9ff}
+.lk-more{font-size:12px;color:#8f95ab;font-weight:600}
+.lk-who{font-size:12px;color:#a0a6b8;margin-left:auto;white-space:nowrap}
+.lk-copy{display:grid;place-items:center;width:26px;height:26px;border-radius:4px;color:#a3aec4;flex-shrink:0}
+.lk-copy:hover{background:#eef2ff;color:#315df8}
+.lk-group>.dv-more{margin:4px 24px 14px}
+@media(max-width:640px){.lk-tools{width:100%;margin-left:0}.lk-search{flex:1;width:auto}.lk-row{padding:12px 14px}.lk-info{padding-left:0}.lk-who{margin-left:0}.lk-ctx{max-width:100%}.lk-group-head>small{margin-left:0!important}}
+/* 업무보고 작성 현황 달력(10-07) */
+.tb-rep-bar{position:relative}
+.tb-rep-cal{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 10px;margin-left:4px;border:1px solid #dfe3ef;border-radius:5px;background:#fff;color:#5b6fa8;font-size:12.5px;font-weight:600}
+.tb-rep-cal:hover,.tb-rep-cal.on{border-color:#95a8eb;color:#315df8;background:#f5f7ff}
+.rc-pop{position:absolute;top:calc(100% + 8px);left:0;z-index:30;width:380px;max-width:calc(100vw - 32px);box-sizing:border-box;padding:14px 16px 12px;background:#fff;border:1px solid #e1e4f3;border-radius:8px;box-shadow:0 12px 32px #0b1c5c1f}
+.rc-head{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.rc-head strong{font-size:15px!important;color:#0b1c5c;min-width:104px;text-align:center}
+.rc-head .rc-x{margin-left:auto}
+.rc-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.rc-wd{font-size:11.5px;font-weight:700;color:#a3aabd;text-align:center;padding-bottom:2px}
+.rc-wd.we{color:#c7a3a3}
+.rc-day{display:flex;flex-direction:column;align-items:center;gap:3px;min-height:52px;padding:6px 2px 4px;border:1px solid transparent;border-radius:5px;background:#f8f9fc;color:#1d2a44}
+.rc-day>b{font-size:13px;font-weight:700;line-height:1}
+.rc-day>small{font-size:10.5px!important;font-weight:700!important;color:#8f95ab!important;margin:0!important;line-height:1}
+.rc-day.all>small{color:#2f9e6e!important}
+.rc-day.we{background:#fbfbfd}
+.rc-day.we>b{color:#b07b7b}
+.rc-day.out{opacity:.45}
+.rc-day.future{opacity:.35;cursor:default}
+.rc-day.today{border-color:#95a8eb}
+.rc-day.on{background:#e8edff;border-color:#315df8}
+.rc-day:not(:disabled):hover{border-color:#95a8eb;background:#f2f5ff}
+.rc-dots{display:flex;gap:3px;height:6px}
+.rc-dots>i{width:6px;height:6px;border-radius:50%;background:#e3e6ef}
+.rc-sum{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;margin-top:12px;padding-top:10px;border-top:1px solid #eef0f7;font-size:12.5px;color:#5f6b85}
+.rc-sum-label{font-weight:700;color:#8f95ab}
+.rc-person{display:inline-flex;align-items:center;gap:5px}
+.rc-person>i{width:7px;height:7px;border-radius:50%}
+.rc-person>b{color:#0b1c5c;margin-left:2px}
+@media(max-width:640px){.tb-rep-cal>span{display:none}.tb-rep-cal{padding:0 8px}.rc-pop{left:-4px;width:calc(100vw - 28px)}.rc-day{min-height:46px}}
 </style>
