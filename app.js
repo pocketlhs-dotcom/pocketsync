@@ -301,6 +301,39 @@ function TabsList({class: cls = '', value, onChange, tabs, label}) {
 function ToggleGroup({class: cls = '', value, onChange, items, label}) {
  return html`<div class=${cx('toggle-group', cls)} role="group" aria-label=${label}>${items.map(i => html`<button type="button" key=${i.value} data-slot="toggle-group-item" data-state=${value === i.value ? 'on' : 'off'} aria-pressed=${value === i.value} class=${i.class || ''} title=${i.title} aria-label=${i.ariaLabel} onClick=${() => onChange(i.value)}>${i.content}</button>`)}</div>`;
 }
+// 앱 모양 드롭다운(기본 select 대신): 버튼을 누르면 아래(자리가 없으면 위)로 목록이 열리고, 위 · 아래 화살표 · Enter · Esc로도 고른다.
+// options: [{value, label, meta?, pct?, group?, action?, blank?}] — group이 바뀌는 곳에 묶음 이름, action은 맨 아래에 줄을 나눠 따로(예: 직접 적기), blank는 골라도 버튼에 안내 문구를 둔다.
+// grid: % 고르기처럼 칩 격자. size 'sm': 작은 버튼.
+function Pick({value, options, onChange, label, placeholder = '고르기', disabled = false, class: cls = '', grid = false, size = ''}) {
+ const [open, setOpen] = useState(false), [up, setUp] = useState(false), [right, setRight] = useState(false), [act, setAct] = useState(-1);
+ const wrap = useRef(null), btn = useRef(null), list = useRef(null);
+ const sel = options.find(o => !o.action && !o.blank && o.value === value);
+ useEffect(() => { if (!open) return; const off = e => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); }; document.addEventListener('pointerdown', off); return () => document.removeEventListener('pointerdown', off); }, [open]);
+ useEffect(() => { if (!open || act < 0 || !list.current) return; const el = list.current.querySelector(`[data-i="${act}"]`); if (el && el.scrollIntoView) el.scrollIntoView({block: 'nearest'}); }, [open, act]);
+ // 목록은 버튼보다 좁아지지 않고 최소 260px. 오른쪽 자리가 모자라면 오른쪽 끝에 맞춘다.
+ const show = () => { if (disabled || !btn.current) return; const r = btn.current.getBoundingClientRect(), below = window.innerHeight - r.bottom; setUp(below < 300 && r.top > below); setRight(r.left + Math.max(r.width, 260) > window.innerWidth - 12); setAct(Math.max(0, options.findIndex(o => !o.action && o.value === value))); setOpen(true); };
+ const choose = o => { setOpen(false); if (btn.current) btn.current.focus(); if (o.action || o.value !== value) onChange(o.value); };
+ const key = e => {
+  if (!open) { if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); show(); } return; }
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); }
+  else if (e.key === 'ArrowDown' || (grid && e.key === 'ArrowRight')) { e.preventDefault(); setAct(i => Math.min(options.length - 1, i + 1)); }
+  else if (e.key === 'ArrowUp' || (grid && e.key === 'ArrowLeft')) { e.preventDefault(); setAct(i => Math.max(0, i - 1)); }
+  else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (options[act]) choose(options[act]); }
+  else if (e.key === 'Tab') setOpen(false);
+ };
+ const has = v => v !== undefined && v !== null;
+ const body = []; let group;
+ options.forEach((o, i) => {
+  if (o.action && !grid) body.push(html`<div class="pk-sep" key=${'s' + i}></div>`);
+  else if (!grid && o.group !== group) { group = o.group; if (o.group) body.push(html`<div class="pk-group" key=${'g' + i}>${o.group}</div>`); }
+  const on = !o.action && o.value === value;
+  body.push(html`<button type="button" role="option" key=${'o' + i} data-i=${i} tabIndex="-1" aria-selected=${on} class=${cx('pk-opt', o.action && 'act', on && 'on', act === i && 'hl', has(o.pct) && o.pct >= 100 && 'full')} onMouseEnter=${() => setAct(i)} onClick=${() => choose(o)}>${grid ? o.label : html`<span class="pk-check">${on ? I('Check', 14) : o.action ? I('Plus', 14) : ''}</span><span class="pk-main"><span class="pk-label">${o.label}</span>${o.meta ? html`<span class="pk-meta">${o.meta}</span>` : ''}</span>${has(o.pct) ? html`<span class="pk-pct"><span class="pk-bar"><i style=${`width:${o.pct}%`}></i></span><b>${o.pct}%</b></span>` : ''}`}</button>`);
+ });
+ return html`<div class=${cx('pk', cls, size && 'pk-' + size, open && 'open')} ref=${wrap}>
+  <button type="button" ref=${btn} class="pk-btn" aria-haspopup="listbox" aria-expanded=${open} aria-label=${label} disabled=${disabled} onClick=${() => (open ? setOpen(false) : show())} onKeyDown=${key}><span class="pk-val">${sel ? html`<span class="pk-label">${sel.label}</span>${sel.meta && !grid ? html`<span class="pk-meta">${sel.meta}</span>` : ''}` : html`<span class="pk-ph">${placeholder}</span>`}</span>${I('ChevronDown', 15)}</button>
+  ${open && html`<div class=${cx('pk-pop', up && 'up', right && 'right', grid && 'grid')} role="listbox" aria-label=${label} ref=${list}>${body}</div>`}
+ </div>`;
+}
 function Choice({value, onChange, options, label, disabled = false, class: cls = '', id}) {
  return html`<select id=${id} class=${cx('choice', cls)} aria-label=${label} disabled=${disabled} value=${value} onChange=${e => onChange(e.target.value)}>${Object.entries(options).map(([key, text]) => html`<option key=${key} value=${key}>${text}</option>`)}</select>`;
 }
@@ -2789,7 +2822,8 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
  const groupsOf = r => { const gs = []; (r ? r.lines : []).forEach(l => { const k = l.task_id || ''; let g = gs.find(x => x.k === k); if (!g) { g = {k, lines: []}; gs.push(g); } g.lines.push(l); }); return [...gs.filter(g => g.k), ...gs.filter(g => !g.k)]; };
  const countOf = r => groupsOf(r).reduce((n, g) => n + (g.k ? Math.max(1, g.lines.filter(l => !projLine(l)).length) : g.lines.length), 0);
  const xBtn = (label, fn) => html`<button type="button" class="link-chip-x" aria-label=${label} title=${label} disabled=${busy} onClick=${fn}>${I('X', 12)}</button>`;
- const pctView = (v, set, label) => set ? html`<label class=${cx('tb-rep-pct', v >= 100 && 'full')}><span class="tb-rep-pct-bar"><i style=${`width:${v}%`}></i></span><select aria-label=${label} value=${String(v)} disabled=${busy} onChange=${e => set(Number(e.target.value))}>${pctOpts(v).map(o => html`<option value=${String(o)}>${o}%</option>`)}</select></label>` : html`<span class=${cx('tb-rep-pct ro', v >= 100 && 'full')}><span class="tb-rep-pct-bar"><i style=${`width:${v}%`}></i></span><b>${v}%</b></span>`;
+ const pctPick = (v, set, label, cls = '') => html`<${Pick} class=${cls} size=${cls ? '' : 'sm'} grid=${true} label=${label} value=${v} disabled=${busy} options=${pctOpts(v).map(o => ({value: o, label: `${o}%`}))} onChange=${n => set(Number(n))} />`;
+ const pctView = (v, set, label) => set ? html`<span class=${cx('tb-rep-pct', v >= 100 && 'full')}><span class="tb-rep-pct-bar"><i style=${`width:${v}%`}></i></span>${pctPick(v, set, label)}</span>` : html`<span class=${cx('tb-rep-pct ro', v >= 100 && 'full')}><span class="tb-rep-pct-bar"><i style=${`width:${v}%`}></i></span><b>${v}%</b></span>`;
  const subLine = (l, t, isMe) => {
   const c = t && l.check_id ? t.checklist.find(x => x.id === l.check_id) : null, v = c && isToday ? c.pct : l.pct, name = c ? c.text : l.text;
   return html`<li key=${l.id}><span class="tb-rep-dot"></span><div class="tb-rep-subtext"><${TeamText} text=${name} />${c && c.by ? html`<small>${c.by}</small>` : ''}</div>${v !== null && v !== undefined ? pctView(v, isMe && c && onCheck ? n => setLinePct(l, t, c, n) : null, `진행률: ${name}`) : html`<span></span>`}${isMe ? xBtn('빼기', () => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), '')) : ''}</li>`;
@@ -2804,19 +2838,16 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
  };
  const workView = (r, isMe) => { const gs = groupsOf(r); return gs.length ? html`<div class="tb-rep-work">${gs.map(g => g.k ? projView(g, isMe) : html`<ul class="tb-rep-lines" key="free">${g.lines.map(l => html`<li key=${l.id}><span class="tb-rep-dot"></span><div><${TeamText} text=${l.text} /></div>${isMe ? xBtn('빼기', () => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), '')) : ''}</li>`)}</ul>`)}</div>` : ''; };
  const optT = x => `${x.title}${x.status === 'done' ? ' · 완료' : ` · ${x.progress || 0}%`}`;
+ const projMeta = (x, who) => [statuses[x.status], x.due ? dDay(x.due).label : '', who ? teamWho(x.assignee) : ''].filter(Boolean).join(' · ');
  const form = html`<form class="tb-rep-form" onSubmit=${async e => { e.preventDefault(); try { await addEntry(); } catch {} }}>
-  <select class="tb-rep-sel proj" aria-label="프로젝트" value=${proj} disabled=${busy} onChange=${e => pickProj(e.target.value)}>
-   <option value="">프로젝트 고르기 (없으면 한 줄로 적기)</option>
-   ${mineT.length > 0 && html`<optgroup label="내 업무">${mineT.map(x => html`<option value=${x.id} key=${x.id}>${optT(x)}</option>`)}</optgroup>`}
-   ${otherT.length > 0 && html`<optgroup label="다른 업무">${otherT.map(x => html`<option value=${x.id} key=${x.id}>${optT(x)}</option>`)}</optgroup>`}
-  </select>
+  <${Pick} class="tb-rep-sel proj" label="프로젝트" placeholder="프로젝트 고르기 (없으면 한 줄로 적기)" value=${proj} disabled=${busy} onChange=${pickProj} options=${[{value: '', label: '프로젝트 없이 한 줄로 적기', meta: '오늘 한 일을 자유롭게 한 줄로', blank: true}, ...mineT.map(x => ({value: x.id, label: x.title, meta: projMeta(x, false), pct: x.progress || 0, group: '내 업무'})), ...otherT.map(x => ({value: x.id, label: x.title, meta: projMeta(x, true), pct: x.progress || 0, group: '다른 업무'}))]} />
   ${proj ? html`<div class="tb-rep-form-row">
-   ${sub === '__new' ? html`<${Fragment}>${subOpts.length > 0 && html`<button type="button" class="icon-button tb-rep-back" aria-label="세부 업무 목록에서 고르기" title="세부 업무 목록에서 고르기" onClick=${() => pickSub(subOpts[0].id)}>${I('List', 15)}</button>`}<input class="tb-rep-newsub" ref=${focusOnMount} maxLength="200" aria-label="새 세부 업무" placeholder="오늘 한 일 (이 업무의 세부 업무로도 추가돼요)" value=${subText} onInput=${e => setSubText(e.target.value)} /><//>` : html`<select class="tb-rep-sel sub" aria-label="세부 업무" value=${sub} disabled=${busy} onChange=${e => pickSub(e.target.value)}>${subOpts.map(c => html`<option value=${c.id} key=${c.id}>${c.text}${c.by ? ` · ${c.by}` : ''} (${c.pct}%)</option>`)}<option value="__new">+ 목록에 없으면 직접 적기</option></select>`}
-   <select class="tb-rep-sel pct" aria-label="진행률" value=${String(subPct)} disabled=${busy} onChange=${e => setSubPct(Number(e.target.value))}>${pctOpts(subPct).map(o => html`<option value=${String(o)}>${o}%</option>`)}</select>
+   ${sub === '__new' ? html`<${Fragment}>${subOpts.length > 0 && html`<button type="button" class="icon-button tb-rep-back" aria-label="세부 업무 목록에서 고르기" title="세부 업무 목록에서 고르기" onClick=${() => pickSub(subOpts[0].id)}>${I('List', 15)}</button>`}<input class="tb-rep-newsub" ref=${focusOnMount} maxLength="200" aria-label="새 세부 업무" placeholder="오늘 한 일 (이 업무의 세부 업무로도 추가돼요)" value=${subText} onInput=${e => setSubText(e.target.value)} /><//>` : html`<${Pick} class="tb-rep-sel sub" label="세부 업무" placeholder="세부 업무 고르기" value=${sub} disabled=${busy} onChange=${pickSub} options=${[...subOpts.map(c => ({value: c.id, label: c.text, meta: c.by || '', pct: c.pct})), {value: '__new', label: '목록에 없으면 직접 적기', meta: '이 업무의 세부 업무로도 추가돼요', action: true}]} />`}
+   ${pctPick(subPct, setSubPct, '진행률', 'tb-rep-sel pct')}
    <button class="secondary-button" disabled=${busy || !canAdd}>추가</button>
   </div>` : html`<div class="tb-rep-form-row"><input maxLength="300" aria-label="오늘 한 일" placeholder="오늘 한 일을 한 줄로 적고 Enter" value=${text} onInput=${e => setText(e.target.value)} /><button class="secondary-button" disabled=${busy || !text.trim()}>추가</button></div>`}
  </form>`;
- const formOff = off => html`<div class="tb-rep-form is-off" title=${off}><select disabled aria-label="프로젝트"><option>프로젝트 고르기</option></select><div class="tb-rep-form-row"><input disabled aria-label="오늘 한 일" placeholder=${off} /><button type="button" class="secondary-button" disabled>추가</button></div></div>`;
+ const formOff = off => html`<div class="tb-rep-form is-off" title=${off}><div class="pk tb-rep-sel proj"><button type="button" class="pk-btn" disabled aria-label="프로젝트"><span class="pk-val"><span class="pk-ph">프로젝트 고르기</span></span>${I('ChevronDown', 15)}</button></div><div class="tb-rep-form-row"><input disabled aria-label="오늘 한 일" placeholder=${off} /><button type="button" class="secondary-button" disabled>추가</button></div></div>`;
  return html`<section class="tb-report">
   <div class="tb-rep-bar"><button type="button" class="icon-button" aria-label="이전 날" onClick=${() => setDay(offsetDate(day, -1))}>${I('ChevronLeft', 16)}</button><strong>${teamDay(day)} 업무보고</strong><button type="button" class="icon-button" aria-label="다음 날" disabled=${day >= today()} onClick=${() => setDay(offsetDate(day, 1))}>${I('ChevronRight', 16)}</button>${day !== today() && html`<button type="button" class="text-button" onClick=${() => setDay(today())}>오늘로</button>`}<small>${reports.filter(r => r.day === day && r.lines.length && seats.some(s => s.key === r.seat)).length}/${seats.length}명 작성</small></div>
   <div class="tb-rep-grid">${people.map(s => { const r = repOf(s.key), isMe = !viewOnly && s.key === me.id, rid = r ? r.id : `C-rep-${s.key}-${day}`, cs = comments.filter(c => c.item_id === rid).sort((a, b) => a.created_at.localeCompare(b.created_at)), off = viewOnly && s.key === me.id ? '디자인팀 보드에서 쓸 수 있어요' : `${s.name}님만 쓸 수 있어요`; if (!isMe && !r && !cs.length && s.name === ADMIN_NAME) return null; return html`<article class=${cx('tb-rep', isMe && 'mine')} key=${s.key}>
