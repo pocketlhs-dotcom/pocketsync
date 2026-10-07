@@ -819,6 +819,9 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
  const [pickOpen, setPickOpen] = useState(false);
  const [day, setDay] = useState(today()), [text, setText] = useState('');
  const [proj, setProj] = useState(''), [sub, setSub] = useState(''), [subText, setSubText] = useState(''), [subPct, setSubPct] = useState(0);
+ // dirty: 마지막 추가 뒤에 사람이 직접 세부 업무 · % · 이름을 고르거나 적었는지. 저장하기는 이때만 추가 전 줄을 함께 넣는다(자동으로 골라 둔 값은 넣지 않음).
+ const [dirty, setDirty] = useState(false);
+ useEffect(() => { setDirty(false); }, [day]);
  // 자유롭게 적은 줄을 나중에 업무에 잇기: {lineId, proj, how('new' | 세부 업무 id | 'none'), pct}
  const [linking, setLinking] = useState(null);
  const people = [...seats].sort((a, b) => Number(b.key === me.id) - Number(a.key === me.id) || Number(a.name === ADMIN_NAME) - Number(b.name === ADMIN_NAME));
@@ -835,8 +838,8 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
  const usedIn = id => new Set(my.lines.filter(l => l.task_id === id && l.check_id).map(l => l.check_id));
  const subOpts = projTask ? projTask.checklist.filter(c => !usedIn(projTask.id).has(c.id)) : [];
  const firstSub = t => { const used = usedIn(t.id), c = t.checklist.find(x => !used.has(x.id)); return c || null; };
- const pickProj = id => { setProj(id); setSubText(''); const t = id ? taskOf(id) : null, c = t ? firstSub(t) : null; setSub(c ? c.id : id ? '__new' : ''); setSubPct(c ? c.pct : 0); };
- const pickSub = v => { setSub(v); const c = projTask && projTask.checklist.find(x => x.id === v); setSubPct(c ? c.pct : 0); };
+ const pickProj = id => { setProj(id); setSubText(''); setDirty(false); const t = id ? taskOf(id) : null, c = t ? firstSub(t) : null; setSub(c ? c.id : id ? '__new' : ''); setSubPct(c ? c.pct : 0); };
+ const pickSub = v => { setSub(v); setDirty(true); const c = projTask && projTask.checklist.find(x => x.id === v); setSubPct(c ? c.pct : 0); };
  const suggest = tasks.filter(x => inSeoul(x.updated_at) === day && x.updated_by === me.id && !my.lines.some(l => l.task_id === x.id)).slice(0, 6);
  const projOnly = x => ({id: newCheckId(), text: x.title, task_id: x.id, task_title: x.title, check_id: '', pct: x.progress || 0});
  // 비슷한 업무 찾기: 적은 글과 업무 제목 · 세부 업무 이름에서 겹치는 낱말(2자 이상, '진행' 같은 흔한 말 제외) 수로 고른다.
@@ -857,12 +860,15 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
   } catch {}
  }
  // 한 줄로 적다가 비슷한 업무를 고르면: 그 업무의 새 세부 업무로 적는 상태로 바꾼다.
- const toProj = x => { setProj(x.id); setSub('__new'); setSubText(text.trim()); setSubPct(0); setText(''); };
+ const toProj = x => { setProj(x.id); setSub('__new'); setSubText(text.trim()); setSubPct(0); setText(''); setDirty(true); };
  const subItem = projTask && sub && sub !== '__new' ? subOpts.find(c => c.id === sub) : null;
  const canAdd = proj ? (projTask ? (sub === '__new' ? !!subText.trim() : !!subItem) : false) : !!text.trim();
+ // 저장하기 때 함께 넣을 '추가 전 줄': 한 줄로 직접 적은 글, 또는 마지막 추가 뒤 직접 고르거나 적은 세부 업무.
+ const pending = canAdd && (proj ? dirty : true);
+ const pendingLabel = !pending ? '' : proj ? `${sub === '__new' ? subText.trim() : subItem.text} ${subPct}%` : text.trim();
  async function addEntry() {
   if (busy || !canAdd) return;
-  if (!proj) { const t = text.trim().slice(0, 300); await onAct(day, cur => ({lines: [...cur.lines, {id: newCheckId(), text: t, task_id: '', task_title: '', check_id: '', pct: null}]}), ''); setText(''); return; }
+  if (!proj) { const t = text.trim().slice(0, 300); await onAct(day, cur => ({lines: [...cur.lines, {id: newCheckId(), text: t, task_id: '', task_title: '', check_id: '', pct: null}]}), ''); setText(''); setDirty(false); return; }
   const t = projTask, v = subPct;
   if (sub !== '__new') {
    const c = subItem;
@@ -874,9 +880,9 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
    await onAct(day, cur => ({lines: [...cur.lines, {id: newCheckId(), text: name, task_id: t.id, task_title: t.title, check_id: cid, pct: v}]}), '');
    setSubText('');
   }
-  // 같은 프로젝트의 다음 세부 업무를 바로 고를 수 있게.
+  // 같은 프로젝트는 그대로 두고 세부 업무 칸은 비운다(다음 세부 업무를 미리 골라 두면 추가하지 않은 줄처럼 보이고 저장하기 때 같이 들어갔음).
   const used = usedIn(t.id); if (sub !== '__new') used.add(sub);
-  const next = t.checklist.find(x => !used.has(x.id)); setSub(next ? next.id : '__new'); setSubPct(next ? next.pct : 0);
+  const left = t.checklist.some(x => !used.has(x.id)); setSub(left ? '' : '__new'); setSubPct(0); setDirty(false);
  }
  async function setLinePct(l, t, c, v) { try { if (c && c.pct !== v) await onCheck(t, {type: 'pct', cid: c.id, pct: v}); await onAct(day, cur => ({lines: cur.lines.map(x => x.id === l.id ? {...x, pct: v} : x)}), ''); } catch {} }
  // 저장하기: 지금 칸에 적혀 있는 것(추가 전인 오늘 한 일, 두 메모)을 한 번에 저장한다. 버튼을 눌러도 입력 칸 포커스가 빠지지 않게 해 두 번 저장되며 겹치지 않게 한다.
@@ -884,7 +890,7 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
   const memo = k => { const el = card && card.querySelector(`[data-memo="${k}"] textarea`); return el ? String(el.value || '').trim().slice(0, 3000) : null; };
   const note = memo('note'), next = memo('next');
   try {
-   if (canAdd) await addEntry();
+   if (pending) await addEntry();
    await onAct(day, () => ({...(note !== null ? {note} : {}), ...(next !== null ? {next} : {})}), '업무보고를 저장했어요.');
    const a = document.activeElement; if (a && card && card.contains(a) && a.blur) a.blur();
   } catch {}
@@ -928,8 +934,8 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
  const form = html`<form class="tb-rep-form" onSubmit=${async e => { e.preventDefault(); try { await addEntry(); } catch {} }}>
   <${Pick} class="tb-rep-sel proj" label="프로젝트" placeholder="프로젝트 고르기 (없으면 한 줄로 적기)" value=${proj} disabled=${busy} onChange=${pickProj} options=${[{value: '', label: '프로젝트 없이 한 줄로 적기', meta: '오늘 한 일을 자유롭게 한 줄로', blank: true}, ...mineT.map(x => ({value: x.id, label: x.title, meta: projMeta(x, false), pct: x.progress || 0, group: '내 업무'})), ...otherT.map(x => ({value: x.id, label: x.title, meta: projMeta(x, true), pct: x.progress || 0, group: '다른 업무'}))]} />
   ${proj ? html`<div class="tb-rep-form-row">
-   ${sub === '__new' ? html`<${Fragment}>${subOpts.length > 0 && html`<button type="button" class="icon-button tb-rep-back" aria-label="세부 업무 목록에서 고르기" title="세부 업무 목록에서 고르기" onClick=${() => pickSub(subOpts[0].id)}>${I('List', 15)}</button>`}<input class="tb-rep-newsub" ref=${focusOnMount} maxLength="200" aria-label="새 세부 업무" placeholder="오늘 한 일 (이 업무의 세부 업무로도 추가돼요)" value=${subText} onInput=${e => setSubText(e.target.value)} /><//>` : html`<${Pick} class="tb-rep-sel sub" label="세부 업무" placeholder="세부 업무 고르기" value=${sub} disabled=${busy} onChange=${pickSub} options=${[...subOpts.map(c => ({value: c.id, label: c.text, meta: c.by || '', pct: c.pct})), {value: '__new', label: '목록에 없으면 직접 적기', meta: '이 업무의 세부 업무로도 추가돼요', action: true}]} />`}
-   ${pctPick(subPct, setSubPct, '진행률', 'tb-rep-sel pct')}
+   ${sub === '__new' ? html`<${Fragment}>${subOpts.length > 0 && html`<button type="button" class="icon-button tb-rep-back" aria-label="세부 업무 목록에서 고르기" title="세부 업무 목록에서 고르기" onClick=${() => pickSub(subOpts[0].id)}>${I('List', 15)}</button>`}<input class="tb-rep-newsub" ref=${focusOnMount} maxLength="200" aria-label="새 세부 업무" placeholder="오늘 한 일 (이 업무의 세부 업무로도 추가돼요)" value=${subText} onInput=${e => { setSubText(e.target.value); setDirty(true); }} /><//>` : html`<${Pick} class="tb-rep-sel sub" label="세부 업무" placeholder="세부 업무 고르기" value=${sub} disabled=${busy} onChange=${pickSub} options=${[...subOpts.map(c => ({value: c.id, label: c.text, meta: c.by || '', pct: c.pct})), {value: '__new', label: '목록에 없으면 직접 적기', meta: '이 업무의 세부 업무로도 추가돼요', action: true}]} />`}
+   ${pctPick(subPct, v => { setSubPct(v); setDirty(true); }, '진행률', 'tb-rep-sel pct')}
    <button class="secondary-button" disabled=${busy || !canAdd}>추가</button>
   </div>` : html`<${Fragment}><div class="tb-rep-form-row"><input maxLength="300" aria-label="오늘 한 일" placeholder="오늘 한 일을 한 줄로 적고 Enter" value=${text} onInput=${e => setText(e.target.value)} /><button class="secondary-button" disabled=${busy || !text.trim()}>추가</button></div>${onCheck && text.trim().length >= 2 && (list => list.length ? html`<div class="tb-rep-hint">${I('Sparkles', 12)}<span>비슷한 업무에 이어 적기</span>${list.map(x => html`<button type="button" key=${x.id} class="chip" title="이 업무의 새 세부 업무로 적어요" onClick=${() => toProj(x)}>${x.title}</button>`)}</div>` : '')(similar(text))}<//>`}
  </form>`;
@@ -950,7 +956,7 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
    <div class="tb-sub"><span>내일 할 일 메모</span></div>
    ${isMe ? html`<${MemoBox} hKey="rep-next" field="next"><${AutoText} class="tb-d-body tb-rep-memo" value=${my.next} label="내일 할 일 메모" placeholder="내일 이어서 할 일, 미리 준비할 것 (선택)" maxLength="3000" disabled=${busy} onCommit=${v => onAct(day, () => ({next: v}), '')} /><//>` : html`<div class=${cx('tb-d-body tb-rep-memo tb-memo-view', !(r && r.next) && 'empty')} aria-readonly="true" title=${off}>${r && r.next ? html`<${TeamText} text=${r.next} />` : '내일 이어서 할 일, 미리 준비할 것 (선택)'}</div>`}
    ${!isMe && html`<div class="tb-rep-save is-off"><small>${r && r.updated_at ? `${teamClock(r.updated_at)} 저장됨` : '아직 저장 전'}</small><button type="button" class="primary-button tb-rep-save-btn" disabled title=${viewOnly && s.key === me.id ? '디자인팀 보드에서 저장할 수 있어요' : `${s.name}님만 저장할 수 있어요`}>${I('Check', 15)}저장하기</button></div>`}
-   ${isMe && html`<div class="tb-rep-save"><small>${r && r.updated_at ? `${teamClock(r.updated_at)} 저장됨` : '아직 저장 전'}</small><button type="button" class="primary-button tb-rep-save-btn" onMouseDown=${e => e.preventDefault()} onClick=${e => saveAll(e.currentTarget.closest('article'))}>${I('Check', 15)}저장하기</button></div>`}
+   ${isMe && html`<div class="tb-rep-save">${pendingLabel ? html`<small class="tb-rep-pending" title="추가를 누르지 않은 줄이에요. 저장하기를 누르면 함께 들어가요.">추가 전인 ‘${pendingLabel.length > 34 ? pendingLabel.slice(0, 33) + '…' : pendingLabel}’도 함께 저장돼요</small>` : html`<small>${r && r.updated_at ? `${teamClock(r.updated_at)} 저장됨` : '아직 저장 전'}</small>`}<button type="button" class="primary-button tb-rep-save-btn" onMouseDown=${e => e.preventDefault()} onClick=${e => saveAll(e.currentTarget.closest('article'))}>${I('Check', 15)}저장하기</button></div>`}
    <div class="tb-rep-comments"><div class="tb-sub"><span>댓글 ${cs.length || ''}</span></div><${TeamCommentList} cs=${cs} me=${me} busy=${busy} onMark=${onMark} onEdit=${onEditComment} onDelete=${onDeleteComment} />${onComment && html`<${ReplyForm} key=${rid} busy=${busy} label=${`${s.name} 업무보고 댓글`} placeholder=${isMe ? '덧붙일 말 · Shift+Enter 줄바꿈' : `${s.name}님에게 댓글 · Shift+Enter 줄바꿈`} onSend=${t => onComment({id: rid}, t)} />`}</div>
   </article>`; })}</div>
  </section>`;
