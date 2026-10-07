@@ -231,7 +231,10 @@ function TeamBoard() {
  const linkPool = useMemo(() => teamLinkPool({items, reports, asks, comments}), [items, reports, asks, comments]);
  const current = sel ? items.find(x => x.id === sel) : null;
  const myBoards = window.PS_BOARDS || [], boardNames = window.PS_BOARD_NAMES || {};
- const go = (v, w) => { setTab(v); if (w !== undefined) setWho(w); window.scrollTo(0, 0); };
+ // 링크모음 등에서 업무보고 그날로 가기: repDay가 있으면 업무보고가 그날로 열린다(다른 탭으로 가면 비움).
+ const [repDay, setRepDay] = useState('');
+ const go = (v, w) => { setTab(v); if (w !== undefined) setWho(w); if (v !== 'report') setRepDay(''); window.scrollTo(0, 0); };
+ const openReport = d => { setRepDay(d || ''); setTab('report'); window.scrollTo(0, 0); };
  const common = {cmap, onOpen: id => { setHandoff(null); setSel(id); }, busy, me};
 
  return html`<div class="app-shell team-shell">
@@ -245,9 +248,9 @@ function TeamBoard() {
     ${tab === 'orders' && html`<${TeamOrders} items=${open} who=${who} onWho=${setWho} isAdmin=${isAdmin} onCreate=${d => run(() => create(d), '오더를 등록했어요.')} onImport=${() => setImportOpen(true)} onPatch=${patch} onChecklist=${checklistAct} ...${common} />`}
     ${tab === 'due' && html`<${TeamDue} items=${open} done=${done} ...${common} />`}
     ${tab === 'issues' && html`<${Fragment}><${TeamAsks} asks=${asks} tasks=${open} comments=${comments} me=${me} busy=${busy} onCreate=${createAsk} onUpdate=${updateAsk} onDelete=${deleteAsk} onComment=${comment} onMark=${markComment} onEditComment=${editComment} onDeleteComment=${deleteComment} onOpenTask=${setSel} /><${TeamIssues} items=${issues} comments=${comments} all=${items} onPatch=${patch} ...${common} /><//>`}
-    ${tab === 'report' && html`<${TeamReport} reports=${reports} tasks=${items} comments=${comments} me=${me} busy=${busy} onAct=${reportAct} onCheck=${checklistAct} onProgress=${(x, v) => patch(x, {progress: v}, `진행률 ${v}%`)} onComment=${comment} onMark=${markComment} onEditComment=${editComment} onDeleteComment=${deleteComment} onOpenTask=${setSel} onAvatar=${setAvatar} />`}
+    ${tab === 'report' && html`<${TeamReport} key=${'rep-' + (repDay || 'today')} initialDay=${repDay} reports=${reports} tasks=${items} comments=${comments} me=${me} busy=${busy} onAct=${reportAct} onCheck=${checklistAct} onProgress=${(x, v) => patch(x, {progress: v}, `진행률 ${v}%`)} onComment=${comment} onMark=${markComment} onEditComment=${editComment} onDeleteComment=${deleteComment} onOpenTask=${setSel} onAvatar=${setAvatar} />`}
     ${tab === 'done' && html`<${TeamDone} items=${done} onPatch=${patch} ...${common} />`}
-    ${tab === 'links' && html`<${TeamLinks} pool=${linkPool} onOpen=${id => { setHandoff(null); setSel(id); }} />`}
+    ${tab === 'links' && html`<${TeamLinks} pool=${linkPool} onOpen=${id => { setHandoff(null); setSel(id); }} onReport=${openReport} />`}
    </div>`}
   </main>
   ${current && html`<${TeamDetail} key=${current.id} handoffFrom=${handoff && handoff.id === current.id ? handoff.from : null} item=${current} comments=${comments.filter(c => c.item_id === current.id).sort((a, b) => a.created_at.localeCompare(b.created_at))} me=${me} isAdmin=${isAdmin} busy=${busy} onClose=${() => setSel(null)} onPatch=${patch} onChecklist=${checklistAct} onComment=${comment} onEditComment=${editComment} onDeleteComment=${deleteComment} onMark=${markComment} onRemove=${remove} onAddLink=${addLink} onRemoveLink=${removeLink} onRefreshSource=${refreshSource} onSendTo=${sendTo} onUnlink=${unlink} />`}
@@ -839,9 +842,9 @@ function ReportCalendar({reports, seats, day, onPick, onClose}) {
   <div class="rc-sum"><span class="rc-sum-label">${Number(month.slice(5))}월 작성</span>${seats.map((s, k) => { const c = work.filter(d => (wrote.get(d) || new Set()).has(s.key)).length; return html`<span key=${s.key} class="rc-person"><i style=${`background:${colorOf(k)}`}></i>${s.name}<b>${c}</b>일</span>`; })}</div>
  </div>`;
 }
-function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgress, onComment, onMark, onEditComment, onDeleteComment, onOpenTask, onAvatar, seats = SEATS, viewOnly = false}) {
+function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgress, onComment, onMark, onEditComment, onDeleteComment, onOpenTask, onAvatar, seats = SEATS, viewOnly = false, initialDay = ''}) {
  const [pickOpen, setPickOpen] = useState(false), [calOpen, setCalOpen] = useState(false);
- const [day, setDay] = useState(today()), [text, setText] = useState('');
+ const [day, setDay] = useState(() => (initialDay && initialDay <= today() ? initialDay : today())), [text, setText] = useState('');
  const [proj, setProj] = useState(''), [sub, setSub] = useState(''), [subText, setSubText] = useState(''), [subPct, setSubPct] = useState(0);
  // dirty: 마지막 추가 뒤에 사람이 직접 세부 업무 · % · 이름을 고르거나 적었는지. 저장하기는 이때만 추가 전 줄을 함께 넣는다(자동으로 골라 둔 값은 넣지 않음).
  const [dirty, setDirty] = useState(false);
@@ -992,6 +995,8 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
 function teamLinkPool({items, reports, asks, comments}) {
  const byId = new Map(items.map(x => [x.id, x])), repById = new Map(reports.map(r => [r.id, r])), askById = new Map(asks.map(a => [a.id, a]));
  const seatName = k => (cSeats().find(s => s.key === k) || SEATS.find(s => s.key === k) || {}).name || '';
+ // 기록에 보일 앞뒤 글: 주소 자리는 '(링크)'로 줄이고 앞뒤 30자 정도만.
+ const snip = (text, url) => { const t = String(text || ''), i = t.indexOf(url); if (i < 0) return ''; const a = Math.max(0, i - 30), b = Math.min(t.length, i + url.length + 30); return `${a > 0 ? '…' : ''}${t.slice(a, i)}(링크)${t.slice(i + url.length, b)}${b < t.length ? '…' : ''}`.replace(/\s+/g, ' ').trim(); };
  const pool = new Map();
  const add = (url, o) => {
   const u = String(url || '').trim(); if (!isHttpUrl(u)) return;
@@ -1003,25 +1008,27 @@ function teamLinkPool({items, reports, asks, comments}) {
  };
  for (const x of items) {
   (x.links || []).forEach(l => add(l.url, {kind: 'task', ref: x.id, task: x, label: l.label, by: personName(l.shared_by || ''), at: l.shared_at || x.created_at, where: '업무 링크'}));
-  (x.src_links || []).forEach(l => add(l.url, {kind: 'origin', ref: x.id, task: x, label: l.label, by: personName(l.shared_by || ''), at: x.src_synced_at || x.created_at, where: `${x.src_board || 'A'} 보드 원본`}));
-  teamUrlsIn(x.body).forEach(u => add(u, {kind: 'body', ref: x.id, task: x, by: personName(x.author_name), at: x.created_at, where: '업무 설명'}));
+  (x.src_links || []).forEach(l => add(l.url, {kind: 'origin', ref: x.id, task: x, label: l.label, by: personName(l.shared_by || ''), at: x.src_synced_at || x.created_at, where: `${x.src_board || 'A'} 보드 원본`, board: x.src_board || 'A'}));
+  teamUrlsIn(x.body).forEach(u => add(u, {kind: 'body', ref: x.id, task: x, by: personName(x.author_name), at: x.created_at, where: '업무 설명', snippet: snip(x.body, u)}));
  }
  for (const r of reports) {
-  (r.links || []).forEach(l => add(l.url, {kind: 'report', ref: r.id, report: r, label: l.label, by: personName(l.shared_by || r.name), at: l.shared_at || r.updated_at, where: `${r.name} 업무보고 · ${teamDay(r.day)}`}));
-  [...teamUrlsIn(r.note), ...teamUrlsIn(r.next)].forEach(u => add(u, {kind: 'report', ref: r.id + ':memo', report: r, by: r.name, at: r.updated_at, where: `${r.name} 업무보고 메모 · ${teamDay(r.day)}`}));
+  (r.links || []).forEach(l => add(l.url, {kind: 'report', ref: r.id, report: r, day: r.day, name: r.name, label: l.label, by: personName(l.shared_by || r.name), at: l.shared_at || r.updated_at, where: `${r.name} 업무보고 · ${teamDay(r.day)}`}));
+  [['note', '오늘 업무 메모'], ['next', '내일 할 일 메모']].forEach(([f, lbl]) => teamUrlsIn(r[f]).forEach(u => add(u, {kind: 'memo', ref: r.id + ':' + f, report: r, day: r.day, name: r.name, by: r.name, at: r.updated_at, where: `${r.name} 업무보고 ${lbl} · ${teamDay(r.day)}`, memo: lbl, snippet: snip(r[f], u)})));
  }
- for (const a of asks) [...teamUrlsIn(a.body), ...teamUrlsIn(a.answer)].forEach(u => add(u, {kind: 'ask', ref: a.id, task: a.task_id ? byId.get(a.task_id) || null : null, by: a.from, at: a.created_at, where: `확인 요청 · ${a.title}`}));
+ for (const a of asks) [['body', ''], ['answer', '답']].forEach(([f, lbl]) => teamUrlsIn(a[f]).forEach(u => add(u, {kind: 'ask', ref: a.id + ':' + f, task: a.task_id ? byId.get(a.task_id) || null : null, by: f === 'answer' ? (a.done_by || a.to) : a.from, at: f === 'answer' ? (a.done_at || a.updated_at || a.created_at) : a.created_at, where: `확인 요청${lbl ? ' ' + lbl : ''} · ${a.title}`, title: a.title, answer: !!lbl, snippet: snip(a[f], u)})));
  for (const c of comments) {
   const t = byId.get(c.item_id), r = repById.get(c.item_id), a = askById.get(c.item_id), m = /^C-rep-([^-]+)-(\d{4}-\d{2}-\d{2})$/.exec(c.item_id || '');
-  const where = t ? '업무 댓글' : r ? `${r.name} 업무보고 댓글` : m ? `${seatName(m[1]) || '업무보고'} 업무보고 댓글 · ${teamDay(m[2])}` : a ? `확인 요청 댓글 · ${a.title}` : '댓글';
-  [...teamUrlsIn(c.body), ...(c.links || []).map(l => l.url)].forEach(u => add(u, {kind: 'comment', ref: c.id, task: t || (a && a.task_id ? byId.get(a.task_id) || null : null), report: r || null, by: personName(c.author_name), at: c.created_at, where}));
+  const repName = r ? r.name : m ? seatName(m[1]) || '업무보고' : '', repDay = r ? r.day : m ? m[2] : '';
+  const where = t ? '업무 댓글' : repDay ? `${repName} 업무보고 댓글 · ${teamDay(repDay)}` : a ? `확인 요청 댓글 · ${a.title}` : '댓글';
+  [...teamUrlsIn(c.body), ...(c.links || []).map(l => l.url)].forEach(u => add(u, {kind: 'comment', ref: c.id, task: t || (a && a.task_id ? byId.get(a.task_id) || null : null), report: r || null, day: repDay, name: repName, ask: a ? a.title : '', by: personName(c.author_name), at: c.created_at, where, snippet: snip(c.body, u)}));
  }
  return [...pool.values()].map(e => ({...e, ctx: [...e.ctx].sort((p, q) => String(q.at || '').localeCompare(String(p.at || '')))})).sort((p, q) => q.at.localeCompare(p.at));
 }
 const linkHost = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
 const linkPath = u => { try { const x = new URL(u); return (x.pathname + x.search).replace(/\/$/, '') || ''; } catch { return ''; } };
-function TeamLinks({pool, onOpen}) {
- const [q, setQ] = useState(''), [who, setWho] = useState('all'), [view, setViewS] = useState(() => dmPref('ps.teamLinkView', ['recent', 'task'], 'recent')), [more, setMore] = useState(60);
+// onReport(day): 업무보고 탭의 그날로 간다(없으면 업무보고 줄은 누를 수 없음).
+function TeamLinks({pool, onOpen, onReport = null}) {
+ const [q, setQ] = useState(''), [who, setWho] = useState('all'), [view, setViewS] = useState(() => dmPref('ps.teamLinkView', ['recent', 'task'], 'recent')), [more, setMore] = useState(60), [hist, setHist] = useState({});
  const setView = v => { setViewS(v); dmKeep('ps.teamLinkView', v); };
  const names = [...new Set([...cNames(), ...pool.flatMap(e => e.ctx.map(c => c.by)).filter(Boolean)])];
  const has = (e, n) => e.ctx.some(c => c.by === n);
@@ -1030,11 +1037,18 @@ function TeamLinks({pool, onOpen}) {
  const list = pool.filter(e => (who === 'all' || has(e, who)) && words.every(w => text(e).includes(w)));
  async function copy(u) { try { await navigator.clipboard.writeText(u); toast.success('주소를 복사했어요.'); } catch { window.prompt('아래 주소를 복사해 주세요', u); } }
  // 한 줄에 보일 '어디에서': 같은 업무는 한 번만(업무 링크 · 댓글 등은 묶어서 툴팁으로), 그 밖은 위치 이름별로 한 번. 업무별 보기에서는 그 업무를 뺀다.
- const placesOf = (e, inTask) => { const out = [], byTask = new Map(), seen = new Set(); for (const c of [...e.ctx].reverse()) { if (c.task) { if (inTask && c.task.id === inTask) continue; const g = byTask.get(c.task.id); if (g) { if (!g.wheres.includes(c.where)) g.wheres.push(c.where); } else { const g2 = {task: c.task, wheres: [c.where], kind: c.kind}; byTask.set(c.task.id, g2); out.push(g2); } } else if (!seen.has(c.where)) { seen.add(c.where); out.push({where: c.where, kind: c.kind}); } } return out; };
- const placeChip = (p, i) => p.task ? html`<button type="button" key=${i} class="lk-ctx task" title=${`${p.wheres.join(' · ')} · 업무 열기`} onClick=${() => onOpen(p.task.id)}>${I('Layers3', 12)}<span>${p.task.title}</span></button>` : html`<span key=${i} class="lk-ctx" title=${p.where}>${I(p.kind === 'report' ? 'NotebookPen' : 'MessageCircle', 12)}<span>${p.where}</span></span>`;
+ const placesOf = (e, inTask) => { const out = [], byTask = new Map(), seen = new Set(); for (const c of [...e.ctx].reverse()) { if (c.task) { if (inTask && c.task.id === inTask) continue; const g = byTask.get(c.task.id); if (g) { if (!g.wheres.includes(c.where)) g.wheres.push(c.where); } else { const g2 = {task: c.task, wheres: [c.where], kind: c.kind}; byTask.set(c.task.id, g2); out.push(g2); } } else if (!seen.has(c.where)) { seen.add(c.where); out.push({where: c.where, kind: c.kind, day: c.day || ''}); } } return out; };
+ const repIcon = k => (k === 'report' || k === 'memo' ? 'NotebookPen' : k === 'ask' ? 'Check' : 'MessageCircle');
+ const placeChip = (p, i) => p.task ? html`<button type="button" key=${i} class="lk-ctx task" title=${`${p.wheres.join(' · ')} · 업무 열기`} onClick=${() => onOpen(p.task.id)}>${I('Layers3', 12)}<span>${p.task.title}</span></button>` : p.day && onReport ? html`<button type="button" key=${i} class="lk-ctx rep" title=${`${p.where} · 업무보고 보기`} onClick=${() => onReport(p.day)}>${I(repIcon(p.kind), 12)}<span>${p.where}</span></button>` : html`<span key=${i} class="lk-ctx" title=${p.where}>${I(repIcon(p.kind), 12)}<span>${p.where}</span></span>`;
+ // 기록: 이 주소가 어디서 · 누가 · 언제 나왔는지 처음부터 순서대로.
+ const verb = c => ({task: '업무에 링크를 공유', origin: `${c.board || 'A'} 보드 원본에 있던 링크`, body: '업무 설명에 적음', report: '업무보고에 링크를 공유', memo: `업무보고 ${c.memo || '메모'}에 적음`, ask: c.answer ? '확인 요청 답에 적음' : '확인 요청에 적음', comment: '댓글에 남김'})[c.kind] || '공유';
+ const histPlace = c => c.task ? html`<button type="button" class="lk-ctx task" title="업무 열기" onClick=${() => onOpen(c.task.id)}>${I('Layers3', 12)}<span>${c.task.title}</span></button>` : c.day ? (onReport ? html`<button type="button" class="lk-ctx rep" title="그날 업무보고 보기" onClick=${() => onReport(c.day)}>${I('NotebookPen', 12)}<span>${c.name || ''} 업무보고 · ${teamDay(c.day)}</span></button>` : html`<span class="lk-ctx">${I('NotebookPen', 12)}<span>${c.name || ''} 업무보고 · ${teamDay(c.day)}</span></span>`) : c.title || c.ask ? html`<span class="lk-ctx">${I('Check', 12)}<span>${c.title || c.ask}</span></span>` : '';
+ const histList = e => html`<ol class="lk-hist">${[...e.ctx].reverse().map((c, i) => html`<li key=${c.kind + c.ref}><span class=${cx('lk-hist-dot', i === 0 && 'first')}></span><div class="lk-hist-main"><div class="lk-hist-line"><b>${c.by || '알 수 없음'}</b><span class="lk-hist-verb">${verb(c)}</span>${histPlace(c)}${i === 0 ? html`<em class="lk-hist-first">처음</em>` : ''}</div>${c.snippet && html`<p class="lk-hist-snip">${c.snippet}</p>`}</div><time>${c.at ? `${teamDay(inSeoul(c.at))} ${teamClock(c.at)}` : ''}</time></li>`)}</ol>`;
+ const hk = (e, inTask) => (inTask ? inTask + '|' : '') + e.key;
  const row = (e, inTask = null) => { const host = linkHost(e.url), first = e.ctx[e.ctx.length - 1] || {}, places = placesOf(e, inTask); return html`<li class="lk-row" key=${e.key}>
   <a class="lk-link" href=${safeLink(e.url)} target="_blank" rel="noreferrer" title=${e.url}><span class="lk-ico">${I('Link2', 15)}</span><span class="lk-name"><strong>${e.label || host || e.url}</strong><small>${e.label ? host : `${host}${linkPath(e.url).slice(0, 60)}`}</small></span><em class="lk-go">${I('ArrowUpRight', 14)}</em></a>
-  <div class="lk-info">${places.slice(0, 2).map(placeChip)}${places.length > 2 ? html`<span class="lk-more" title=${places.slice(2).map(p => p.task ? p.task.title : p.where).join('\n')}>외 ${places.length - 2}곳</span>` : ''}<span class="lk-who" title=${e.ctx.length > 1 ? `${e.ctx.length}곳에서 공유 · 마지막 ${teamDay(inSeoul(e.at))} ${teamClock(e.at)}` : ''}>${[first.by, first.at ? `${teamDay(inSeoul(first.at))} ${teamClock(first.at)}` : ''].filter(Boolean).join(' · ')}${e.ctx.length > 1 ? ` 외 ${e.ctx.length - 1}번` : ''}</span><button type="button" class="lk-copy" title="주소 복사" aria-label="주소 복사" onClick=${() => copy(e.url)}>${I('Copy', 13)}</button></div>
+  <div class="lk-info">${places.slice(0, 2).map(placeChip)}${places.length > 2 ? html`<span class="lk-more" title=${places.slice(2).map(p => p.task ? p.task.title : p.where).join('\n')}>외 ${places.length - 2}곳</span>` : ''}<span class="lk-who">${[first.by, first.at ? `${teamDay(inSeoul(first.at))} ${teamClock(first.at)}` : ''].filter(Boolean).join(' · ')}</span><button type="button" class=${cx('lk-hist-btn', hist[hk(e, inTask)] && 'on', e.ctx.length > 1 && 'many')} aria-expanded=${!!hist[hk(e, inTask)]} title="어디서 · 누가 · 언제 공유했는지 기록 보기" onClick=${() => setHist(h => ({...h, [hk(e, inTask)]: !h[hk(e, inTask)]}))}>${I('History', 13)}기록 ${e.ctx.length}${I(hist[hk(e, inTask)] ? 'ChevronUp' : 'ChevronDown', 12)}</button><button type="button" class="lk-copy" title="주소 복사" aria-label="주소 복사" onClick=${() => copy(e.url)}>${I('Copy', 13)}</button></div>
+  ${hist[hk(e, inTask)] && histList(e)}
  </li>`; };
  const groups = () => {
   const map = new Map(), loose = [];
@@ -1067,7 +1081,8 @@ function DesignMirror({data, me, db, writable}) {
  const [sub, setSubS] = useState(() => dmPref('ps.dmSub', ['status', 'report', 'links'], 'status'));
  const [view, setViewS] = useState(() => dmPref('ps.dmView', ['list', 'timeline'], 'list'));
  const [stab, setStabS] = useState(() => dmPref('ps.dmStab', ['doing', 'todo', 'hold', 'done', 'all'], 'doing'));
- const setSub = v => { setSubS(v); dmKeep('ps.dmSub', v); }, setView = v => { setViewS(v); dmKeep('ps.dmView', v); }, setStab = v => { setStabS(v); dmKeep('ps.dmStab', v); };
+ const [repDay, setRepDay] = useState('');
+ const setSub = v => { setSubS(v); dmKeep('ps.dmSub', v); if (v !== 'report') setRepDay(''); }, setView = v => { setViewS(v); dmKeep('ps.dmView', v); }, setStab = v => { setStabS(v); dmKeep('ps.dmStab', v); };
  const [who, setWho] = useState('all'), [sel, setSel] = useState(null), [busy, setBusy] = useState(false), [checksOpen, setChecksOpen] = useState({});
  const can = !!(writable && db);
  const all = data.items.filter(x => x.kind === 'task').map(normTeam);
@@ -1105,7 +1120,7 @@ function DesignMirror({data, me, db, writable}) {
  const issues = open.filter(x => x.issue);
  return html`<section class="dm">
   ${head}
-  ${sub === 'links' ? html`<${TeamLinks} pool=${teamLinkPool({items: all, reports, asks: data.items.filter(x => x.team_type === 'ask').map(normAsk), comments})} onOpen=${setSel} />` : sub === 'report' ? html`<${TeamReport} reports=${reports} tasks=${all} comments=${comments} me=${me} busy=${busy} seats=${cSeats()} viewOnly=${true} onComment=${can ? onComment : null} onMark=${can ? onMark : null} onEditComment=${can ? onEdit : null} onDeleteComment=${can ? onDelete : null} onOpenTask=${setSel} />` : html`<${Fragment}>
+  ${sub === 'links' ? html`<${TeamLinks} pool=${teamLinkPool({items: all, reports, asks: data.items.filter(x => x.team_type === 'ask').map(normAsk), comments})} onOpen=${setSel} onReport=${d => { setSubS('report'); dmKeep('ps.dmSub', 'report'); setRepDay(d || ''); }} />` : sub === 'report' ? html`<${TeamReport} key=${'rep-' + (repDay || 'today')} initialDay=${repDay} reports=${reports} tasks=${all} comments=${comments} me=${me} busy=${busy} seats=${cSeats()} viewOnly=${true} onComment=${can ? onComment : null} onMark=${can ? onMark : null} onEditComment=${can ? onEdit : null} onDeleteComment=${can ? onDelete : null} onOpenTask=${setSel} />` : html`<${Fragment}>
   ${issues.length > 0 && html`<div class="tb-alert">${I('AlertCircle', 16)}<strong>특이사항 ${issues.length}</strong><span>${issues[0].title} · ${TEAM_ISSUES[issues[0].issue]}${issues[0].issue_note ? ` · ${issues[0].issue_note}` : ''}</span><button type="button" class="text-button" onClick=${() => setSel(issues[0].id)}>열기${I('ChevronRight', 13)}</button></div>`}
   <div class=${cx('tb-split', view === 'timeline' && 'tl-on')}>
    <section class="tb-assign">

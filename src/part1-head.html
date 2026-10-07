@@ -1726,4 +1726,23 @@ p.ab-clink-hint{display:block}
 .rc-person>i{width:7px;height:7px;border-radius:50%}
 .rc-person>b{color:#0b1c5c;margin-left:2px}
 @media(max-width:640px){.tb-rep-cal>span{display:none}.tb-rep-cal{padding:0 8px}.rc-pop{left:-4px;width:calc(100vw - 28px)}.rc-day{min-height:46px}}
+/* 링크모음 기록(10-07) */
+.lk-ctx.rep{background:#f6f2ff;color:#6b4fcf}
+.lk-ctx.rep:hover{background:#ede6ff}
+.lk-hist-btn{display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 8px;border:1px solid #e1e4f3;border-radius:4px;background:#fff;color:#6b7591;font-size:12px;font-weight:600;flex-shrink:0}
+.lk-hist-btn.many{color:#315df8;border-color:#c9d4f5}
+.lk-hist-btn:hover,.lk-hist-btn.on{border-color:#95a8eb;background:#f5f7ff;color:#315df8}
+.lk-hist{list-style:none;margin:4px 0 2px 40px;padding:10px 14px;border:1px solid #eef0f7;border-radius:6px;background:#fafbfe;display:flex;flex-direction:column;gap:10px;position:relative}
+.lk-hist>li{display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:10px;align-items:start;position:relative}
+.lk-hist>li:not(:last-child)::after{content:'';position:absolute;left:4px;top:14px;bottom:-12px;width:1px;background:#dfe3ef}
+.lk-hist-dot{width:9px;height:9px;border-radius:50%;background:#c3cbe0;margin-top:5px;position:relative;z-index:1}
+.lk-hist-dot.first{background:#315df8}
+.lk-hist-main{min-width:0;display:flex;flex-direction:column;gap:4px}
+.lk-hist-line{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;font-size:13px;color:#3d4863}
+.lk-hist-line>b{color:#0b1c5c;font-weight:700}
+.lk-hist-verb{color:#5f6b85}
+.lk-hist-first{font-style:normal;font-size:11px;font-weight:700;color:#315df8;background:#e8edff;border-radius:3px;padding:1px 6px}
+.lk-hist-snip{margin:0;font-size:12.5px;color:#7d879c;line-height:1.55;overflow-wrap:anywhere}
+.lk-hist>li>time{font-size:12px;color:#a0a6b8;white-space:nowrap;padding-top:2px}
+@media(max-width:640px){.lk-hist{margin-left:0;padding:10px 12px}.lk-hist>li{grid-template-columns:10px minmax(0,1fr)}.lk-hist>li>time{grid-column:2;padding-top:0}}
 </style>
