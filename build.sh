@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")"
 HASHES=$(tr -d '\n' < src/seat-hashes.json)
 sed "s|__SEAT_HASHES__|$HASHES|" src/platform-firebase.js > platform.js
-cat src/icons.js src/part2-core.js src/part3-app.js src/part4-team.js > app.js
+cat src/icons.js src/part2-core.js src/part3-app.js src/part4-team.js src/part5-abwork.js > app.js
 {
  sed 's|<link rel="stylesheet" href="https://fonts.googleapis.com|<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><link rel="stylesheet" href="https://fonts.googleapis.com|' src/part1-head.html
  echo '<div id="app"></div>'

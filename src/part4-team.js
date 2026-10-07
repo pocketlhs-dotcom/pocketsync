@@ -540,17 +540,18 @@ function TeamOrders({items, who, onWho, isAdmin, cmap, onOpen, onCreate, onImpor
  </section>`;
 }
 
-function TeamDue({items, done, cmap, onOpen}) {
+// Mini: 줄 모양(C는 TeamMini, A·B는 AbMini).
+function TeamDue({items, done, cmap, onOpen, Mini = TeamMini, tools = null}) {
  const [f, setF] = useState('all');
  const t = today(), wEnd = offsetDate(mondayOf(t), 6), nEnd = offsetDate(wEnd, 7);
  const groups = [['late', '지난 마감', x => x.due && x.due < t, 'late'], ['today', '오늘', x => x.due === t, 'today'], ['week', '이번 주', x => x.due > t && x.due <= wEnd, ''], ['next', '다음 주', x => x.due > wEnd && x.due <= nEnd, ''], ['later', '그 후', x => x.due > nEnd, ''], ['none', '마감 없음', x => !x.due, 'muted']];
  const sorted = [...items].sort(teamByDue), fin = [...done].filter(x => x.due).sort((a, b) => doneAt(b).localeCompare(doneAt(a)));
  const chips = [['all', '전체', items.length], ...groups.map(([k, l, fn]) => [k, l, sorted.filter(fn).length]), ['done', '마감 완료', fin.length]];
  const shown = f === 'all' ? groups : groups.filter(g => g[0] === f);
- const row = x => html`<${TeamMini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} extra=${x.due ? html`<span class="tb-date">${teamDay(x.due)}</span>` : ''} />`;
+ const row = x => html`<${Mini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} extra=${x.due ? html`<span class="tb-date">${teamDay(x.due)}</span>` : ''} />`;
  return html`<section class="tb-due">
-  <div class="dv-who tb-due-chips" role="group" aria-label="마감 구분">${chips.map(([k, l, n]) => html`<button type="button" key=${k} class=${cx('chip', k === 'late' && n && 'late')} aria-pressed=${f === k} onClick=${() => setF(k)}>${l}<span>${n}</span></button>`)}</div>
-  ${f === 'done' ? (fin.length ? html`<div class="pl-group tb-due-group done"><div class="pl-group-head"><span>마감 완료</span><small>${fin.length}건 · 최근 완료순</small></div>${fin.slice(0, 80).map(x => html`<${TeamMini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} extra=${html`<span class=${cx('tb-date', inSeoul(doneAt(x)) > x.due && 'late')}>${shortDate(x.due)} 마감 · ${teamDay(inSeoul(doneAt(x)))} 완료${inSeoul(doneAt(x)) > x.due ? ' (늦음)' : ''}</span>`} />`)}</div>` : html`<p class="tb-none pad">마감일이 있던 완료 업무가 아직 없어요.</p>`)
+  <div class="dv-who tb-due-chips" role="group" aria-label="마감 구분">${chips.map(([k, l, n]) => html`<button type="button" key=${k} class=${cx('chip', k === 'late' && n && 'late')} aria-pressed=${f === k} onClick=${() => setF(k)}>${l}<span>${n}</span></button>`)}${tools && html`<span class="dv-tools">${tools}</span>`}</div>
+  ${f === 'done' ? (fin.length ? html`<div class="pl-group tb-due-group done"><div class="pl-group-head"><span>마감 완료</span><small>${fin.length}건 · 최근 완료순</small></div>${fin.slice(0, 80).map(x => html`<${Mini} key=${x.id} x=${x} cmap=${cmap} onOpen=${onOpen} extra=${html`<span class=${cx('tb-date', inSeoul(doneAt(x)) > x.due && 'late')}>${shortDate(x.due)} 마감 · ${teamDay(inSeoul(doneAt(x)))} 완료${inSeoul(doneAt(x)) > x.due ? ' (늦음)' : ''}</span>`} />`)}</div>` : html`<p class="tb-none pad">마감일이 있던 완료 업무가 아직 없어요.</p>`)
    : shown.map(([k, l, fn, c]) => { const list = sorted.filter(fn); return (list.length > 0 || f !== 'all') && html`<div class=${cx('pl-group tb-due-group', c)} key=${k}><div class="pl-group-head"><span>${l}</span><small>${list.length}건</small></div>${list.length ? list.map(row) : html`<p class="tb-none pad">해당하는 업무가 없어요.</p>`}</div>`; })}
   ${f === 'all' && !items.length && html`<p class="tb-none pad">남은 업무가 없어요.</p>`}
  </section>`;

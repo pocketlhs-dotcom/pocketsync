@@ -1505,6 +1505,118 @@ body.memo-resizing,body.memo-resizing *{cursor:ns-resize!important;user-select:n
 .tb-rep-hint>svg{color:#8a9bd6}
 .tb-rep-hint .chip{min-height:26px;padding:0 9px;border:1px solid #c9d4fb;background:#fff;color:#315df8;font-size:12px;font-weight:600;border-radius:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:640px){.tb-rep-link .pk.tb-rep-sel.pct{flex-basis:90px;width:90px}.tb-rep-linkbtn{padding:0 5px!important}}
+/* ===== A·B 보드 업무 현황(10-07): C 팀 현황 틀 · 탭 줄 · 사람 카드 · 확인 요청 · 이야기 ===== */
+.ab-tabs{flex-direction:row!important;align-items:center;gap:14px!important;border-bottom:1px solid #dfe6f1;margin-bottom:20px}
+.ab-tabs>.top-tabs{flex:1;min-width:0;border-bottom:0!important;margin-bottom:0!important}
+.ab-tabs>.ab-compose{flex:none;min-height:34px;height:34px;padding:0 14px;font-size:13.5px;font-weight:600;gap:5px;box-shadow:none}
+.ab-body{display:flex;flex-direction:column;gap:14px;padding-bottom:60px}
+.ab-body>.attention-bar,.ab-body>.attention-bar+.attention-bar{margin:0}
+.ab-body>.board-panel{min-width:0}
+.ab-mini-side{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end}
+.ab-mini-side:empty{display:none}
+.tb-mini:has(>.ab-mini-side:empty){grid-template-columns:auto minmax(0,1fr) auto}
+.ab-mini-side .tb-date{font-size:12px;font-weight:600;color:#9aa1b5;white-space:nowrap}
+/* 오늘 일정 */
+.ab-day .tb-meet-head>small{margin-right:auto}
+.ab-day .tb-meet-head>.tb-meet-state{margin-left:0}
+.ab-free{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ab-free>small{font-size:12px!important;color:#7fa792!important;font-weight:600!important}
+.ab-free>.chip{min-height:26px;height:26px;padding:0 9px;font-size:12px;font-weight:600}
+.ab-day .strip{margin-top:2px}
+.ab-day-row .agenda-title{gap:6px 8px}
+.ab-who{display:inline-flex!important;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#6b7d98;flex-shrink:0}
+.ab-who.joint{color:#2f5bd1}
+.ab-who .avatar.mini{width:20px;height:20px;font-size:10.5px;border-radius:6px}
+.ab-day-form .ab-day-who{display:inline-flex;gap:4px;flex-shrink:0}
+.ab-day-form .ab-day-who .chip{min-height:30px;height:30px;padding:0 10px;font-size:12.5px;font-weight:600}
+/* 업무 리스트 */
+.ab-topic-pick{width:auto;min-width:150px;max-width:230px}
+.ab-assign .tb-head-right{display:flex;align-items:center;gap:8px}
+.tag.ab-topic{background:#eef7f1;color:#4b8b66}
+.tag.ab-foreign{display:inline-flex;align-items:center;gap:3px;background:#f2f4f8;color:#7d879c}
+.ab-row.is-foreign .tb-arow-title strong{color:#5d6680}
+.ab-row.is-req{background:#fffcf6}
+.ab-who-btns .tb-abtn:disabled{cursor:default}
+/* 사람 카드 */
+.ab-person{gap:8px}
+.ab-person-tools{display:inline-flex;align-items:center;gap:10px;flex-shrink:0}
+.ab-thread{gap:4px}
+.ab-thread.has{color:#2f5bd1!important;font-weight:700}
+.me-card.bare{border:0;background:#f8f9fd;border-radius:6px;padding:11px 12px 10px;gap:8px}
+.me-card.bare.tired{background:#fffaf3}.me-card.bare.sad{background:#f6f7fb}.me-card.bare.great{background:#fdf7f3}
+.me-card.bare .me-head{align-items:flex-start}
+.me-card.bare .me-label{font-size:13px!important;font-weight:700!important;color:#0b1c5c!important}
+.me-card.bare .me-facts{font-size:11.5px}
+.me-card.bare .me-edit{height:28px;padding:0 9px}
+.ab-req-head{color:#c27a1c!important}
+.ab-req{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border:1px solid #f3e3c8;background:#fffaf2;border-radius:6px}
+.ab-req-main{display:flex;align-items:center;gap:10px;flex:1 1 220px;min-width:0;text-align:left}
+.ab-req-main>.dday{height:24px;padding:0 8px;border-radius:20px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;background:#edeff6;color:#9699a8;white-space:nowrap}
+.ab-req-main>.dday.late{background:#fff3ef;color:#d13737}.ab-req-main>.dday.today{background:#ffe9e1;color:#ff482b}.ab-req-main>.dday.soon{background:#fff3e2;color:#c27a1c}
+.ab-req-text{display:flex;flex-direction:column;min-width:0}
+.ab-req-text>strong{font-size:14px;font-weight:700;color:#141a2e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ab-req-text>small{font-size:12px;color:#b08a52;font-weight:500}
+.ab-req .req-actions{display:flex;gap:6px;flex-shrink:0;margin-left:auto}
+.ab-req .req-actions .primary-button,.ab-req .req-actions .secondary-button{min-height:30px;height:30px;padding:0 12px;font-size:12.5px}
+.ab-req .req-wait{margin-left:auto;font-size:12px;font-weight:600;color:#b08a52}
+.ab-req .req-decline{display:flex;gap:6px;flex:1 1 100%}
+.ab-req .req-decline input{flex:1;min-width:0;height:30px;border:1px solid #e9d8bb;padding:0 10px;font-size:13px;background:#fff}
+.ab-req .req-decline .primary-button{min-height:30px;height:30px;padding:0 12px;font-size:12.5px}
+/* 확인 요청 · 이야기 · 마감 · 완료 · 주간 회의 머리 */
+.ab-viewbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ab-viewbar>small{font-size:12px;color:#9aa1b5;font-weight:600}
+.ab-notices{display:flex;flex-direction:column;gap:14px}
+.ab-notices .pl-group-head{padding:14px 24px}
+.ab-asks .tb-ask-form{border-top:0}
+.ab-list{border:0!important;border-radius:0!important}
+.ab-list>.record-row,.ab-list>.notice-record{border-bottom:1px solid #eef0f7}
+.ab-list>:last-child{border-bottom:0}
+.ab-notices .ask-more{margin:0;padding:10px 24px 14px;align-self:flex-start;font-size:12.5px}
+.ab-notices .pl-group{display:flex;flex-direction:column}
+.ab-pins{display:inline-flex;align-items:center;gap:4px;font-size:12px!important;color:#5b6fa8!important;font-weight:600}
+.ab-stories .pl-group-head>small{flex:1}
+.ab-say-row{padding:12px 24px;border-bottom:1px solid #eef0f7}
+.ab-say{max-width:none!important;height:36px}
+.ab-say-more{display:grid;place-items:center;width:24px;height:24px;border-radius:4px;color:#8a96b3;flex:none}
+.ab-say-more:hover{background:#f1f4fb;color:#315df8}
+.ab-ask-form .ab-ask-task{max-width:420px;width:100%}
+.dv-tools{display:inline-flex;margin-left:auto}
+.tb-due-chips{align-items:center}
+.done-view .dv-head .dv-tools{margin-left:12px}
+.ab-week-nav{display:flex;align-items:center;gap:6px}
+.ab-week-nav h2{margin:0}
+.ab-week-nav .text-button{font-size:12.5px;margin-left:4px}
+.weekly-tools .ab-topic-pick{margin-right:4px}
+/* 업무 상세(C 모양 칩 줄) */
+.detail-head .ab-fields{margin:4px 0 2px}
+.ab-fields .tb-multi-hint{font-size:11.5px;color:#a9b0c2;margin-left:2px}
+@media(max-width:1100px){.ab-people{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}}
+@media(max-width:640px){
+ .ab-tabs{gap:8px!important;margin-bottom:14px}
+ .ab-tabs>.ab-compose{width:34px;padding:0;justify-content:center}
+ .ab-tabs>.ab-compose>span{display:none}
+ .ab-body{gap:12px}
+ .ab-topic-pick{min-width:0;max-width:none;flex:1}
+ .ab-assign .tb-head-right{width:100%}
+ .ab-notices .pl-group-head,.ab-say-row{padding-left:14px;padding-right:14px}
+ .ab-notices .ask-more{padding-left:14px}
+ .ab-viewbar>small{flex-basis:100%}
+ .ab-viewbar>.ab-topic-pick{flex:1}
+ .dv-tools{margin-left:0;flex-basis:100%}
+ .dv-tools>.ab-topic-pick{max-width:none}
+ .done-view .dv-head .dv-tools{margin-left:0}
+ .ab-free{width:100%}
+ .ab-day-form .ab-day-who{width:100%}
+ .ab-req-main{flex-basis:100%}
+ .ab-req .req-actions{margin-left:0}
+ .ab-week-nav h2{font-size:19px}
+}
+.tb-ask-filter .dv-who .chip.late:not([aria-pressed=true]),.ab-assign .dv-who .chip.late:not([aria-pressed=true]){color:#e0643f;border-color:#ffd2c6}
+@media(max-width:640px){.tb-arow>.tb-duepick{grid-area:d;align-self:center}.tb-arow>.tb-arow-checks{grid-column:1/-1}.me-card.bare .me-head{flex-wrap:wrap}.me-card.bare .me-edit{margin-left:0}.me-card.bare .me-name{flex:1 1 100%}}
+@media(max-width:640px){.tb-arow.ab-row{grid-template-areas:'m m' 'd b'}.tb-arow.ab-row>.ab-who-btns{justify-self:end}}
+.dv-stats{flex-wrap:wrap;align-items:center}
+@media(max-width:640px){.ab-notices .pl-group-head>small{flex:1 1 100%;order:3}.ab-notices .pl-group-head>.tb-import-btn,.ab-notices .pl-group-head>.ab-pins{margin-left:auto}.dv-stats>.dv-tools{flex-basis:100%;margin-left:0!important}}
+@media(max-width:940px) and (min-width:641px){.presence-peek{display:none}.header-profile>strong{display:none}}
 </style>
 </head><body>
 <div id="app"></div>
@@ -1514,6 +1626,6 @@ body.memo-resizing,body.memo-resizing *{cursor:ns-resize!important;user-select:n
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1791335929"></script>
-<script src="app.js?v=1791335929"></script>
+<script src="platform.js?v=1791351649"></script>
+<script src="app.js?v=1791351649"></script>
 </body></html>
