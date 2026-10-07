@@ -159,22 +159,132 @@
   const us = [sub('items', 'items'), sub('comments', 'comments'), sub('avatars', 'avatars')];
   return () => us.forEach(u => { try { u(); } catch (e) {} });
  };
- // 이현성이 어느 보드를 열어 두든: C 오더의 진행 상황을 A 원본(c_link)에 옮겨 적는다. 디자이너는 A에 쓸 수 없어서 이현성 쪽에서 맞춘다.
+ // ===== C ⇄ A·B 연결 업무 맞추기 =====
+ // 이현성 화면이 열려 있는 동안(어느 보드든) 돈다. 디자이너는 A·B에, 권중선·정규진은 C 업무에 쓸 수 없어서 양쪽 모두 쓸 수 있는 이현성 쪽에서 맞춘다.
+ // 연결: C 업무의 src_id(A에서 불러온 원본)와 out_links(C에서 보낸 업무). 맞추는 항목: 상태 · 마감 · 시작일 · 중요도 · 세부 업무 · 진행률(양방향).
+ // A·B 문서의 c_sync = 지난번에 맞춘 값. 항목마다 바뀐 쪽을 따르고, 양쪽이 같은 항목을 바꿨으면 C 기준.
+ // 처음 맞출 때: 상태 · 마감 · 시작일 · 중요도는 C 기준. 세부 업무는 합친다(이름이 같으면 더 많이 진행된 쪽, A·B에만 있던 것은 C에 덧붙임) — 이미 한 일을 되돌리지 않게.
+ // C 업무가 지워지면(이현성 화면이 열려 있을 때) 연결됐던 A·B 업무의 디자인팀 표시 · 맞춤 기준을 지우고 따로 움직이게 둔다.
+ // A·B 쪽 디자인팀 표시(c_link)와 C 쪽 '보이는 보드'(link_vis)도 여기서 쓴다.
+ // 같은 업무가 한 보드에 두 번 보이면(A·B 공통으로 이미 보이는데 그 보드로 또 보낸 이현성 업무) 나중에 보낸 것을 지운다(댓글·상대 수정이 없을 때만).
  function watchTeamLinks() {
-  let seen = {}; try { seen = JSON.parse(localStorage.getItem('ps.clink') || '{}') || {}; } catch (e) {}
-  fs.collection('items').where('board', '==', 'C').onSnapshot(async s => {
-   for (const d of s.docs) {
-    const v = d.data() || {};
-    const targets = [...(v.src_board === 'A' && v.src_id ? [v.src_id] : []), ...(Array.isArray(v.out_links) ? v.out_links.map(o => o && o.id).filter(Boolean) : [])];
-    if (!targets.length) continue;
-    const who = v.assignee === '모두' ? '셋 다' : v.assignee === '함께' ? BOARDS.C.seats.filter(k => k !== 'lhs').map(k => SEAT_NAMES[k]).join('·') : (v.assignee || '미배정');
-    const link = {id: d.id, status: v.status || 'todo', progress: Number(v.progress) || 0, assignee: who, due: v.due || '', issue: v.issue || '', at: v.updated_at || ''};
-    const key = JSON.stringify([link, targets]); if (seen[d.id] === key) continue;
-    for (const t of targets) { try { await fs.doc('items/' + t).update({c_link: link}); } catch (e) { console.error('team link', e); } }
-    seen[d.id] = key;
-   }
-   try { localStorage.setItem('ps.clink', JSON.stringify(seen)); } catch (e) {}
+  const ST = ['todo', 'doing', 'hold', 'done'], PR = ['share', 'urgent', 'critical'], DRE = /^\d{4}-\d{2}-\d{2}$/;
+  const F = ['status', 'due', 'start_on', 'priority', 'checklist', 'progress'];
+  const NAME = {status: '상태', due: '마감', start_on: '시작일', priority: '중요도', checklist: '세부 업무', progress: '진행률'};
+  const KIND = {status: 'status', due: 'due', start_on: 'start', priority: 'priority', checklist: 'check', progress: 'progress'};
+  const STL = {todo: '예정', doing: '진행 중', hold: '보류', done: '완료'}, PRL = {share: '보통', urgent: '급함', critical: '아주급함'};
+  const LHS = ['이현성', '현성 이', '부대표', 'pocket.lhs', 'lhs'];
+  const sd = d => d ? `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))}` : '없음';
+  const pct = v => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+  // 세부 업무 정리: 앱의 normChecklist와 같은 규칙(그래야 양쪽 비교가 흔들리지 않는다).
+  const nChecks = v => (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const p = c.done ? 100 : pct(c.pct); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct: p, done: p === 100, ...(c.by ? {by: String(c.by).slice(0, 20)} : {}), ...(c.at ? {at: String(c.at).slice(0, 30)} : {})}; });
+  const stateOf = v => ({status: ST.includes(v.status) ? v.status : 'todo', due: DRE.test(v.due || '') ? v.due : '', start_on: DRE.test(v.start_on || '') ? v.start_on : '', priority: PR.includes(v.priority) ? v.priority : 'share', checklist: nChecks(v.checklist), progress: pct(v.progress)});
+  const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
+  const fv = (st, f) => f === 'checklist' ? hash(JSON.stringify(st.checklist)) : String(st[f]);
+  const bv = (b, f) => f === 'checklist' ? String(b.ck ?? '') : String(b[f] ?? '');
+  const sigOf = st => ({status: st.status, due: st.due, start_on: st.start_on, priority: st.priority, ck: fv(st, 'checklist'), progress: st.progress});
+  const ckLabel = list => `${list.filter(c => c.done).length}/${list.length}`;
+  const label = (f, v) => f === 'status' ? STL[v] : f === 'priority' ? PRL[v] : f === 'checklist' ? ckLabel(v) : f === 'progress' ? `${v}%` : sd(v);
+  const avg = list => Math.round(list.reduce((a, c) => a + (c.pct || 0), 0) / list.length);
+  const whoOf = a => a === '모두' ? '셋 다' : a === '함께' ? BOARDS.C.seats.filter(k => k !== 'lhs').map(k => SEAT_NAMES[k]).join('·') : (a || '미배정');
+  const visOf = b => b === 'all' ? ['A', 'B'] : (b === 'A' || b === 'B') ? [b] : [];
+  const boardName = t => t.src ? 'A 보드' : `${t.board || 'A'} 보드`;
+  const targetsOf = v => [...(v.src_board === 'A' && v.src_id ? [{id: String(v.src_id), src: true, at: '', board: 'A'}] : []), ...(Array.isArray(v.out_links) ? v.out_links.filter(o => o && o.id).map(o => ({id: String(o.id), src: false, at: String(o.at || ''), board: String(o.board || '')})) : [])];
+  const cDocs = new Map(), tDocs = new Map(), tSubs = new Map(), tErr = new Set(), dupSeen = new Map(), prevTargets = new Map();
+  // 같은 사람의 탭이 여러 개면 하나만 쓴다(기록이 두 번 남지 않게).
+  const tabId = Math.random().toString(36).slice(2);
+  const lead = () => { try { const now = Date.now(), v = JSON.parse(localStorage.getItem('ps.linkLeader') || 'null'); if (!v || v.id === tabId || now - v.at > 90000) { localStorage.setItem('ps.linkLeader', JSON.stringify({id: tabId, at: now})); return true; } return false; } catch (e) { return true; } };
+  let timer = null, running = false, again = false;
+  const schedule = () => { clearTimeout(timer); timer = setTimeout(runAll, 700); };
+  setInterval(() => { if (lead()) schedule(); }, 20000);
+  fs.collection('items').where('board', '==', 'C').onSnapshot(s => {
+   cDocs.clear(); s.docs.forEach(d => { const v = d.data() || {}; if (v.kind === 'task') cDocs.set(d.id, v); });
+   // 지워진 C 업무: 연결됐던 A·B 업무에서 c_link · c_sync를 지운다(여러 탭이면 맞추는 탭 하나만).
+   for (const [cid, ids] of [...prevTargets]) if (!cDocs.has(cid)) { prevTargets.delete(cid); if (ids.length && lead()) ids.forEach(id => fs.doc('items/' + id).update({c_link: null, c_sync: null}).catch(e => console.error('link clear', id, e))); }
+   for (const [cid, v] of cDocs) prevTargets.set(cid, targetsOf(v).map(t => t.id));
+   const want = new Set(); for (const v of cDocs.values()) targetsOf(v).forEach(t => want.add(t.id));
+   for (const id of want) if (!tSubs.has(id)) tSubs.set(id, fs.doc('items/' + id).onSnapshot(ds => { tErr.delete(id); tDocs.set(id, ds.exists ? (ds.data() || {}) : null); schedule(); }, e => { console.error('link target', id, e); tErr.add(id); schedule(); }));
+   for (const [id, u] of tSubs) if (!want.has(id)) { try { u(); } catch (e) {} tSubs.delete(id); tDocs.delete(id); tErr.delete(id); }
+   schedule();
   }, e => console.error('team links', e));
+  async function runAll() {
+   if (running) { again = true; return; }
+   if (!lead()) return;
+   running = true;
+   try { for (const [cid, c] of [...cDocs]) { const ts = targetsOf(c); if (ts.length) { try { await syncTask(cid, c, ts); } catch (e) { console.error('link sync', cid, e); } } } }
+   finally { running = false; if (again) { again = false; schedule(); } }
+  }
+  async function syncTask(cid, c, ts) {
+   if (ts.some(t => !tDocs.has(t.id) && !tErr.has(t.id))) return; // 연결 업무를 다 읽은 뒤에 판단
+   const live = ts.filter(t => tDocs.get(t.id)), gone = ts.filter(t => !t.src && tDocs.has(t.id) && tDocs.get(t.id) === null);
+   if (!live.length && !gone.length) return;
+   const now = new Date().toISOString(), hist = [], cPatch = {};
+   // 1) 같은 보드에 두 번 보이는 이현성 혼자 업무 정리(남기는 순서: A 원본 → 먼저 보낸 것). 지울 것은 맞추기에서 뺀다.
+   const order = [...live].sort((x, y) => (Number(y.src) - Number(x.src)) || x.at.localeCompare(y.at)), covered = new Set(), drop = [];
+   for (const t of order) {
+    const a = tDocs.get(t.id), v = visOf(String(a.board || ''));
+    if (!v.length || v.some(b => !covered.has(b))) { v.forEach(b => covered.add(b)); continue; }
+    if (t.src || !LHS.includes(String(a.assignee || '')) || a.req === 'pending' || ['kjs', 'jgj'].includes(a.updated_by)) continue;
+    const hit = dupSeen.get(t.id); let n = 1;
+    if (hit && Date.now() - hit.at < 600000) n = hit.n;
+    else { try { n = (await fs.collection('comments').where('item_id', '==', t.id).where('board', 'in', ['A', 'B', 'all']).get()).size; } catch (e) { console.error('link dup check', e); } dupSeen.set(t.id, {n, at: Date.now()}); }
+    if (n) continue;
+    // 먼저 지우고(실패하면 그대로 둔다), 지운 것만 C 연결에서 뺀다.
+    try { await fs.doc('items/' + t.id).delete(); } catch (e) { console.error('link dup delete', e); continue; }
+    drop.push(t); hist.push({at: now, by: '이현성', kind: 'sync', text: `${v.join('·')} 보드에 같은 업무가 두 번 보여서 나중에 보낸 것(${boardName(t)})을 정리`});
+   }
+   const keep = live.filter(t => !drop.includes(t));
+   let cs = stateOf(c), src = null;
+   // 2) A·B → C: 지난번 맞춘 값(c_sync)에서 A·B만 바뀐 항목을 C로.
+   for (const t of keep) {
+    const a = tDocs.get(t.id), as = stateOf(a), base = a.c_sync && typeof a.c_sync === 'object' ? a.c_sync : null;
+    if (!base) {
+     // 처음 맞추는 연결: 상태 · 마감 · 시작일 · 중요도는 C 기준. 세부 업무는 합친다 — 이름이 같으면 더 많이 진행된 쪽, A·B에만 있던 것은 C에 덧붙인다.
+     const byText = new Map(as.checklist.map(x => [x.text, x])), have = new Set(cs.checklist.map(x => x.text)), ids = new Set(cs.checklist.map(x => x.id));
+     let raised = 0;
+     const merged = cs.checklist.map(x => { const o = byText.get(x.text); if (o && o.pct > x.pct) { raised++; return {...x, pct: o.pct, done: o.pct === 100}; } return x; });
+     const extra = as.checklist.filter(x => !have.has(x.text));
+     const diff = F.filter(f => fv(as, f) !== fv(cs, f));
+     if (raised || extra.length) { const list = [...merged, ...extra.map(x => ids.has(x.id) ? {...x, id: (x.id + 'a').slice(0, 40)} : x)]; cs = {...cs, checklist: list, progress: avg(list)}; cPatch.checklist = list; cPatch.progress = cs.progress; }
+     if (diff.length || extra.length || raised) hist.push({at: now, by: '이현성', kind: 'sync', text: `${boardName(t)} 업무와 맞춤 · 디자인팀 보드 기준 (${boardName(t)}: ${STL[as.status]} ${as.progress}% · 세부 ${ckLabel(as.checklist)} · 마감 ${sd(as.due)})${extra.length ? ` · ${boardName(t)}에만 있던 세부 업무 ${extra.length}개 추가` : ''}${raised ? ` · ${boardName(t)}에서 더 진행된 세부 업무 ${raised}개 반영` : ''}`});
+     continue;
+    }
+    const moved = F.filter(f => fv(as, f) !== fv(cs, f) && bv(base, f) === fv(cs, f)); // C는 그대로, A·B만 바뀐 항목
+    for (const f of moved) {
+     if (!(f === 'progress' && moved.includes('checklist'))) hist.push({at: now, by: `${a.updated_by_name || '이현성'} · ${boardName(t)}`, kind: KIND[f], text: `${NAME[f]} ${label(f, as[f])}`, from: label(f, cs[f]), to: label(f, as[f])});
+     cs = {...cs, [f]: as[f]}; cPatch[f] = as[f];
+    }
+    if (moved.length) src = {t, a};
+   }
+   const doneAt = cs.status === 'done' ? (c.status === 'done' && c.done_at ? String(c.done_at) : src && src.a.status === 'done' && src.a.done_at ? String(src.a.done_at) : now) : '';
+   if (String(c.done_at || '') !== doneAt) cPatch.done_at = doneAt;
+   const vis = [...new Set(keep.flatMap(t => visOf(String(tDocs.get(t.id).board || ''))))].sort();
+   const outRm = [...gone, ...drop].map(t => t.id);
+   if (outRm.length) cPatch.out_links = (Array.isArray(c.out_links) ? c.out_links : []).filter(o => o && !outRm.includes(String(o.id)));
+   if (JSON.stringify(Array.isArray(c.link_vis) ? c.link_vis : null) !== JSON.stringify(vis)) cPatch.link_vis = vis;
+   if (Object.keys(cPatch).length || hist.length) {
+    const said = hist.filter(h => h.kind !== 'sync').map(h => h.text);
+    const meta = src ? {updated_at: now, updated_by: src.a.updated_by || 'lhs', updated_by_name: src.a.updated_by_name || '이현성', last_change: `${boardName(src.t)}에서 ${said.join(', ')}`} : {};
+    const last = Array.isArray(c.history) ? c.history : [];
+    const fresh = hist.filter(h => !last.slice(-8).some(o => o && o.text === h.text && o.kind === h.kind && Math.abs(Date.parse(o.at) - Date.parse(h.at)) < 120000));
+    await fs.doc('items/' + cid).update({...cPatch, ...meta, ...(fresh.length ? {history: [...last, ...fresh].slice(-200)} : {})});
+   }
+   // 3) C → A·B: 맞춘 값을 연결된 업무에 쓴다.
+   const link = {id: cid, status: cs.status, progress: cs.progress, assignee: whoOf(c.assignee), due: cs.due, issue: c.issue || '', at: (src ? now : c.updated_at) || ''};
+   const actor = src ? {id: src.a.updated_by || 'lhs', name: src.a.updated_by_name || '이현성', via: boardName(src.t)} : {id: c.updated_by || 'lhs', name: c.updated_by_name || '이현성', via: '디자인팀 보드'};
+   const sig = sigOf(cs);
+   for (const t of keep) {
+    const a = tDocs.get(t.id), as = stateOf(a), aPatch = {}, changed = [];
+    for (const f of F) if (fv(as, f) !== fv(cs, f)) { aPatch[f] = cs[f]; if (!(f === 'progress' && 'checklist' in aPatch)) changed.push(`${NAME[f]} ${label(f, cs[f])}`); }
+    if (String(a.done_at || '') !== doneAt) aPatch.done_at = doneAt;
+    if (changed.length) Object.assign(aPatch, {updated_at: now, updated_by: actor.id, updated_by_name: actor.name, last_change: `${actor.via}: ${changed.join(', ')}`});
+    const l0 = a.c_link || {};
+    if (['id', 'status', 'progress', 'assignee', 'due', 'issue'].some(k => String(l0[k] ?? '') !== String(link[k] ?? ''))) aPatch.c_link = link;
+    const b0 = a.c_sync || {};
+    if (['status', 'due', 'start_on', 'priority', 'ck', 'progress'].some(k => String(b0[k] ?? '') !== String(sig[k] ?? ''))) aPatch.c_sync = {...sig, at: now};
+    if (Object.keys(aPatch).length) { try { await fs.doc('items/' + t.id).update(aPatch); } catch (e) { console.error('link write', t.id, e); } }
+   }
+  }
  }
 
  // 이현성 일정 → 디자인팀 보드 '오늘 미팅'. 디자이너는 A·B('all' 포함)를 읽을 수 없어서, 이현성 화면이 열려 있을 때

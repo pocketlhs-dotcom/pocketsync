@@ -1368,6 +1368,67 @@ body.memo-resizing,body.memo-resizing *{cursor:ns-resize!important;user-select:n
 .dm-list li::before{content:'';position:absolute;left:12px;top:17px;width:5px;height:5px;border-radius:50%;background:#9aa8c4}
 .dm-ro-tag{display:inline-flex;align-items:center;gap:4px;background:#f1f4fa!important;color:#5d6b86!important}
 @media(max-width:640px){.tb-arow.dm-row{grid-template-areas:'m m' 'd b'}.dm-row>.dm-who{grid-area:b;justify-self:end}.dm-fields>div{grid-template-columns:56px minmax(0,1fr)}.dm-ro{height:28px}.dm-ro-more{display:none}.dm>.section-heading .heading-tools{flex-wrap:nowrap}.dm-prog i{width:110px}}
+/* 업무보고: 프로젝트 → 세부 업무 → % (10-07) */
+.tb-rep-work{display:flex;flex-direction:column;gap:8px}
+.tb-rep-work>.tb-rep-lines{padding:2px 2px 0}
+.tb-rep-proj{border:1px solid #e6eaf3;border-radius:7px;padding:10px 10px 10px 12px;background:#fbfcfe}
+.tb-rep-proj-head{display:flex;align-items:center;gap:8px;min-width:0}
+.tb-rep-proj-ico{display:inline-flex;color:#8a96ad;flex-shrink:0}
+.tb-rep-proj-title{flex:1;min-width:0;text-align:left;font-size:14.5px;font-weight:700;color:#13204a;background:none;border:0;padding:0;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb-rep-proj-title:hover{color:#315df8;text-decoration:underline;text-underline-offset:3px}
+.tb-rep-proj-title:disabled{cursor:default;color:#8a96ad;text-decoration:none}
+.tb-rep-subs{list-style:none;margin:8px 0 0;padding:0 0 0 2px;display:flex;flex-direction:column;gap:6px}
+.tb-rep-subs li{display:grid;grid-template-columns:8px minmax(0,1fr) auto auto;gap:8px;align-items:center;min-height:30px}
+.tb-rep-subs .tb-rep-dot{margin-top:0;background:#7c9cf9}
+.tb-rep-subtext{display:flex;align-items:baseline;gap:6px;min-width:0}
+.tb-rep-subtext .tb-text{font-size:14px;min-width:0}
+.tb-rep-subtext small{font-size:11.5px;color:#a0a6b8;white-space:nowrap}
+.tb-rep-pct{display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+.tb-rep-pct-bar{display:block;width:48px;height:5px;border-radius:9px;background:#e9edf5;overflow:hidden}
+.tb-rep-pct-bar i{display:block;height:100%;background:#315df8;border-radius:9px}
+.tb-rep-pct.full .tb-rep-pct-bar i{background:#3f8c66}
+.tb-rep-pct select{height:28px!important;min-height:0!important;padding:0 4px!important;border:1px solid #dfe3ef;font-size:12.5px;font-weight:600;color:#0b1c5c;background:#fff;cursor:pointer}
+.tb-rep-pct.ro b{font-size:12.5px;font-weight:700;color:#0b1c5c;min-width:34px;text-align:right}
+.tb-rep-form{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.tb-rep-form-row{display:flex;gap:6px;align-items:center;min-width:0}
+.tb-rep-form select,.tb-rep-form input{height:34px!important;min-height:0!important;border:1px solid #dfe3ef;padding:0 10px;font-size:13.5px;background:#fff;color:#2b3550;min-width:0;box-sizing:border-box}
+.tb-rep-sel.proj{width:100%}
+.tb-rep-sel.sub,.tb-rep-form-row>input{flex:1}
+.tb-rep-sel.pct{flex:0 0 84px;width:84px;padding:0 6px!important}
+.tb-rep-form .secondary-button{height:34px!important;min-height:0!important;padding:0 14px!important;font-size:13px;white-space:nowrap;flex-shrink:0}
+.tb-rep-back{width:34px;height:34px;flex-shrink:0;border:1px solid #dfe3ef;border-radius:3px;color:#6b7591;background:#fff}
+.tb-rep-form.is-off select,.tb-rep-form.is-off input{background:#f7f8fa!important;border-color:#eceff5!important;color:#a9b3c4;cursor:not-allowed}
+.tb-rep-form.is-off input::placeholder{color:#c3c9d6}
+.tb-rep-form.is-off .secondary-button{cursor:not-allowed;color:#c3c9d6!important;border-color:#eceff5!important;background:#fff!important}
+/* 링크 넓게 */
+.link-chips.wide{flex-direction:column;align-items:stretch;gap:6px;width:100%}
+.link-chips.wide .link-chip{width:100%;height:auto;min-height:40px;padding:0 6px 0 12px;box-sizing:border-box;font-size:13.5px;border-radius:5px!important}
+.link-chips.wide .link-chip>a{flex:1;gap:8px;padding:9px 0;min-width:0}
+.link-chips.wide .link-chip>a>span{max-width:none;flex:0 1 auto;font-weight:600}
+.link-chips.wide .link-host{margin-left:auto;padding-left:8px;font-size:12px;color:#93a3bf;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%}
+.link-chips.wide .link-go{display:inline-flex;color:#9bb0cf;font-style:normal;margin-left:4px;flex-shrink:0}
+.link-chips.wide .link-chip>a>span+.link-go{margin-left:auto}
+.link-chips.wide .link-chip.add{justify-content:center;min-height:38px}
+.link-chips.wide .link-add{width:100%;flex-wrap:nowrap}
+.link-chips.wide .link-add>input{flex:1;width:auto;min-width:0;height:34px}
+.link-chips.wide .link-add>input+input{flex:0 0 32%}
+/* 댓글: 수정 · 삭제, 줄바꿈 입력, 입력 칸 여백 */
+.tb-ask-c-body{min-width:0}
+.tb-ask-c-meta{display:flex;align-items:baseline;gap:4px;min-width:0}
+.tb-ask-c{padding:8px 0 2px}
+.tb-ask-c .tb-c-tools{margin-left:auto}
+.tb-c-inline{margin-top:4px}
+.tb-c-inline textarea{min-height:60px;resize:none;font-size:13.5px;line-height:1.55}
+.tb-ask-reply.tb-reply{align-items:flex-end;min-width:0}
+.tb-rep-comments .tb-reply{margin-top:12px}
+.tb-ask-actions{align-items:flex-end}
+.tb-reply textarea{flex:1;min-width:0;min-height:36px;max-height:200px;resize:none;border:1px solid #dfe3ef;padding:7px 10px;font-size:13.5px;line-height:1.5;box-sizing:border-box;background:#fff;color:#2b3550;overflow-y:auto}
+.tb-reply textarea::placeholder{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-reply textarea{height:36px}
+.tb-reply textarea:focus{outline:none;border-color:#9fb3f7;box-shadow:0 0 0 3px #e8edff}
+.tb-ask-reply.tb-reply .secondary-button{height:36px!important;flex-shrink:0}
+.tb-rep-comments{padding-bottom:2px}
+@media(max-width:640px){.tb-rep-pct-bar{display:none}.tb-rep-subs li{grid-template-columns:8px minmax(0,1fr) auto auto;gap:6px}.tb-rep-sel.pct{flex-basis:74px;width:74px}.link-chips.wide .link-host{display:none}}
 </style>
 </head><body>
 <div id="app"></div>
@@ -1377,6 +1438,6 @@ body.memo-resizing,body.memo-resizing *{cursor:ns-resize!important;user-select:n
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1791256678"></script>
-<script src="app.js?v=1791256678"></script>
+<script src="platform.js?v=1791333402"></script>
+<script src="app.js?v=1791333402"></script>
 </body></html>

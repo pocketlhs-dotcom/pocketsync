@@ -6,7 +6,7 @@ const TEAM_ISSUE_HINT = {blocked: '진행이 멈춰 있어요', risk: '마감을
 const TEAM_TABS = {status: '팀 현황', orders: '오더', due: '마감', issues: '확인 요청 및 특이사항', report: '오늘의 업무보고', done: '완료'};
 const ASK_TYPES = {confirm: '확인 요청', need: '자료 필요', feedback: '피드백 요청'};
 function normAsk(d) { return {id: d.id, ask_type: ASK_TYPES[d.ask_type] ? d.ask_type : 'confirm', title: String(d.title || ''), body: String(d.body || ''), from: String(d.from || ''), from_id: String(d.from_id || ''), to: String(d.to || '모두'), task_id: String(d.task_id || ''), task_title: String(d.task_title || ''), reply_by: DATE_RE.test(d.reply_by || '') ? d.reply_by : '', state: d.state === 'done' ? 'done' : 'open', done_by: String(d.done_by || ''), done_at: String(d.done_at || ''), answer: String(d.answer || ''), created_at: String(d.created_at || ''), updated_at: String(d.updated_at || '')}; }
-function normReport(d) { return {id: d.id, seat: String(d.seat || ''), name: String(d.name || ''), day: String(d.day || ''), lines: (Array.isArray(d.lines) ? d.lines : []).filter(l => l && String(l.text || '').trim()).map((l, i) => ({id: String(l.id || 'r' + i), text: String(l.text), task_id: String(l.task_id || ''), task_title: String(l.task_title || '')})), note: String(d.note || ''), next: String(d.next || ''), links: teamLinks(d.links), updated_at: String(d.updated_at || '')}; }
+function normReport(d) { return {id: d.id, seat: String(d.seat || ''), name: String(d.name || ''), day: String(d.day || ''), lines: (Array.isArray(d.lines) ? d.lines : []).filter(l => l && String(l.text || '').trim()).map((l, i) => ({id: String(l.id || 'r' + i), text: String(l.text), task_id: String(l.task_id || ''), task_title: String(l.task_title || ''), check_id: String(l.check_id || ''), pct: l.pct === null || l.pct === undefined || l.pct === '' ? null : Math.max(0, Math.min(100, Math.round(Number(l.pct) || 0)))})), note: String(d.note || ''), next: String(d.next || ''), links: teamLinks(d.links), updated_at: String(d.updated_at || '')}; }
 const teamDesigners = () => SEATS.filter(s => s.name !== ADMIN_NAME);
 const teamJoint = () => teamDesigners().map(s => s.name).join('·');
 // 담당: 디자이너 이름 | '함께'(디자이너 모두) | ''(미배정)
@@ -47,7 +47,7 @@ function shrinkImage(file, size = 128) {
 }
 function normTeam(d) {
  const b = normItem(d);
- return {...b, assignee: String(d.assignee || ''), topic_label: String(d.topic_label || ''), src_board: String(d.src_board || ''), src_id: String(d.src_id || ''), src_title: String(d.src_title || ''), issue: TEAM_ISSUES[d.issue] ? d.issue : '', issue_note: String(d.issue_note || ''), issue_at: String(d.issue_at || ''), issue_by: String(d.issue_by || ''), src_body: String(d.src_body || ''), src_checks: normChecklist(d.src_checks), src_links: teamLinks(d.src_links), src_synced_at: String(d.src_synced_at || ''), start_on: DATE_RE.test(d.start_on || '') ? d.start_on : '', spec: normChecklist(d.spec).map(c => ({id: c.id, text: c.text, done: c.done})), issue_log: (Array.isArray(d.issue_log) ? d.issue_log : []).filter(h => h && h.resolved_at).map(h => ({issue: TEAM_ISSUES[h.issue] ? h.issue : 'check', note: String(h.note || ''), by: String(h.by || ''), at: String(h.at || ''), resolved_by: String(h.resolved_by || ''), resolved_at: String(h.resolved_at), how: String(h.how || '')})), history: (Array.isArray(d.history) ? d.history : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), text: String(h.text || ''), kind: String(h.kind || ''), from: h.from === undefined ? null : String(h.from), to: h.to === undefined ? null : String(h.to), note: String(h.note || '')})), handoffs: (Array.isArray(d.handoffs) ? d.handoffs : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), from: String(h.from || ''), to: String(h.to || ''), note: String(h.note || '')})), out_links: (Array.isArray(d.out_links) ? d.out_links : []).filter(o => o && ['A', 'B'].includes(o.board) && o.id).map(o => ({board: o.board, id: String(o.id), at: String(o.at || '')}))};
+ return {...b, assignee: String(d.assignee || ''), topic_label: String(d.topic_label || ''), src_board: String(d.src_board || ''), src_id: String(d.src_id || ''), src_title: String(d.src_title || ''), issue: TEAM_ISSUES[d.issue] ? d.issue : '', issue_note: String(d.issue_note || ''), issue_at: String(d.issue_at || ''), issue_by: String(d.issue_by || ''), src_body: String(d.src_body || ''), src_checks: normChecklist(d.src_checks), src_links: teamLinks(d.src_links), src_synced_at: String(d.src_synced_at || ''), start_on: DATE_RE.test(d.start_on || '') ? d.start_on : '', spec: normChecklist(d.spec).map(c => ({id: c.id, text: c.text, done: c.done})), issue_log: (Array.isArray(d.issue_log) ? d.issue_log : []).filter(h => h && h.resolved_at).map(h => ({issue: TEAM_ISSUES[h.issue] ? h.issue : 'check', note: String(h.note || ''), by: String(h.by || ''), at: String(h.at || ''), resolved_by: String(h.resolved_by || ''), resolved_at: String(h.resolved_at), how: String(h.how || '')})), history: (Array.isArray(d.history) ? d.history : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), text: String(h.text || ''), kind: String(h.kind || ''), from: h.from === undefined ? null : String(h.from), to: h.to === undefined ? null : String(h.to), note: String(h.note || '')})), handoffs: (Array.isArray(d.handoffs) ? d.handoffs : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), from: String(h.from || ''), to: String(h.to || ''), note: String(h.note || '')})), out_links: (Array.isArray(d.out_links) ? d.out_links : []).filter(o => o && ['A', 'B'].includes(o.board) && o.id).map(o => ({board: o.board, id: String(o.id), at: String(o.at || '')})), link_vis: Array.isArray(d.link_vis) ? d.link_vis.filter(b => b === 'A' || b === 'B') : null};
 }
 const teamByDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || ({critical: 0, urgent: 1, share: 2}[a.priority] - {critical: 0, urgent: 1, share: 2}[b.priority]) || String(a.created_at || '').localeCompare(String(b.created_at || ''));
 // 팀 현황 순서: 손으로 정한 순서(prio_no) 먼저, 나머지는 미배정 먼저 · 마감순.
@@ -60,6 +60,11 @@ function teamClock(iso) { const d = new Date(iso); return isNaN(d) ? '' : d.toLo
 function teamDay(d) { const t = today(); return d === t ? '오늘' : d === offsetDate(t, -1) ? '어제' : d === offsetDate(t, 1) ? '내일' : `${shortDate(d)} (${'일월화수목금토'[new Date(d + 'T12:00:00Z').getUTCDay()]})`; }
 // A 원본에 남기는 C 진행 상황(이현성만 A에 쓸 수 있다).
 const teamLinkOf = x => ({id: x.id, status: x.status, progress: x.progress || 0, assignee: teamWho(x.assignee), due: x.due || '', issue: x.issue || '', at: x.updated_at || nowIso()});
+// A·B로 보낼 때 문서가 놓일 보드: 이현성 혼자 업무로 A에 보내면 A·B 공통('all'), 그 밖에는 고른 보드(A·B 보드에서 만드는 규칙과 같다).
+const sendBoardOf = (board, who) => who === 'me' && board === 'A' ? 'all' : board;
+const boardsSeen = b => b === 'all' ? ['A', 'B'] : [b];
+// 이 C 업무가 이미 보이는 보드: 연결 맞추기가 적어 둔 link_vis, 아직 없으면 연결 정보로 짐작.
+const linkVisOf = x => x.link_vis || [...new Set([...(x.src_board === 'A' && x.src_id ? ['A'] : []), ...x.out_links.map(o => o.board)])];
 
 function TeamBoard() {
  const meKey = window.PS_SEAT || '', me = {id: meKey, name: (SEATS.find(s => s.key === meKey) || {}).name || ''};
@@ -86,13 +91,14 @@ function TeamBoard() {
  async function run(fn, ok) { setBusy(true); try { const r = await fn(); if (ok) toast.success(ok); return r; } catch (e) { console.error('team save', e); toast.error(friendlyError(e)); throw e; } finally { setBusy(false); } }
  // A 원본의 C 진행 표시 갱신(이현성일 때만; 디자이너는 A에 쓸 수 없다).
  const linkTargets = x => [...(x.src_board === 'A' && x.src_id ? [x.src_id] : []), ...(x.out_links || []).map(o => o.id)];
- async function syncLink(x, patch) { if (!isAdmin) return; for (const id of linkTargets(x)) { try { await db.doc('items/' + id).update({c_link: patch === null ? null : teamLinkOf({...x, ...patch})}); } catch (e) { console.error('link', e); } } }
- // 이현성: C 업무를 A·B 보드로 보낸다. 보낸 업무에는 디자인팀 진행 상황(c_link)이 붙고 C 쪽에는 out_links로 남긴다.
+ // 연결을 끊거나 C 업무를 지울 때 A·B 쪽 표시와 맞춤 기준(c_sync)을 지운다. 평소 맞추기는 플랫폼의 watchTeamLinks가 한다.
+ async function clearLinks(x) { if (!isAdmin) return; for (const id of linkTargets(x)) { try { await db.doc('items/' + id).update({c_link: null, c_sync: null}); } catch (e) { console.error('link', e); } } }
+ // 이현성: C 업무를 A·B 보드로 보낸다. 보낸 업무는 지금 C 상태(상태 · 진행률 · 세부 업무 · 시작일)로 만들고, 이후는 연결 맞추기가 양쪽을 같게 둔다. C 쪽에는 out_links로 남긴다.
  async function sendTo(x, board, who) {
   const id = uuid(), now = nowIso(), partner = board === 'A' ? '권중선' : '정규진';
   const assignee = who === 'me' ? ADMIN_NAME : who === 'partner' ? partner : '함께';
-  const lhsSolo = assignee === ADMIN_NAME, boardField = lhsSolo && board === 'A' ? 'all' : board;
-  const doc = {kind: 'task', title: x.title, body: x.body || '', due: x.due || '', priority: x.priority, status: 'todo', progress: 0, checklist: [], assignee, day: today(), topic_id: '', topic_label: '', topic_map: {}, share_all: false, links: teamLinks(x.links), category: 'work', ack: false, start: '', end: '', pinned: false, pinned_by: '', pinned_at: '', prio_no: 0, req: assignee === partner ? 'pending' : '', req_at: assignee === partner ? now : '', req_reply: '', ref_id: '', reply_by: '', collab: '', demo: 0, board: boardField, home: board, c_link: teamLinkOf(x), author_id: me.id, author_name: me.name, created_at: now, updated_at: now, updated_by: me.id, updated_by_name: me.name, last_change: '디자인팀 보드에서 보냄', done_at: '', plan_day: ''};
+  const boardField = sendBoardOf(board, who);
+  const doc = {kind: 'task', title: x.title, body: x.body || '', due: x.due || '', priority: x.priority, status: x.status, progress: x.progress || 0, checklist: normChecklist(x.checklist), start_on: x.start_on || '', assignee, day: today(), topic_id: '', topic_label: '', topic_map: {}, share_all: false, links: teamLinks(x.links), category: 'work', ack: false, start: '', end: '', pinned: false, pinned_by: '', pinned_at: '', prio_no: 0, req: assignee === partner ? 'pending' : '', req_at: assignee === partner ? now : '', req_reply: '', ref_id: '', reply_by: '', collab: '', demo: 0, board: boardField, home: board, c_link: teamLinkOf(x), author_id: me.id, author_name: me.name, created_at: now, updated_at: now, updated_by: me.id, updated_by_name: me.name, last_change: '디자인팀 보드에서 보냄', done_at: x.status === 'done' ? (x.done_at || now) : '', plan_day: ''};
   await run(async () => { await db.doc('items/' + id).set(doc); await db.doc('items/' + x.id).update({out_links: [...(x.out_links || []), {board, id, at: now}]}); }, `${board} 보드 : ${partner}에 보냈어요.`);
  }
  async function patch(x, fields, change) {
@@ -114,11 +120,12 @@ function TeamBoard() {
    next.history = [...(x.history || []), {at: nowIso(), by: me.name, text: change, kind: f, ...ft, ...(ho ? {from: ho.from, to: ho.to, note: ho.note} : {})}].slice(-200);
   }
   await run(() => db.doc('items/' + x.id).update({...next, ...stamp(), last_change: change || ''}));
-  syncLink(x, next);
  }
  async function create(draft) {
   const id = uuid(), now = nowIso();
-  const doc = {kind: 'task', title: draft.title, body: draft.body || '', due: draft.due || '', priority: draft.priority || 'share', status: 'todo', progress: draft.checklist && normChecklist(draft.checklist).length ? checkStat({checklist: normChecklist(draft.checklist)}).pct : 0, checklist: normChecklist(draft.checklist).map(c => ({...c, id: newCheckId()})), assignee: draft.assignee || '', day: today(), topic_id: '', topic_label: draft.topic_label || '', src_board: draft.src_board || '', src_id: draft.src_id || '', src_title: draft.src_title || '', src_body: draft.src_body || '', src_checks: normChecklist(draft.src_checks), src_links: teamLinks(draft.src_links), src_synced_at: draft.src_id ? now : '', spec: normChecklist(draft.spec).map(c => ({id: newCheckId(), text: c.text, done: false})), issue: '', issue_note: '', issue_at: '', issue_by: '', links: teamLinks(draft.links), category: 'work', ack: false, start: '', end: '', pinned: false, prio_no: 0, req: '', demo: 0, board: 'C', home: 'C', author_id: me.id, author_name: me.name, created_at: now, updated_at: now, updated_by: me.id, updated_by_name: me.name, last_change: draft.src_id ? 'A 보드에서 불러옴' : '오더', done_at: '', history: [{at: now, by: me.name, text: draft.src_id ? 'A 보드에서 불러옴' : '등록', kind: 'create'}], handoffs: []};
+  // A에서 불러올 때는 상태 · 진행률 · 시작일 · 세부 업무(id 포함)를 원본 그대로 가져와 처음부터 A와 같게 둔다(연결 맞추기 기준).
+  const imp = !!draft.src_id, st0 = imp && statuses[draft.status] ? draft.status : 'todo', cl0 = imp ? normChecklist(draft.checklist) : normChecklist(draft.checklist).map(c => ({...c, id: newCheckId()}));
+  const doc = {kind: 'task', title: draft.title, body: draft.body || '', due: draft.due || '', priority: draft.priority || 'share', status: st0, progress: imp && draft.progress !== undefined ? Math.max(0, Math.min(100, Math.round(Number(draft.progress) || 0))) : cl0.length ? checkStat({checklist: cl0}).pct : 0, checklist: cl0, start_on: imp && DATE_RE.test(draft.start_on || '') ? draft.start_on : '', assignee: draft.assignee || '', day: today(), topic_id: '', topic_label: draft.topic_label || '', src_board: draft.src_board || '', src_id: draft.src_id || '', src_title: draft.src_title || '', src_body: draft.src_body || '', src_checks: normChecklist(draft.src_checks), src_links: teamLinks(draft.src_links), src_synced_at: draft.src_id ? now : '', spec: normChecklist(draft.spec).map(c => ({id: newCheckId(), text: c.text, done: false})), issue: '', issue_note: '', issue_at: '', issue_by: '', links: teamLinks(draft.links), category: 'work', ack: false, start: '', end: '', pinned: false, prio_no: 0, req: '', demo: 0, board: 'C', home: 'C', author_id: me.id, author_name: me.name, created_at: now, updated_at: now, updated_by: me.id, updated_by_name: me.name, last_change: draft.src_id ? 'A 보드에서 불러옴' : '오더', done_at: st0 === 'done' ? (draft.done_at || now) : '', history: [{at: now, by: me.name, text: draft.src_id ? 'A 보드에서 불러옴' : '등록', kind: 'create'}], handoffs: []};
   await db.doc('items/' + id).set(doc);
   if (isAdmin && doc.src_board === 'A' && doc.src_id) { try { await db.doc('items/' + doc.src_id).update({c_link: teamLinkOf({...doc, id})}); } catch (e) { console.error('link A', e); } }
   return id;
@@ -129,6 +136,7 @@ function TeamBoard() {
   if (act.type === 'toggle') list = list.map(c => c.id === act.cid ? {...c, done: !!act.done, pct: act.done ? 100 : 0} : c);
   else if (act.type === 'pct') list = list.map(c => c.id === act.cid ? {...c, pct: act.pct, done: act.pct >= 100} : c);
   else if (act.type === 'add') list = [...list, ...act.texts.map(t => ({id: newCheckId(), text: t, done: false, by: me.name, at: nowIso()}))];
+  else if (act.type === 'addOne') { const p = Math.max(0, Math.min(100, Math.round(Number(act.pct) || 0))); list = [...list, {id: act.id || newCheckId(), text: act.text, pct: p, done: p >= 100, by: me.name, at: nowIso()}]; }
   else if (act.type === 'remove') list = list.filter(c => c.id !== act.cid);
   else if (act.type === 'edit') list = list.map(c => c.id === act.cid ? {...c, text: act.text} : c);
   else if (act.type === 'by') list = list.map(c => c.id === act.cid ? (act.by ? {...c, by: act.by} : (({by, ...rest}) => rest)(c)) : c);
@@ -151,7 +159,7 @@ function TeamBoard() {
  async function remove(x) {
   if (!confirm(`'${x.title}' 업무를 지울까요? 댓글도 함께 지워져요.`)) return;
   await run(async () => { for (const c of comments.filter(c => c.item_id === x.id)) await db.doc('comments/' + c.id).delete(); await db.doc('items/' + x.id).delete(); }, '업무를 지웠어요.');
-  syncLink(x, null); setSel(null);
+  clearLinks(x); setSel(null);
  }
  async function comment(x, body) { const t = String(body || '').trim(); if (!t) return; await run(() => db.doc('comments/' + uuid()).set({item_id: x.id, author_id: me.id, author_name: me.name, body: t.slice(0, 3000), links: [], created_at: nowIso()})); }
  // 댓글 확인·좋아요: 누른 사람 이름을 남긴다(다시 누르면 취소).
@@ -191,8 +199,8 @@ function TeamBoard() {
  async function unlink(x, target) {
   if (!confirm('이 연결을 끊을까요? 상대 보드 업무에서 디자인팀 진행 표시가 사라져요.')) return;
   await run(async () => {
-   if (target === 'src') { if (x.src_id) { try { await db.doc('items/' + x.src_id).update({c_link: null}); } catch (e) { console.error('unlink', e); } } await db.doc('items/' + x.id).update({src_board: '', src_id: '', src_title: '', src_body: '', src_checks: [], src_links: [], last_change: 'A 원본 연결 끊음', ...stamp()}); }
-   else { try { await db.doc('items/' + target).update({c_link: null}); } catch (e) { console.error('unlink', e); } await db.doc('items/' + x.id).update({out_links: x.out_links.filter(o => o.id !== target), ...stamp()}); }
+   if (target === 'src') { if (x.src_id) { try { await db.doc('items/' + x.src_id).update({c_link: null, c_sync: null}); } catch (e) { console.error('unlink', e); } } await db.doc('items/' + x.id).update({src_board: '', src_id: '', src_title: '', src_body: '', src_checks: [], src_links: [], last_change: 'A 원본 연결 끊음', ...stamp()}); }
+   else { try { await db.doc('items/' + target).update({c_link: null, c_sync: null}); } catch (e) { console.error('unlink', e); } await db.doc('items/' + x.id).update({out_links: x.out_links.filter(o => o.id !== target), ...stamp()}); }
   }, '연결을 끊었어요.');
  }
  async function createAsk(a) {
@@ -202,14 +210,15 @@ function TeamBoard() {
  async function updateAsk(a, fields, ok) { await run(() => db.doc('items/' + a.id).update({...fields, updated_at: nowIso()}), ok); }
  async function deleteAsk(a) { if (!confirm('이 요청을 지울까요?')) return; await run(async () => { for (const c of comments.filter(c => c.item_id === a.id)) await db.doc('comments/' + c.id).delete(); await db.doc('items/' + a.id).delete(); }, '요청을 지웠어요.'); }
  // 오늘의 업무보고: 사람·날짜마다 문서 하나(C-rep-자리-날짜).
- async function saveReport(day, fields) {
-  const ref = db.doc('items/C-rep-' + me.id + '-' + day), snap = await ref.get(), now = nowIso();
+ async function saveReport(day, fields, known) {
+  const ref = db.doc('items/C-rep-' + me.id + '-' + day), snap = known || await ref.get(), now = nowIso();
   if (snap.exists) await ref.update({...fields, updated_at: now});
   else await ref.set({kind: 'daily', team_type: 'report', ack: false, seat: me.id, name: me.name, day, title: `${me.name} 업무보고 ${day}`, lines: [], note: '', next: '', links: [], priority: 'share', status: 'todo', assignee: '', board: 'C', home: 'C', author_id: me.id, author_name: me.name, created_at: now, updated_at: now, ...fields});
  }
- async function reportAct(day, fn, ok) { const cur = reports.find(r => r.seat === me.id && r.day === day) || {lines: [], links: [], note: '', next: ''}; await run(() => saveReport(day, fn(cur)), ok); }
+ // 업무보고 고치기: 저장소의 최신 보고 위에서 바꾼다(연달아 넣어도 앞 줄이 빠지지 않게).
+ async function reportAct(day, fn, ok) { await run(async () => { const snap = await db.doc('items/C-rep-' + me.id + '-' + day).get(); const cur = snap.exists ? normReport({id: snap.id, ...snap.data()}) : {lines: [], links: [], note: '', next: ''}; await saveReport(day, fn(cur), snap); }, ok); }
  async function importRows(rows, assignee) {
-  await run(async () => { for (const r of rows) await create({title: r.title, body: r.body, due: r.due, priority: r.priority, assignee, topic_label: r.topic, src_board: 'A', src_id: r.id, src_title: r.title, src_body: r.body, src_checks: r.checklist, src_links: r.links, links: r.links, checklist: r.checklist, spec: r.checklist}); }, `${rows.length}건을 오더로 불러왔어요.`);
+  await run(async () => { for (const r of rows) await create({title: r.title, body: r.body, due: r.due, priority: r.priority, status: r.status, progress: r.progress, start_on: r.start_on, done_at: r.done_at, assignee, topic_label: r.topic, src_board: 'A', src_id: r.id, src_title: r.title, src_body: r.body, src_checks: r.checklist, src_links: r.links, links: r.links, checklist: r.checklist, spec: r.checklist}); }, `${rows.length}건을 오더로 불러왔어요.`);
   setImportOpen(false); setTab('status'); if (stab !== 'all') pickStab('todo');
  }
 
@@ -234,8 +243,8 @@ function TeamBoard() {
     ${tab === 'status' && html`<${TeamStatus} meet=${meet} onMeetAdd=${addMeeting} onMeetRemove=${removeMeeting} onMeetEdit=${editMeeting} stab=${stab} onStab=${pickStab} items=${open} doneItems=${done.filter(x => !isArchived(x))} kpi=${kpi} issues=${issues} onGo=${go} isAdmin=${isAdmin} onPatch=${patch} onImport=${() => setImportOpen(true)} onCreate=${d => run(() => create(d), '업무를 추가했어요.')} onReorder=${reorder} who=${who} onWho=${setWho} onChecklist=${checklistAct} onAvatar=${setAvatar} ...${common} />`}
     ${tab === 'orders' && html`<${TeamOrders} items=${open} who=${who} onWho=${setWho} isAdmin=${isAdmin} onCreate=${d => run(() => create(d), '오더를 등록했어요.')} onImport=${() => setImportOpen(true)} onPatch=${patch} onChecklist=${checklistAct} ...${common} />`}
     ${tab === 'due' && html`<${TeamDue} items=${open} done=${done} ...${common} />`}
-    ${tab === 'issues' && html`<${Fragment}><${TeamAsks} asks=${asks} tasks=${open} comments=${comments} me=${me} busy=${busy} onCreate=${createAsk} onUpdate=${updateAsk} onDelete=${deleteAsk} onComment=${comment} onMark=${markComment} onOpenTask=${setSel} /><${TeamIssues} items=${issues} comments=${comments} all=${items} onPatch=${patch} ...${common} /><//>`}
-    ${tab === 'report' && html`<${TeamReport} reports=${reports} tasks=${items} comments=${comments} me=${me} busy=${busy} onAct=${reportAct} onComment=${comment} onMark=${markComment} onOpenTask=${setSel} onAvatar=${setAvatar} />`}
+    ${tab === 'issues' && html`<${Fragment}><${TeamAsks} asks=${asks} tasks=${open} comments=${comments} me=${me} busy=${busy} onCreate=${createAsk} onUpdate=${updateAsk} onDelete=${deleteAsk} onComment=${comment} onMark=${markComment} onEditComment=${editComment} onDeleteComment=${deleteComment} onOpenTask=${setSel} /><${TeamIssues} items=${issues} comments=${comments} all=${items} onPatch=${patch} ...${common} /><//>`}
+    ${tab === 'report' && html`<${TeamReport} reports=${reports} tasks=${items} comments=${comments} me=${me} busy=${busy} onAct=${reportAct} onCheck=${checklistAct} onProgress=${(x, v) => patch(x, {progress: v}, `진행률 ${v}%`)} onComment=${comment} onMark=${markComment} onEditComment=${editComment} onDeleteComment=${deleteComment} onOpenTask=${setSel} onAvatar=${setAvatar} />`}
     ${tab === 'done' && html`<${TeamDone} items=${done} onPatch=${patch} ...${common} />`}
    </div>`}
   </main>
@@ -604,9 +613,9 @@ function TeamDetail({handoffFrom = null, item: x, comments, me, isAdmin, busy, o
    <${Checklist} item=${x} editable=${true} busy=${busy} onAct=${onChecklist} />
    ${isAdmin && html`<section class=${cx('tb-send', linkOpen && 'open')}><button type="button" class="tb-send-toggle" aria-expanded=${linkOpen} onClick=${toggleLink}>${I('ArrowUpRight', 15)}<b>다른 보드 연결</b><small>${[x.src_board ? 'A 원본 연결됨' : '', ...x.out_links.map(o => o.board + ' 보드로 보냄')].filter(Boolean).join(' · ') || '연결 없음'}</small>${I(linkOpen ? 'ChevronUp' : 'ChevronDown', 15)}</button>${linkOpen && html`<div class="tb-send-body">
     <h3>보내기</h3>
-    <div class="tb-chips">${['A', 'B'].map(b => { const done = (x.src_board === b) || x.out_links.some(o => o.board === b); return html`<button type="button" key=${b} class="chip" aria-pressed=${sendBoard === b} disabled=${busy || done} title=${done ? '이미 연결된 보드예요' : ''} onClick=${() => setSendBoard(sendBoard === b ? '' : b)}>${b} 보드 : ${b === 'A' ? '권중선' : '정규진'}${done ? ' · 연결됨' : ''}</button>`; })}</div>
-    ${sendBoard && html`<div class="tb-send-who"><span>${sendBoard} 보드에서 담당</span>${[['me', '이현성'], ['partner', sendBoard === 'A' ? '권중선' : '정규진'], ['both', '함께']].map(([v, l]) => html`<button type="button" key=${v} class="secondary-button" disabled=${busy} onClick=${async () => { try { await onSendTo(x, sendBoard, v); setSendBoard(''); } catch {} }}>${l}로 보내기</button>`)}</div>`}
-    ${x.out_links.length > 0 && html`<ul class="tb-out">${x.out_links.map(o => html`<li key=${o.id}>${I('Link2', 13)}${o.board} 보드 : ${o.board === 'A' ? '권중선' : '정규진'}에 보냄${o.at ? ` · ${teamDay(inSeoul(o.at))}` : ''}<button type="button" class="text-button" disabled=${busy} onClick=${() => onUnlink(x, o.id)}>연결 끊기</button></li>`)}</ul>`}<small>보낸 업무에는 디자인팀 진행 상황이 함께 표시돼요. 연결을 끊으면 그 표시가 사라져요.</small>
+    <div class="tb-chips">${['A', 'B'].map(b => { const done = linkVisOf(x).includes(b); return html`<button type="button" key=${b} class="chip" aria-pressed=${sendBoard === b} disabled=${busy || done} title=${done ? '이 보드에는 이미 연결된 업무가 보여요' : ''} onClick=${() => setSendBoard(sendBoard === b ? '' : b)}>${b} 보드 : ${b === 'A' ? '권중선' : '정규진'}${done ? ' · 연결됨' : ''}</button>`; })}</div>
+    ${sendBoard && html`<div class="tb-send-who"><span>${sendBoard} 보드에서 담당</span>${[['me', '이현성'], ['partner', sendBoard === 'A' ? '권중선' : '정규진'], ['both', '함께']].map(([v, l]) => { const dup = boardsSeen(sendBoardOf(sendBoard, v)).find(b => linkVisOf(x).includes(b)); return html`<button type="button" key=${v} class="secondary-button" disabled=${busy || !!dup} title=${dup ? `이현성 혼자 업무는 A·B 공통이라 ${dup} 보드에 같은 업무가 두 번 보여요` : ''} onClick=${async () => { try { await onSendTo(x, sendBoard, v); setSendBoard(''); } catch {} }}>${l}로 보내기</button>`; })}</div>`}
+    ${x.out_links.length > 0 && html`<ul class="tb-out">${x.out_links.map(o => html`<li key=${o.id}>${I('Link2', 13)}${o.board} 보드 : ${o.board === 'A' ? '권중선' : '정규진'}에 보냄${o.at ? ` · ${teamDay(inSeoul(o.at))}` : ''}<button type="button" class="text-button" disabled=${busy} onClick=${() => onUnlink(x, o.id)}>연결 끊기</button></li>`)}</ul>`}<small>연결된 업무는 상태 · 마감 · 시작일 · 중요도 · 세부 업무 · 진행률이 양쪽 같이 바뀌어요(이현성 화면이 열려 있을 때 맞춰져요). 양쪽에서 같은 항목을 동시에 바꾸면 디자인팀 보드 기준이에요. 연결을 끊으면 따로 움직여요.</small>
     ${x.src_board && html`<p class="tb-src-line">${I('Link2', 13)}A 보드 원본: <strong>${x.src_title}</strong>${isAdmin ? html` · 진행 상황이 A 보드 원본에도 표시돼요<button type="button" class="text-button tb-unlink" disabled=${busy} onClick=${() => onUnlink(x, 'src')}>연결 끊기</button>` : ''}</p>`}</div>`}</section>`}
    ${!isAdmin && x.src_board && html`<p class="tb-src-line">${I('Link2', 13)}A 보드 원본: <strong>${x.src_title}</strong></p>`}
    <section class="tb-comments"><h3>${I('MessageCircle', 15)}댓글 · 보고 <span>${comments.length}</span></h3>
@@ -624,7 +633,7 @@ function TeamDetail({handoffFrom = null, item: x, comments, me, isAdmin, busy, o
 // 업무 자세히 보기: 내용 · 세부 업무 · 레퍼런스 링크(직접 공유 + A 원본 + 글·댓글 속 주소)를 한 화면에.
 const pullSrcChecks = (x, onPatch) => { const list = normChecklist(x.src_checks).map(c => ({...c, id: newCheckId()})); return onPatch(x, {checklist: list, progress: checkStat({checklist: list}).pct}, `원본 세부 업무 ${list.length}개 가져옴`); };
 // 업무 기록: 날짜별로 묶고, 같은 사람이 10분 안에 같은 항목을 여러 번 바꾸면 '처음 → 마지막' 한 줄로 합친다.
-const HIST = {assign: ['UserRound', '담당'], status: ['Check', '상태'], due: ['CalendarClock', '마감'], priority: ['Flag', '중요도'], progress: ['Gauge', '진행률'], check: ['ListChecks', '세부 업무'], spec: ['NotebookPen', '요청 세부'], start: ['CalendarDays', '시작일'], issue: ['AlertCircle', '특이사항'], handoff: ['MoveRight', '인수인계'], link: ['Link2', '링크'], title: ['Pencil', '제목'], body: ['NotebookPen', '설명'], create: ['Plus', '등록']};
+const HIST = {assign: ['UserRound', '담당'], status: ['Check', '상태'], due: ['CalendarClock', '마감'], priority: ['Flag', '중요도'], progress: ['Gauge', '진행률'], check: ['ListChecks', '세부 업무'], spec: ['NotebookPen', '요청 세부'], start: ['CalendarDays', '시작일'], issue: ['AlertCircle', '특이사항'], handoff: ['MoveRight', '인수인계'], link: ['Link2', '링크'], title: ['Pencil', '제목'], body: ['NotebookPen', '설명'], create: ['Plus', '등록'], sync: ['RefreshCw', '보드 연동']};
 function TeamHistory({x}) {
  const [all, setAll] = useState(false), [memo, setMemo] = useState({});
  const merged = [];
@@ -687,7 +696,7 @@ function TeamImport({existing, busy, onClose, onImport, onCreate}) {
   try {
    if (!window.PS_READ_BOARD) throw new Error('이 화면에서는 A 보드를 읽을 수 없어요.');
    const r = await window.PS_READ_BOARD('A'); const tname = Object.fromEntries(r.topics.map(t => [t.id, t.name]));
-   const rows = r.items.filter(d => d.kind === 'task' && (d.home || 'A') === 'A').map(d => ({id: d.id, title: String(d.title || ''), body: String(d.body || ''), due: String(d.due || ''), priority: priorities[d.priority] ? d.priority : 'share', status: statuses[d.status] ? d.status : 'todo', assignee: personName(d.assignee || '함께'), topic_id: String(d.topic_id || ''), topic: tname[d.topic_id] || '', checklist: normChecklist(d.checklist), links: teamLinks(d.links), created_at: String(d.created_at || ''), linked: !!(d.c_link && d.c_link.id)})).sort(teamByDue);
+   const rows = r.items.filter(d => d.kind === 'task' && (d.home || 'A') === 'A').map(d => ({id: d.id, title: String(d.title || ''), body: String(d.body || ''), due: String(d.due || ''), priority: priorities[d.priority] ? d.priority : 'share', status: statuses[d.status] ? d.status : 'todo', progress: Math.max(0, Math.min(100, Math.round(Number(d.progress) || 0))), start_on: DATE_RE.test(d.start_on || '') ? d.start_on : '', done_at: String(d.done_at || ''), assignee: personName(d.assignee || '함께'), topic_id: String(d.topic_id || ''), topic: tname[d.topic_id] || '', checklist: normChecklist(d.checklist), links: teamLinks(d.links), created_at: String(d.created_at || ''), linked: !!(d.c_link && d.c_link.id)})).sort(teamByDue);
    setState({loading: false, rows, topics: r.topics.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)), error: ''});
   } catch (e) { console.error('import read', e); setState({loading: false, rows: [], topics: [], error: friendlyError(e)}); }
  })(); }, []);
@@ -714,11 +723,11 @@ function AppRoot() { return BOARD === 'C' ? html`<${TeamBoard} />` : html`<${Boa
 if (window.PS_MOUNT) window.PS_MOUNT(AppRoot, ShareView); else render(html`<${AppRoot} />`, document.getElementById('app'));
 
 // 확인 요청: 업무 사이에 필요한 확인·자료·피드백을 사람에게 요청하고, 받은 사람이 확인 완료로 닫는다.
-function TeamAsks({asks, tasks, comments, me, busy, onCreate, onUpdate, onDelete, onComment, onMark, onOpenTask}) {
+function TeamAsks({asks, tasks, comments, me, busy, onCreate, onUpdate, onDelete, onComment, onMark, onEditComment, onDeleteComment, onOpenTask}) {
  const others = SEATS.filter(s => s.key !== me.id).map(s => s.name);
  const [open, setOpen] = useState(false), [f, setF] = useState('me');
  const [form, setForm] = useState({ask_type: 'confirm', to: others[0] || '모두', task_id: '', title: '', body: '', due: 'none', date: ''});
- const [answer, setAnswer] = useState({}), [reply, setReply] = useState({}), [thread, setThread] = useState({});
+ const [answer, setAnswer] = useState({}), [thread, setThread] = useState({});
  const isForMe = a => a.from_id !== me.id && (a.to === me.name || a.to === '모두');
  const lists = {me: asks.filter(a => a.state === 'open' && isForMe(a)), sent: asks.filter(a => a.state === 'open' && a.from_id === me.id), all: asks.filter(a => a.state === 'open'), done: asks.filter(a => a.state === 'done')};
  const list = [...lists[f]].sort((a, b) => f === 'done' ? b.done_at.localeCompare(a.done_at) : (a.reply_by || '9999').localeCompare(b.reply_by || '9999') || b.created_at.localeCompare(a.created_at));
@@ -743,10 +752,10 @@ function TeamAsks({asks, tasks, comments, me, busy, onCreate, onUpdate, onDelete
    <div class="tb-ask-meta"><span>${a.from} → ${a.to}</span><span>${teamDay(inSeoul(a.created_at))} ${teamClock(a.created_at)}</span>${a.task_id && html`<button type="button" class="tag tb-ask-link" onClick=${() => onOpenTask(a.task_id)}>${I('Layers3', 12)}${a.task_title}</button>`}</div>
    ${a.body && html`<${TeamText} text=${a.body} class="tb-ask-text" />`}
    ${a.state === 'done' && html`<div class="tb-ask-done">${I('Check', 13)}<strong>${a.done_by}</strong> 확인 완료 · ${teamDay(inSeoul(a.done_at))} ${teamClock(a.done_at)}${a.answer ? html`<${TeamText} text=${a.answer} />` : ''}</div>`}
-   ${showThread && cs.map(c => html`<div class="tb-ask-c" key=${c.id}><${Av} name=${personName(c.author_name)} mini /><div><b>${personName(c.author_name)}</b><small>${teamDay(inSeoul(c.created_at))} ${teamClock(c.created_at)}</small><${TeamText} text=${c.body} /><${TeamMarks} c=${c} me=${me} onMark=${onMark} /></div></div>`)}
+   ${showThread && html`<${TeamCommentList} cs=${cs} me=${me} busy=${busy} onMark=${onMark} onEdit=${onEditComment} onDelete=${onDeleteComment} />`}
    <div class="tb-ask-actions">
     ${cs.length > 2 && html`<button type="button" class="text-button" onClick=${() => setThread(t => ({...t, [a.id]: !t[a.id]}))}>${I('MessageCircle', 13)}댓글 ${cs.length} ${thread[a.id] ? '접기' : '보기'}</button>`}
-    <form class="tb-ask-reply" onSubmit=${async e => { e.preventDefault(); const t = (reply[a.id] || '').trim(); if (!t) return; try { await onComment(a, t); setReply(r => ({...r, [a.id]: ''})); setThread(x => ({...x, [a.id]: true})); } catch {} }}><input maxLength="3000" placeholder="댓글 · 질문 · 링크" value=${reply[a.id] || ''} onInput=${e => { const v = e.target.value; setReply(r => ({...r, [a.id]: v})); }} /><button class="secondary-button" disabled=${busy || !(reply[a.id] || '').trim()}>남기기</button></form>
+    <${ReplyForm} key=${'r-' + a.id} busy=${busy} label="확인 요청 댓글" placeholder="댓글 · 질문 · 링크 · Shift+Enter 줄바꿈" onSend=${async t => { await onComment(a, t); setThread(x => ({...x, [a.id]: true})); }} />
     ${canDone && html`<span class="tb-ask-close"><input maxLength="300" placeholder="답변 (선택)" value=${answer[a.id] || ''} onInput=${e => { const v = e.target.value; setAnswer(r => ({...r, [a.id]: v})); }} /><button type="button" class="primary-button" disabled=${busy} onClick=${() => onUpdate(a, {state: 'done', done_by: me.name, done_at: nowIso(), answer: (answer[a.id] || '').trim()}, '확인 완료로 바꿨어요.')}>${I('Check', 14)}확인 완료</button></span>`}
     ${a.state === 'done' && (mine || a.done_by === me.name) && html`<button type="button" class="text-button" disabled=${busy} onClick=${() => onUpdate(a, {state: 'open', done_by: '', done_at: '', answer: ''}, '다시 열었어요.')}>다시 열기</button>`}
     ${mine && html`<button type="button" class="text-button tb-ask-del" disabled=${busy} onClick=${() => onDelete(a)}>${I('Trash2', 13)}지우기</button>`}
@@ -774,46 +783,139 @@ function MemoBox({hKey, field = '', children}) {
  return html`<div class="tb-memo-box" data-memo=${field || undefined} style=${`--memo-h:${h}px`}>${children}<div class="tb-memo-grip" role="separator" aria-orientation="horizontal" aria-label="메모 칸 높이 조절" aria-valuenow=${h} aria-valuemin=${MIN} aria-valuemax=${MAX} tabIndex="0" title="끌어서 칸 높이 조절 · 두 번 누르면 기본 높이" onPointerDown=${start} onDblClick=${() => save(set(DEF))} onKeyDown=${e => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); save(set(h + (e.key === 'ArrowDown' ? 20 : -20))); } }}><i></i></div></div>`;
 }
 
+// 댓글 입력: Enter로 남기고 Shift+Enter로 줄바꿈(한글 조합 중 Enter는 무시). 줄이 늘면 칸이 커진다.
+const keySend = (e, fn) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); fn(); return true; } return false; };
+const fitArea = el => { if (!el) return; if (!el.value) { el.style.height = ''; return; } el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight + 2, 200) + 'px'; };
+function ReplyForm({placeholder, busy, label, onSend}) {
+ const [t, setT] = useState(''), ref = useRef(null);
+ useEffect(() => fitArea(ref.current), [t]);
+ async function send(e) { if (e) e.preventDefault(); const v = t.trim(); if (!v || busy) return; try { await onSend(v); setT(''); } catch {} }
+ return html`<form class="tb-ask-reply tb-reply" onSubmit=${send}><textarea ref=${ref} rows="1" maxLength="3000" aria-label=${label} title="Enter로 남기기 · Shift+Enter로 줄바꿈" placeholder=${placeholder} value=${t} onInput=${e => setT(e.target.value)} onKeyDown=${e => keySend(e, send)}></textarea><button class="secondary-button" disabled=${busy || !t.trim()}>남기기</button></form>`;
+}
+function CommentEdit({c, busy, onCancel, onSave}) {
+ const [t, setT] = useState(c.body), ref = useRef(null);
+ useEffect(() => { const el = ref.current; if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, []);
+ useEffect(() => fitArea(ref.current), [t]);
+ async function save(e) { if (e) e.preventDefault(); const v = t.trim(); if (!v || busy) return; try { await onSave(v); } catch {} }
+ return html`<form class="tb-c-edit tb-c-inline" onSubmit=${save}><textarea ref=${ref} rows="2" maxLength="3000" aria-label="댓글 고치기" value=${t} onInput=${e => setT(e.target.value)} onKeyDown=${e => { if (!keySend(e, save) && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onCancel(); } }}></textarea><div><button type="button" class="secondary-button" onClick=${onCancel}>취소</button><button class="primary-button" disabled=${busy || !t.trim()}>저장</button></div></form>`;
+}
+// 업무보고 · 확인 요청의 댓글 줄: 확인 · 좋아요, 내가 쓴 댓글은 수정 · 삭제.
+function TeamCommentList({cs, me, busy, onMark, onEdit, onDelete}) {
+ const [editing, setEditing] = useState(null);
+ return html`<${Fragment}>${cs.map(c => { const mine = !!onEdit && c.author_id === me.id; return html`<div class="tb-ask-c" key=${c.id}><${Av} name=${personName(c.author_name)} mini /><div class="tb-ask-c-body">
+  <div class="tb-ask-c-meta"><b>${personName(c.author_name)}</b><small>${teamDay(inSeoul(c.created_at))} ${teamClock(c.created_at)}${c.edited_at ? ' · 수정됨' : ''}</small>${mine && editing !== c.id && html`<span class="tb-c-tools"><button type="button" class="text-button" onClick=${() => setEditing(c.id)}>수정</button>${onDelete && html`<button type="button" class="text-button" onClick=${() => onDelete(c)}>삭제</button>`}</span>`}</div>
+  ${editing === c.id ? html`<${CommentEdit} c=${c} busy=${busy} onCancel=${() => setEditing(null)} onSave=${async t => { await onEdit(c, t); setEditing(null); }} />` : html`<${TeamText} text=${c.body} />`}
+  <${TeamMarks} c=${c} me=${me} onMark=${onMark} />
+ </div></div>`; })}<//>`;
+}
+
+// 오늘 한 일 = 프로젝트(C 업무) → 세부 업무 → 진행률(%). 프로젝트를 고르고 그 세부 업무를 고르거나, 목록에 없으면 새로 적는다(그 업무의 세부 업무로도 추가).
+// %를 바꾸면 그 업무의 세부 업무 진행률도 같이 바뀌고(업무 진행률 → 연결된 A·B 업무까지), 보고 줄에는 그때 값이 남는다(지난 날 보고는 그 값, 오늘은 지금 값).
+// 세부 업무가 없는 업무는 프로젝트 줄에서 업무 진행률을 바로 고른다. 프로젝트 없이 한 줄로도 적을 수 있다.
+// 보고 줄: {id, text, task_id, task_title, check_id, pct}. task_id만 있고 check_id가 없으며 글이 업무 이름으로 시작하면 '프로젝트 줄'(제목만 보임).
 // seats: 카드를 만들 자리(기본은 이 보드 자리). viewOnly: A·B 보드 '디자인팀' 탭처럼 보기만 할 때(모든 카드 비활성, 댓글 · 확인 · 좋아요는 onComment · onMark가 있으면 가능).
-function TeamReport({reports, tasks, comments, me, busy, onAct, onComment, onMark, onOpenTask, onAvatar, seats = SEATS, viewOnly = false}) {
+function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgress, onComment, onMark, onEditComment, onDeleteComment, onOpenTask, onAvatar, seats = SEATS, viewOnly = false}) {
  const [pickOpen, setPickOpen] = useState(false);
- const [day, setDay] = useState(today()), [text, setText] = useState(''), [taskId, setTaskId] = useState(''), [reply, setReply] = useState({});
+ const [day, setDay] = useState(today()), [text, setText] = useState('');
+ const [proj, setProj] = useState(''), [sub, setSub] = useState(''), [subText, setSubText] = useState(''), [subPct, setSubPct] = useState(0);
  const people = [...seats].sort((a, b) => Number(b.key === me.id) - Number(a.key === me.id) || Number(a.name === ADMIN_NAME) - Number(b.name === ADMIN_NAME));
- const mineTasks = tasks.filter(x => teamHas(x, me.name) || (me.name === ADMIN_NAME && x.author_id === me.id));
  const repOf = seat => reports.find(r => r.seat === seat && r.day === day);
  const my = repOf(me.id) || {lines: [], links: [], note: '', next: ''};
+ const isToday = day === today();
+ const taskOf = id => tasks.find(x => x.id === id);
+ const projLine = l => !!l.task_id && !l.check_id && String(l.text || '').startsWith(l.task_title || '\u0000');
+ const pctOpts = v => [...new Set([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, v])].sort((a, b) => a - b);
+ // 프로젝트 후보: 진행 중인 업무 + 이날 끝낸 업무. 내 업무 먼저.
+ const cand = tasks.filter(x => x.status !== 'done' || inSeoul(x.done_at) === day);
+ const mineT = cand.filter(x => teamHas(x, me.name)).sort(teamOrder), otherT = cand.filter(x => !teamHas(x, me.name)).sort(teamOrder);
+ const projTask = proj ? taskOf(proj) : null;
+ const usedIn = id => new Set(my.lines.filter(l => l.task_id === id && l.check_id).map(l => l.check_id));
+ const subOpts = projTask ? projTask.checklist.filter(c => !usedIn(projTask.id).has(c.id)) : [];
+ const firstSub = t => { const used = usedIn(t.id), c = t.checklist.find(x => !used.has(x.id)); return c || null; };
+ const pickProj = id => { setProj(id); setSubText(''); const t = id ? taskOf(id) : null, c = t ? firstSub(t) : null; setSub(c ? c.id : id ? '__new' : ''); setSubPct(c ? c.pct : 0); };
+ const pickSub = v => { setSub(v); const c = projTask && projTask.checklist.find(x => x.id === v); setSubPct(c ? c.pct : 0); };
  const suggest = tasks.filter(x => inSeoul(x.updated_at) === day && x.updated_by === me.id && !my.lines.some(l => l.task_id === x.id)).slice(0, 6);
- const lineOf = x => `${x.title}${x.status === 'done' ? ' · 완료' : x.progress ? ` · ${x.progress}%` : ''}`;
- const addLine = (t, task) => onAct(day, cur => ({lines: [...cur.lines, {id: newCheckId(), text: t, task_id: task ? task.id : '', task_title: task ? task.title : ''}]}), '');
- async function submit(e) { e.preventDefault(); const t = text.trim(); if (!t || busy) return; try { await addLine(t, null); setText(''); } catch {} }
- // 저장하기: 지금 칸에 적혀 있는 것(한 줄 입력 중인 오늘 한 일, 두 메모)을 한 번에 저장한다. 버튼을 눌러도 입력 칸 포커스가 빠지지 않게 해 두 번 저장되며 겹치지 않게 한다.
+ const projOnly = x => ({id: newCheckId(), text: x.title, task_id: x.id, task_title: x.title, check_id: '', pct: x.progress || 0});
+ const subItem = projTask && sub && sub !== '__new' ? subOpts.find(c => c.id === sub) : null;
+ const canAdd = proj ? (projTask ? (sub === '__new' ? !!subText.trim() : !!subItem) : false) : !!text.trim();
+ async function addEntry() {
+  if (busy || !canAdd) return;
+  if (!proj) { const t = text.trim().slice(0, 300); await onAct(day, cur => ({lines: [...cur.lines, {id: newCheckId(), text: t, task_id: '', task_title: '', check_id: '', pct: null}]}), ''); setText(''); return; }
+  const t = projTask, v = subPct;
+  if (sub !== '__new') {
+   const c = subItem;
+   if (c.pct !== v) await onCheck(t, {type: 'pct', cid: c.id, pct: v});
+   await onAct(day, cur => ({lines: [...cur.lines, {id: newCheckId(), text: c.text, task_id: t.id, task_title: t.title, check_id: c.id, pct: v}]}), '');
+  } else {
+   const name = subText.trim().slice(0, 200), cid = newCheckId();
+   await onCheck(t, {type: 'addOne', id: cid, text: name, pct: v});
+   await onAct(day, cur => ({lines: [...cur.lines, {id: newCheckId(), text: name, task_id: t.id, task_title: t.title, check_id: cid, pct: v}]}), '');
+   setSubText('');
+  }
+  // 같은 프로젝트의 다음 세부 업무를 바로 고를 수 있게.
+  const used = usedIn(t.id); if (sub !== '__new') used.add(sub);
+  const next = t.checklist.find(x => !used.has(x.id)); setSub(next ? next.id : '__new'); setSubPct(next ? next.pct : 0);
+ }
+ async function setLinePct(l, t, c, v) { try { if (c && c.pct !== v) await onCheck(t, {type: 'pct', cid: c.id, pct: v}); await onAct(day, cur => ({lines: cur.lines.map(x => x.id === l.id ? {...x, pct: v} : x)}), ''); } catch {} }
+ // 저장하기: 지금 칸에 적혀 있는 것(추가 전인 오늘 한 일, 두 메모)을 한 번에 저장한다. 버튼을 눌러도 입력 칸 포커스가 빠지지 않게 해 두 번 저장되며 겹치지 않게 한다.
  async function saveAll(card) {
   const memo = k => { const el = card && card.querySelector(`[data-memo="${k}"] textarea`); return el ? String(el.value || '').trim().slice(0, 3000) : null; };
-  const note = memo('note'), next = memo('next'), t = text.trim();
+  const note = memo('note'), next = memo('next');
   try {
-   await onAct(day, cur => ({...(note !== null ? {note} : {}), ...(next !== null ? {next} : {}), ...(t ? {lines: [...cur.lines, {id: newCheckId(), text: t.slice(0, 300), task_id: '', task_title: ''}]} : {})}), '업무보고를 저장했어요.');
-   if (t) setText('');
+   if (canAdd) await addEntry();
+   await onAct(day, () => ({...(note !== null ? {note} : {}), ...(next !== null ? {next} : {})}), '업무보고를 저장했어요.');
    const a = document.activeElement; if (a && card && card.contains(a) && a.blur) a.blur();
   } catch {}
  }
+ const groupsOf = r => { const gs = []; (r ? r.lines : []).forEach(l => { const k = l.task_id || ''; let g = gs.find(x => x.k === k); if (!g) { g = {k, lines: []}; gs.push(g); } g.lines.push(l); }); return [...gs.filter(g => g.k), ...gs.filter(g => !g.k)]; };
+ const countOf = r => groupsOf(r).reduce((n, g) => n + (g.k ? Math.max(1, g.lines.filter(l => !projLine(l)).length) : g.lines.length), 0);
+ const xBtn = (label, fn) => html`<button type="button" class="link-chip-x" aria-label=${label} title=${label} disabled=${busy} onClick=${fn}>${I('X', 12)}</button>`;
+ const pctView = (v, set, label) => set ? html`<label class=${cx('tb-rep-pct', v >= 100 && 'full')}><span class="tb-rep-pct-bar"><i style=${`width:${v}%`}></i></span><select aria-label=${label} value=${String(v)} disabled=${busy} onChange=${e => set(Number(e.target.value))}>${pctOpts(v).map(o => html`<option value=${String(o)}>${o}%</option>`)}</select></label>` : html`<span class=${cx('tb-rep-pct ro', v >= 100 && 'full')}><span class="tb-rep-pct-bar"><i style=${`width:${v}%`}></i></span><b>${v}%</b></span>`;
+ const subLine = (l, t, isMe) => {
+  const c = t && l.check_id ? t.checklist.find(x => x.id === l.check_id) : null, v = c && isToday ? c.pct : l.pct, name = c ? c.text : l.text;
+  return html`<li key=${l.id}><span class="tb-rep-dot"></span><div class="tb-rep-subtext"><${TeamText} text=${name} />${c && c.by ? html`<small>${c.by}</small>` : ''}</div>${v !== null && v !== undefined ? pctView(v, isMe && c && onCheck ? n => setLinePct(l, t, c, n) : null, `진행률: ${name}`) : html`<span></span>`}${isMe ? xBtn('빼기', () => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), '')) : ''}</li>`;
+ };
+ const projView = (g, isMe) => {
+  const t = taskOf(g.k), title = t ? t.title : (g.lines[0].task_title || '지워진 업무'), subs = g.lines.filter(l => !projLine(l)), prog = t ? (t.progress || 0) : null;
+  const canProg = isMe && t && !t.checklist.length && onProgress;
+  return html`<section class="tb-rep-proj" key=${g.k}>
+   <div class="tb-rep-proj-head"><span class="tb-rep-proj-ico">${I('Layers3', 13)}</span><button type="button" class="tb-rep-proj-title" disabled=${!t} title=${t ? '업무 열기' : '지워진 업무예요'} onClick=${() => t && onOpenTask(t.id)}>${title}</button>${prog !== null ? pctView(prog, canProg ? v => onProgress(t, v) : null, `업무 진행률: ${title}`) : ''}${isMe ? xBtn('이 프로젝트 줄 모두 빼기', () => onAct(day, cur => ({lines: cur.lines.filter(x => x.task_id !== g.k)}), '')) : ''}</div>
+   ${subs.length > 0 && html`<ul class="tb-rep-subs">${subs.map(l => subLine(l, t, isMe))}</ul>`}
+  </section>`;
+ };
+ const workView = (r, isMe) => { const gs = groupsOf(r); return gs.length ? html`<div class="tb-rep-work">${gs.map(g => g.k ? projView(g, isMe) : html`<ul class="tb-rep-lines" key="free">${g.lines.map(l => html`<li key=${l.id}><span class="tb-rep-dot"></span><div><${TeamText} text=${l.text} /></div>${isMe ? xBtn('빼기', () => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), '')) : ''}</li>`)}</ul>`)}</div>` : ''; };
+ const optT = x => `${x.title}${x.status === 'done' ? ' · 완료' : ` · ${x.progress || 0}%`}`;
+ const form = html`<form class="tb-rep-form" onSubmit=${async e => { e.preventDefault(); try { await addEntry(); } catch {} }}>
+  <select class="tb-rep-sel proj" aria-label="프로젝트" value=${proj} disabled=${busy} onChange=${e => pickProj(e.target.value)}>
+   <option value="">프로젝트 고르기 (없으면 한 줄로 적기)</option>
+   ${mineT.length > 0 && html`<optgroup label="내 업무">${mineT.map(x => html`<option value=${x.id} key=${x.id}>${optT(x)}</option>`)}</optgroup>`}
+   ${otherT.length > 0 && html`<optgroup label="다른 업무">${otherT.map(x => html`<option value=${x.id} key=${x.id}>${optT(x)}</option>`)}</optgroup>`}
+  </select>
+  ${proj ? html`<div class="tb-rep-form-row">
+   ${sub === '__new' ? html`<${Fragment}>${subOpts.length > 0 && html`<button type="button" class="icon-button tb-rep-back" aria-label="세부 업무 목록에서 고르기" title="세부 업무 목록에서 고르기" onClick=${() => pickSub(subOpts[0].id)}>${I('List', 15)}</button>`}<input class="tb-rep-newsub" ref=${focusOnMount} maxLength="200" aria-label="새 세부 업무" placeholder="오늘 한 일 (이 업무의 세부 업무로도 추가돼요)" value=${subText} onInput=${e => setSubText(e.target.value)} /><//>` : html`<select class="tb-rep-sel sub" aria-label="세부 업무" value=${sub} disabled=${busy} onChange=${e => pickSub(e.target.value)}>${subOpts.map(c => html`<option value=${c.id} key=${c.id}>${c.text}${c.by ? ` · ${c.by}` : ''} (${c.pct}%)</option>`)}<option value="__new">+ 목록에 없으면 직접 적기</option></select>`}
+   <select class="tb-rep-sel pct" aria-label="진행률" value=${String(subPct)} disabled=${busy} onChange=${e => setSubPct(Number(e.target.value))}>${pctOpts(subPct).map(o => html`<option value=${String(o)}>${o}%</option>`)}</select>
+   <button class="secondary-button" disabled=${busy || !canAdd}>추가</button>
+  </div>` : html`<div class="tb-rep-form-row"><input maxLength="300" aria-label="오늘 한 일" placeholder="오늘 한 일을 한 줄로 적고 Enter" value=${text} onInput=${e => setText(e.target.value)} /><button class="secondary-button" disabled=${busy || !text.trim()}>추가</button></div>`}
+ </form>`;
+ const formOff = off => html`<div class="tb-rep-form is-off" title=${off}><select disabled aria-label="프로젝트"><option>프로젝트 고르기</option></select><div class="tb-rep-form-row"><input disabled aria-label="오늘 한 일" placeholder=${off} /><button type="button" class="secondary-button" disabled>추가</button></div></div>`;
  return html`<section class="tb-report">
   <div class="tb-rep-bar"><button type="button" class="icon-button" aria-label="이전 날" onClick=${() => setDay(offsetDate(day, -1))}>${I('ChevronLeft', 16)}</button><strong>${teamDay(day)} 업무보고</strong><button type="button" class="icon-button" aria-label="다음 날" disabled=${day >= today()} onClick=${() => setDay(offsetDate(day, 1))}>${I('ChevronRight', 16)}</button>${day !== today() && html`<button type="button" class="text-button" onClick=${() => setDay(today())}>오늘로</button>`}<small>${reports.filter(r => r.day === day && r.lines.length && seats.some(s => s.key === r.seat)).length}/${seats.length}명 작성</small></div>
   <div class="tb-rep-grid">${people.map(s => { const r = repOf(s.key), isMe = !viewOnly && s.key === me.id, rid = r ? r.id : `C-rep-${s.key}-${day}`, cs = comments.filter(c => c.item_id === rid).sort((a, b) => a.created_at.localeCompare(b.created_at)), off = viewOnly && s.key === me.id ? '디자인팀 보드에서 쓸 수 있어요' : `${s.name}님만 쓸 수 있어요`; if (!isMe && !r && !cs.length && s.name === ADMIN_NAME) return null; return html`<article class=${cx('tb-rep', isMe && 'mine')} key=${s.key}>
-   <div class="tb-person-head"><${Av} name=${s.name} editable=${!viewOnly && (isMe || me.name === ADMIN_NAME)} busy=${busy} onPick=${f => onAvatar(f, s.name)} /><div><strong>${s.name}${isMe ? ' (나)' : ''}</strong><small>${r && (r.lines.length || r.note || r.next || r.links.length) ? `${r.lines.length ? `${r.lines.length}건 · ` : '메모 · '}${teamClock(r.updated_at)} 수정` : '아직 작성 전'}</small></div></div>
+   <div class="tb-person-head"><${Av} name=${s.name} editable=${!viewOnly && (isMe || me.name === ADMIN_NAME)} busy=${busy} onPick=${f => onAvatar(f, s.name)} /><div><strong>${s.name}${isMe ? ' (나)' : ''}</strong><small>${r && (r.lines.length || r.note || r.next || r.links.length) ? `${r.lines.length ? `${countOf(r)}건 · ` : '메모 · '}${teamClock(r.updated_at)} 수정` : '아직 작성 전'}</small></div></div>
    <div class="tb-sub"><span>오늘 한 일</span></div>
-   ${r && r.lines.length ? html`<ul class="tb-rep-lines">${r.lines.map(l => html`<li key=${l.id}><span class="tb-rep-dot"></span><div><${TeamText} text=${l.text} />${l.task_id && html`<button type="button" class="tag tb-ask-link" onClick=${() => onOpenTask(l.task_id)}>${I('Layers3', 12)}${l.text.startsWith(l.task_title) ? '업무 열기' : l.task_title}</button>`}</div>${isMe && html`<button type="button" class="link-chip-x" aria-label="빼기" disabled=${busy} onClick=${() => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), '')}>${I('X', 12)}</button>`}</li>`)}</ul>` : ''}
+   ${workView(r, isMe)}
    ${isMe ? html`<${Fragment}>
-    <form class="tb-rep-add" onSubmit=${submit}><input maxLength="300" placeholder="오늘 한 일을 한 줄로 적고 Enter" value=${text} onInput=${e => setText(e.target.value)} /><button class="secondary-button" disabled=${busy || !text.trim()}>추가</button></form>
-    ${suggest.length > 0 && html`<div class="tb-rep-suggest"><span>${I('Sparkles', 13)}오늘 손댄 업무 ${suggest.length}건</span>${pickOpen ? html`<button type="button" class="text-button" disabled=${busy} onClick=${async () => { try { await onAct(day, cur => ({lines: [...cur.lines, ...suggest.map(x => ({id: newCheckId(), text: lineOf(x), task_id: x.id, task_title: x.title}))]}), ''); setPickOpen(false); } catch {} }}>한 번에 넣기</button><button type="button" class="text-button" onClick=${() => setPickOpen(false)}>접기</button>` : html`<button type="button" class="text-button" onClick=${() => setPickOpen(true)}>골라 넣기</button>`}${pickOpen && html`<div class="tb-rep-picks">${suggest.map(x => html`<button type="button" key=${x.id} class="chip" disabled=${busy} onClick=${() => addLine(lineOf(x), x)}>${I('Plus', 11)}${lineOf(x)}</button>`)}</div>`}</div>`}` : html`<div class="tb-rep-add is-off" title=${off}><input disabled aria-label="오늘 한 일" placeholder=${off} /><button type="button" class="secondary-button" disabled>추가</button></div>`}
+    ${form}
+    ${suggest.length > 0 && html`<div class="tb-rep-suggest"><span>${I('Sparkles', 13)}오늘 손댄 업무 ${suggest.length}건</span>${pickOpen ? html`<button type="button" class="text-button" disabled=${busy} onClick=${async () => { try { await onAct(day, cur => ({lines: [...cur.lines, ...suggest.filter(x => !cur.lines.some(l => l.task_id === x.id)).map(projOnly)]}), ''); setPickOpen(false); } catch {} }}>한 번에 넣기</button><button type="button" class="text-button" onClick=${() => setPickOpen(false)}>접기</button>` : html`<button type="button" class="text-button" onClick=${() => setPickOpen(true)}>골라 넣기</button>`}${pickOpen && html`<div class="tb-rep-picks">${suggest.map(x => html`<button type="button" key=${x.id} class="chip" disabled=${busy} title="프로젝트로 넣고 세부 업무를 바로 고를 수 있어요" onClick=${async () => { try { await onAct(day, cur => ({lines: cur.lines.some(l => l.task_id === x.id) ? cur.lines : [...cur.lines, projOnly(x)]}), ''); pickProj(x.id); } catch {} }}>${I('Plus', 11)}${optT(x)}</button>`)}</div>`}</div>`}<//>` : formOff(off)}
    <div class="tb-sub"><span>링크</span></div>
-   ${isMe ? html`<${LinkChips} links=${my.links} editable=${true} busy=${busy} max=${20} addLabel="링크 공유" idPrefix=${'rep-' + day} onAdd=${l => onAct(day, cur => ({links: [...cur.links, {id: newCheckId(), label: l.label, url: l.url, shared_by: me.name, shared_at: nowIso()}]}), '')} onRemove=${i => onAct(day, cur => ({links: cur.links.filter((_, k) => k !== i)}), '')} />` : r && r.links.length ? html`<${LinkChips} links=${r.links} editable=${false} />` : html`<div class="link-chips tb-link-off"><button type="button" class="link-chip add" disabled title=${off}>${I('Plus', 13)}링크 공유</button></div>`}
+   ${isMe ? html`<${LinkChips} wide=${true} links=${my.links} editable=${true} busy=${busy} max=${20} addLabel="링크 공유" idPrefix=${'rep-' + day} onAdd=${l => onAct(day, cur => ({links: [...cur.links, {id: newCheckId(), label: l.label, url: l.url, shared_by: me.name, shared_at: nowIso()}]}), '')} onRemove=${i => onAct(day, cur => ({links: cur.links.filter((_, k) => k !== i)}), '')} />` : r && r.links.length ? html`<${LinkChips} wide=${true} links=${r.links} editable=${false} />` : html`<div class="link-chips wide tb-link-off"><button type="button" class="link-chip add" disabled title=${off}>${I('Plus', 13)}링크 공유</button></div>`}
    <div class="tb-sub"><span>오늘 업무 메모</span></div>
    ${isMe ? html`<${MemoBox} hKey="rep-note" field="note"><${AutoText} class="tb-d-body tb-rep-memo" value=${my.note} label="오늘 업무 메모" placeholder="오늘 진행한 업무의 특이사항, 공유할 내용 (선택)" maxLength="3000" disabled=${busy} onCommit=${v => onAct(day, () => ({note: v}), '')} /><//>` : html`<div class=${cx('tb-d-body tb-rep-memo tb-memo-view', !(r && r.note) && 'empty')} aria-readonly="true" title=${off}>${r && r.note ? html`<${TeamText} text=${r.note} />` : '오늘 진행한 업무의 특이사항, 공유할 내용 (선택)'}</div>`}
    <div class="tb-sub"><span>내일 할 일 메모</span></div>
    ${isMe ? html`<${MemoBox} hKey="rep-next" field="next"><${AutoText} class="tb-d-body tb-rep-memo" value=${my.next} label="내일 할 일 메모" placeholder="내일 이어서 할 일, 미리 준비할 것 (선택)" maxLength="3000" disabled=${busy} onCommit=${v => onAct(day, () => ({next: v}), '')} /><//>` : html`<div class=${cx('tb-d-body tb-rep-memo tb-memo-view', !(r && r.next) && 'empty')} aria-readonly="true" title=${off}>${r && r.next ? html`<${TeamText} text=${r.next} />` : '내일 이어서 할 일, 미리 준비할 것 (선택)'}</div>`}
    ${!isMe && html`<div class="tb-rep-save is-off"><small>${r && r.updated_at ? `${teamClock(r.updated_at)} 저장됨` : '아직 저장 전'}</small><button type="button" class="primary-button tb-rep-save-btn" disabled title=${viewOnly && s.key === me.id ? '디자인팀 보드에서 저장할 수 있어요' : `${s.name}님만 저장할 수 있어요`}>${I('Check', 15)}저장하기</button></div>`}
    ${isMe && html`<div class="tb-rep-save"><small>${r && r.updated_at ? `${teamClock(r.updated_at)} 저장됨` : '아직 저장 전'}</small><button type="button" class="primary-button tb-rep-save-btn" onMouseDown=${e => e.preventDefault()} onClick=${e => saveAll(e.currentTarget.closest('article'))}>${I('Check', 15)}저장하기</button></div>`}
-   <div class="tb-rep-comments"><div class="tb-sub"><span>댓글 ${cs.length || ''}</span></div>${cs.map(c => html`<div class="tb-ask-c" key=${c.id}><${Av} name=${personName(c.author_name)} mini /><div><b>${personName(c.author_name)}</b><small>${teamDay(inSeoul(c.created_at))} ${teamClock(c.created_at)}</small><${TeamText} text=${c.body} /><${TeamMarks} c=${c} me=${me} onMark=${onMark} /></div></div>`)}${onComment && html`<form class="tb-ask-reply" onSubmit=${async e => { e.preventDefault(); const t = (reply[rid] || '').trim(); if (!t) return; try { await onComment({id: rid}, t); setReply(x => ({...x, [rid]: ''})); } catch {} }}><input maxLength="3000" aria-label=${`${s.name} 업무보고 댓글`} placeholder=${isMe ? '덧붙일 말' : `${s.name}님에게 댓글`} value=${reply[rid] || ''} onInput=${e => { const v = e.target.value; setReply(x => ({...x, [rid]: v})); }} /><button class="secondary-button" disabled=${busy || !(reply[rid] || '').trim()}>남기기</button></form>`}</div>
+   <div class="tb-rep-comments"><div class="tb-sub"><span>댓글 ${cs.length || ''}</span></div><${TeamCommentList} cs=${cs} me=${me} busy=${busy} onMark=${onMark} onEdit=${onEditComment} onDelete=${onDeleteComment} />${onComment && html`<${ReplyForm} key=${rid} busy=${busy} label=${`${s.name} 업무보고 댓글`} placeholder=${isMe ? '덧붙일 말 · Shift+Enter 줄바꿈' : `${s.name}님에게 댓글 · Shift+Enter 줄바꿈`} onSend=${t => onComment({id: rid}, t)} />`}</div>
   </article>`; })}</div>
  </section>`;
 }
@@ -871,7 +973,7 @@ function DesignMirror({data, me, db, writable}) {
  const issues = open.filter(x => x.issue);
  return html`<section class="dm">
   ${head}
-  ${sub === 'report' ? html`<${TeamReport} reports=${reports} tasks=${all} comments=${comments} me=${me} busy=${busy} seats=${cSeats()} viewOnly=${true} onComment=${can ? onComment : null} onMark=${can ? onMark : null} onOpenTask=${setSel} />` : html`<${Fragment}>
+  ${sub === 'report' ? html`<${TeamReport} reports=${reports} tasks=${all} comments=${comments} me=${me} busy=${busy} seats=${cSeats()} viewOnly=${true} onComment=${can ? onComment : null} onMark=${can ? onMark : null} onEditComment=${can ? onEdit : null} onDeleteComment=${can ? onDelete : null} onOpenTask=${setSel} />` : html`<${Fragment}>
   ${issues.length > 0 && html`<div class="tb-alert">${I('AlertCircle', 16)}<strong>특이사항 ${issues.length}</strong><span>${issues[0].title} · ${TEAM_ISSUES[issues[0].issue]}${issues[0].issue_note ? ` · ${issues[0].issue_note}` : ''}</span><button type="button" class="text-button" onClick=${() => setSel(issues[0].id)}>열기${I('ChevronRight', 13)}</button></div>`}
   <div class=${cx('tb-split', view === 'timeline' && 'tl-on')}>
    <section class="tb-assign">
