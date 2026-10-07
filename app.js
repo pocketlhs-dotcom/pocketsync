@@ -2770,6 +2770,8 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
  const [pickOpen, setPickOpen] = useState(false);
  const [day, setDay] = useState(today()), [text, setText] = useState('');
  const [proj, setProj] = useState(''), [sub, setSub] = useState(''), [subText, setSubText] = useState(''), [subPct, setSubPct] = useState(0);
+ // 자유롭게 적은 줄을 나중에 업무에 잇기: {lineId, proj, how('new' | 세부 업무 id | 'none'), pct}
+ const [linking, setLinking] = useState(null);
  const people = [...seats].sort((a, b) => Number(b.key === me.id) - Number(a.key === me.id) || Number(a.name === ADMIN_NAME) - Number(b.name === ADMIN_NAME));
  const repOf = seat => reports.find(r => r.seat === seat && r.day === day);
  const my = repOf(me.id) || {lines: [], links: [], note: '', next: ''};
@@ -2788,6 +2790,25 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
  const pickSub = v => { setSub(v); const c = projTask && projTask.checklist.find(x => x.id === v); setSubPct(c ? c.pct : 0); };
  const suggest = tasks.filter(x => inSeoul(x.updated_at) === day && x.updated_by === me.id && !my.lines.some(l => l.task_id === x.id)).slice(0, 6);
  const projOnly = x => ({id: newCheckId(), text: x.title, task_id: x.id, task_title: x.title, check_id: '', pct: x.progress || 0});
+ // 비슷한 업무 찾기: 적은 글과 업무 제목 · 세부 업무 이름에서 겹치는 낱말(2자 이상, '진행' 같은 흔한 말 제외) 수로 고른다.
+ const STOP = new Set(['진행', '진행중', '제작', '작업', '업무', '완료', '수정', '확인', '검토', '정리', '준비', '반영', '오늘', '내일', '예정', '관련', '그리고', '하기', '전달', '공유']);
+ const toks = t => String(t || '').toLowerCase().split(/[\s\-–—_\[\]\(\)\{\}·,./:;!?'"|~+]+/).filter(w => w.length >= 2 && !STOP.has(w));
+ const simScore = (text, x) => { const a = toks(text); if (!a.length) return 0; const b = [...toks(x.title), ...x.checklist.flatMap(c => toks(c.text))]; return a.filter(w => b.some(v => v.includes(w) || w.includes(v))).length; };
+ const similar = text => cand.map(x => ({x, n: simScore(text, x)})).filter(o => o.n > 0).sort((p, q) => q.n - p.n || teamOrder(p.x, q.x)).slice(0, 3).map(o => o.x);
+ const startLink = (l, projId) => setLinking({lineId: l.id, proj: projId || '', how: 'new', pct: 0});
+ // 잇기: 새 세부 업무로 추가(이 줄 이름 그대로) / 이미 있는 세부 업무로 기록 / 세부 업무 없이 업무에만 묶기.
+ async function doLink(l) {
+  const lk = linking, t = lk && taskOf(lk.proj); if (!t || busy) return;
+  const put = fields => onAct(day, cur => ({lines: cur.lines.map(x => x.id === l.id ? {...x, task_id: t.id, task_title: t.title, ...fields} : x)}), `‘${t.title}’에 이었어요.`);
+  try {
+   if (lk.how === 'new') { const cid = newCheckId(); await onCheck(t, {type: 'addOne', id: cid, text: l.text.slice(0, 200), pct: lk.pct}); await put({check_id: cid, pct: lk.pct}); }
+   else if (lk.how === 'none') await put({check_id: '', pct: null});
+   else { const c = t.checklist.find(x => x.id === lk.how); if (!c) return; if (c.pct !== lk.pct) await onCheck(t, {type: 'pct', cid: c.id, pct: lk.pct}); await put({check_id: c.id, pct: lk.pct, text: c.text}); }
+   setLinking(null);
+  } catch {}
+ }
+ // 한 줄로 적다가 비슷한 업무를 고르면: 그 업무의 새 세부 업무로 적는 상태로 바꾼다.
+ const toProj = x => { setProj(x.id); setSub('__new'); setSubText(text.trim()); setSubPct(0); setText(''); };
  const subItem = projTask && sub && sub !== '__new' ? subOpts.find(c => c.id === sub) : null;
  const canAdd = proj ? (projTask ? (sub === '__new' ? !!subText.trim() : !!subItem) : false) : !!text.trim();
  async function addEntry() {
@@ -2836,7 +2857,23 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
    ${subs.length > 0 && html`<ul class="tb-rep-subs">${subs.map(l => subLine(l, t, isMe))}</ul>`}
   </section>`;
  };
- const workView = (r, isMe) => { const gs = groupsOf(r); return gs.length ? html`<div class="tb-rep-work">${gs.map(g => g.k ? projView(g, isMe) : html`<ul class="tb-rep-lines" key="free">${g.lines.map(l => html`<li key=${l.id}><span class="tb-rep-dot"></span><div><${TeamText} text=${l.text} /></div>${isMe ? xBtn('빼기', () => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), '')) : ''}</li>`)}</ul>`)}</div>` : ''; };
+ const linkPanel = l => {
+  const lk = linking, t = lk.proj ? taskOf(lk.proj) : null, used = t ? usedIn(t.id) : new Set(), items = t ? t.checklist.filter(c => !used.has(c.id)) : [];
+  const top = similar(l.text), seen = new Set(top.map(x => x.id));
+  const projOpts = [...top.map(x => ({value: x.id, label: x.title, meta: projMeta(x, !teamHas(x, me.name)), pct: x.progress || 0, group: '비슷한 업무'})), ...mineT.filter(x => !seen.has(x.id)).map(x => ({value: x.id, label: x.title, meta: projMeta(x, false), pct: x.progress || 0, group: '내 업무'})), ...otherT.filter(x => !seen.has(x.id)).map(x => ({value: x.id, label: x.title, meta: projMeta(x, true), pct: x.progress || 0, group: '다른 업무'}))];
+  const howOpts = [{value: 'new', label: '새 세부 업무로 추가', meta: `‘${l.text.slice(0, 40)}’ 이름 그대로`}, ...items.map(c => ({value: c.id, label: c.text, meta: c.by || '', pct: c.pct, group: '이미 있는 세부 업무로 기록'})), {value: 'none', label: '세부 업무 없이 업무에만 묶기', meta: '% 없이 그 업무 아래에 둬요', group: '그 밖에'}];
+  return html`<div class="tb-rep-link" role="group" aria-label="업무에 잇기">
+   <div class="tb-rep-link-head">${I('Link2', 13)}<b>업무에 잇기</b><small>${l.text}</small></div>
+   <${Pick} class="tb-rep-sel proj" label="이을 업무" placeholder="이을 업무 고르기" value=${lk.proj} disabled=${busy} options=${projOpts} onChange=${v => setLinking(k => ({...k, proj: v, how: 'new', pct: 0}))} />
+   ${t && html`<div class="tb-rep-form-row"><${Pick} class="tb-rep-sel sub" label="잇는 방식" value=${lk.how} disabled=${busy} options=${howOpts} onChange=${v => setLinking(k => ({...k, how: v, pct: v === 'new' || v === 'none' ? k.pct : ((items.find(c => c.id === v) || {}).pct || 0)}))} />${lk.how !== 'none' ? pctPick(lk.pct, v => setLinking(k => ({...k, pct: v})), '진행률', 'tb-rep-sel pct') : ''}</div>`}
+   <div class="tb-rep-link-actions"><button type="button" class="text-button" onClick=${() => setLinking(null)}>취소</button><button type="button" class="primary-button" disabled=${busy || !t} onClick=${() => doLink(l)}>${I('Link2', 14)}잇기</button></div>
+  </div>`;
+ };
+ const freeLine = (l, isMe) => {
+  const can = isMe && !!onCheck, open = can && linking && linking.lineId === l.id, sug = can && !open ? similar(l.text)[0] : null;
+  return html`<li key=${l.id} class=${cx(open && 'linking')}><span class="tb-rep-dot"></span><div class="tb-rep-free"><${TeamText} text=${l.text} />${sug ? html`<button type="button" class="tb-rep-sug" disabled=${busy} title="이 업무에 이어서 세부 업무 · %로 남기기" onClick=${() => startLink(l, sug.id)}>${I('Sparkles', 11)}<span>${sug.title}</span><em>에 잇기</em></button>` : ''}</div>${isMe ? html`<span class="tb-rep-free-tools">${can && !open ? html`<button type="button" class="text-button tb-rep-linkbtn" disabled=${busy} onClick=${() => startLink(l, sug ? sug.id : '')}>${I('Link2', 12)}업무에 잇기</button>` : ''}${xBtn('빼기', () => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), ''))}</span>` : ''}${open ? linkPanel(l) : ''}</li>`;
+ };
+ const workView = (r, isMe) => { const gs = groupsOf(r); return gs.length ? html`<div class="tb-rep-work">${gs.map(g => g.k ? projView(g, isMe) : html`<ul class="tb-rep-lines" key="free">${g.lines.map(l => freeLine(l, isMe))}</ul>`)}</div>` : ''; };
  const optT = x => `${x.title}${x.status === 'done' ? ' · 완료' : ` · ${x.progress || 0}%`}`;
  const projMeta = (x, who) => [statuses[x.status], x.due ? dDay(x.due).label : '', who ? teamWho(x.assignee) : ''].filter(Boolean).join(' · ');
  const form = html`<form class="tb-rep-form" onSubmit=${async e => { e.preventDefault(); try { await addEntry(); } catch {} }}>
@@ -2845,7 +2882,7 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
    ${sub === '__new' ? html`<${Fragment}>${subOpts.length > 0 && html`<button type="button" class="icon-button tb-rep-back" aria-label="세부 업무 목록에서 고르기" title="세부 업무 목록에서 고르기" onClick=${() => pickSub(subOpts[0].id)}>${I('List', 15)}</button>`}<input class="tb-rep-newsub" ref=${focusOnMount} maxLength="200" aria-label="새 세부 업무" placeholder="오늘 한 일 (이 업무의 세부 업무로도 추가돼요)" value=${subText} onInput=${e => setSubText(e.target.value)} /><//>` : html`<${Pick} class="tb-rep-sel sub" label="세부 업무" placeholder="세부 업무 고르기" value=${sub} disabled=${busy} onChange=${pickSub} options=${[...subOpts.map(c => ({value: c.id, label: c.text, meta: c.by || '', pct: c.pct})), {value: '__new', label: '목록에 없으면 직접 적기', meta: '이 업무의 세부 업무로도 추가돼요', action: true}]} />`}
    ${pctPick(subPct, setSubPct, '진행률', 'tb-rep-sel pct')}
    <button class="secondary-button" disabled=${busy || !canAdd}>추가</button>
-  </div>` : html`<div class="tb-rep-form-row"><input maxLength="300" aria-label="오늘 한 일" placeholder="오늘 한 일을 한 줄로 적고 Enter" value=${text} onInput=${e => setText(e.target.value)} /><button class="secondary-button" disabled=${busy || !text.trim()}>추가</button></div>`}
+  </div>` : html`<${Fragment}><div class="tb-rep-form-row"><input maxLength="300" aria-label="오늘 한 일" placeholder="오늘 한 일을 한 줄로 적고 Enter" value=${text} onInput=${e => setText(e.target.value)} /><button class="secondary-button" disabled=${busy || !text.trim()}>추가</button></div>${onCheck && text.trim().length >= 2 && (list => list.length ? html`<div class="tb-rep-hint">${I('Sparkles', 12)}<span>비슷한 업무에 이어 적기</span>${list.map(x => html`<button type="button" key=${x.id} class="chip" title="이 업무의 새 세부 업무로 적어요" onClick=${() => toProj(x)}>${x.title}</button>`)}</div>` : '')(similar(text))}<//>`}
  </form>`;
  const formOff = off => html`<div class="tb-rep-form is-off" title=${off}><div class="pk tb-rep-sel proj"><button type="button" class="pk-btn" disabled aria-label="프로젝트"><span class="pk-val"><span class="pk-ph">프로젝트 고르기</span></span>${I('ChevronDown', 15)}</button></div><div class="tb-rep-form-row"><input disabled aria-label="오늘 한 일" placeholder=${off} /><button type="button" class="secondary-button" disabled>추가</button></div></div>`;
  return html`<section class="tb-report">
