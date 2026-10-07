@@ -161,7 +161,7 @@
  };
  // ===== C ⇄ A·B 연결 업무 맞추기 =====
  // 이현성 화면이 열려 있는 동안(어느 보드든) 돈다. 디자이너는 A·B에, 권중선·정규진은 C 업무에 쓸 수 없어서 양쪽 모두 쓸 수 있는 이현성 쪽에서 맞춘다.
- // 연결: C 업무의 src_id(A에서 불러온 원본)와 out_links(C에서 보낸 업무). 맞추는 항목: 상태 · 마감 · 시작일 · 중요도 · 세부 업무 · 진행률(양방향).
+ // 연결: C 업무의 src_id(A·B 원본: C에서 불러왔거나 A·B에서 보낸 · 이은 업무)와 out_links(C에서 보낸 업무). 맞추는 항목: 상태 · 마감 · 시작일 · 중요도 · 세부 업무 · 진행률(양방향).
  // A·B 문서의 c_sync = 지난번에 맞춘 값. 항목마다 바뀐 쪽을 따르고, 양쪽이 같은 항목을 바꿨으면 C 기준.
  // 처음 맞출 때: 상태 · 마감 · 시작일 · 중요도는 C 기준. 세부 업무는 합친다(이름이 같으면 더 많이 진행된 쪽, A·B에만 있던 것은 C에 덧붙임) — 이미 한 일을 되돌리지 않게.
  // C 업무가 지워지면(이현성 화면이 열려 있을 때) 연결됐던 A·B 업무의 디자인팀 표시 · 맞춤 기준을 지우고 따로 움직이게 둔다.
@@ -188,8 +188,8 @@
   const avg = list => Math.round(list.reduce((a, c) => a + (c.pct || 0), 0) / list.length);
   const whoOf = a => a === '모두' ? '셋 다' : a === '함께' ? BOARDS.C.seats.filter(k => k !== 'lhs').map(k => SEAT_NAMES[k]).join('·') : (a || '미배정');
   const visOf = b => b === 'all' ? ['A', 'B'] : (b === 'A' || b === 'B') ? [b] : [];
-  const boardName = t => t.src ? 'A 보드' : `${t.board || 'A'} 보드`;
-  const targetsOf = v => [...(v.src_board === 'A' && v.src_id ? [{id: String(v.src_id), src: true, at: '', board: 'A'}] : []), ...(Array.isArray(v.out_links) ? v.out_links.filter(o => o && o.id).map(o => ({id: String(o.id), src: false, at: String(o.at || ''), board: String(o.board || '')})) : [])];
+  const boardName = t => `${t.board || 'A'} 보드`;
+  const targetsOf = v => [...((v.src_board === 'A' || v.src_board === 'B') && v.src_id ? [{id: String(v.src_id), src: true, at: '', board: v.src_board}] : []), ...(Array.isArray(v.out_links) ? v.out_links.filter(o => o && o.id).map(o => ({id: String(o.id), src: false, at: String(o.at || ''), board: String(o.board || '')})) : [])];
   const cDocs = new Map(), tDocs = new Map(), tSubs = new Map(), tErr = new Set(), dupSeen = new Map(), prevTargets = new Map();
   // 같은 사람의 탭이 여러 개면 하나만 쓴다(기록이 두 번 남지 않게).
   const tabId = Math.random().toString(36).slice(2);

@@ -1634,4 +1634,20 @@ body.memo-resizing,body.memo-resizing *{cursor:ns-resize!important;user-select:n
 .ab-props .collab-box{padding:9px 12px;border-radius:5px}
 .ab-props .collab-box>p{font-size:13px}
 @media(max-width:640px){.ab-props>.prop{grid-template-columns:minmax(0,1fr);gap:4px}.ab-props>.prop>dt{padding-top:0}}
+/* 디자인팀(C) 연결 폼(10-07): 업무 리스트 줄 아래 · 업무 상세 디자인팀 줄 */
+.ab-clink-chip.empty{color:#7d8bb0}
+.ab-clink{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border:1px solid #e1e4f3;border-radius:5px;background:#fafbfe;width:100%;box-sizing:border-box}
+.ab-clink-fields{border:0!important;padding:0!important;gap:8px!important}
+.ab-clink-fields>div{grid-template-columns:44px minmax(0,1fr)!important}
+.ab-clink-pick{flex:1 1 260px;min-width:0;max-width:440px}
+.ab-clink-hint{display:inline-flex;align-items:center;gap:5px;margin:0;font-size:12px;line-height:1.55;color:#8f95ab}
+p.ab-clink-hint{display:block}
+.ab-clink-actions{display:flex;justify-content:flex-end;gap:6px}
+.ab-clink-actions .primary-button,.ab-clink-actions .secondary-button{min-height:32px;height:32px;padding:0 12px;font-size:13px}
+.ab-clink-row{padding-top:8px!important}
+.ab-props .ab-clink-start{color:#315df8;border-color:#c9d4f5;background:#f5f7ff}
+.ab-props .ab-unlink{font-size:12px;color:#8a93ab;padding:0 2px}
+.ab-props .ab-unlink:hover{color:#c0503f}
+.ab-props .clink-prop>.prop-hint{flex-basis:100%}
+@media(max-width:640px){.ab-clink{padding:10px 12px}.ab-clink-fields>div{grid-template-columns:minmax(0,1fr)!important}.ab-clink-pick{max-width:none}}
 </style>

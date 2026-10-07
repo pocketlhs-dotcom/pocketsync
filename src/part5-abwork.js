@@ -66,8 +66,9 @@ function AbToday({events, meId, meName, writable, busy, onOpen, onCreate, onComp
 
 // 업무 리스트: C 팀 현황과 같은 틀(사람 필터 · 한 줄 추가 · 상태 탭 · 줄마다 상태 · 마감 · 담당 바로 바꾸기 · 세부 업무 · 끌어서 순서 · 리스트/타임라인).
 // A·B 것: 카테고리(고르기 + 줄 태그), 업무 요청(요청 칩 · 수락 대기 태그), 확인 요청 중 · 협업 · 디자인팀 연결 · 다른 보드에서 공유된 업무(보기 전용).
-function AbTaskList({tasks, view, onView, stab, onStab, who, onWho, topic, onTopic, topics, topicName, cmap = {}, confirmIds, freshIds, meId, meName, writable, busy, onOpen, onPatch, onChecklist, onCreate, onReorder, onTopicAdd, onTopicManage}) {
- const [title, setTitle] = useState(''), [checksOpen, setChecksOpen] = useState({});
+// clink: 디자인팀(C) 연결 패널을 그리는 함수(이현성만). 줄의 '+ 디자인팀'을 누르면 줄 아래에 펼친다.
+function AbTaskList({tasks, view, onView, stab, onStab, who, onWho, topic, onTopic, topics, topicName, cmap = {}, confirmIds, freshIds, meId, meName, writable, busy, onOpen, onPatch, onChecklist, onCreate, onReorder, onTopicAdd, onTopicManage, clink = null}) {
+ const [title, setTitle] = useState(''), [checksOpen, setChecksOpen] = useState({}), [linkOpen, setLinkOpen] = useState({});
  const names = abNames();
  const inTopic = x => topic === 'all' || (x.topic_id || 'unassigned') === topic;
  const pool0 = tasks.filter(x => x.status !== 'done' || !isArchived(x)), pool = pool0.filter(inTopic);
@@ -91,9 +92,10 @@ function AbTaskList({tasks, view, onView, stab, onStab, who, onWho, topic, onTop
   return html`<div class=${cx('tb-arow ab-row', 'st-' + x.status, x.req === 'pending' && 'is-req', x.foreign && 'is-foreign')} key=${x.id} data-sort-id=${x.id}>
    ${ed && list.length > 1 && stab !== 'done' && html`<${SortGrip} id=${x.id} label="끌어서 순서 바꾸기" onDrop=${onReorder} />`}
    ${ed ? html`<${TeamDuePick} x=${x} busy=${busy} onPatch=${onPatch} />` : html`<span class="tb-duepick"><span class=${cx('dday', x.status === 'done' ? 'none' : d.cls)}>${x.status === 'done' ? '완료' : d.label}</span></span>`}
-   <div class="tb-arow-main"><button type="button" class="tb-arow-title" onClick=${() => onOpen(x.id)}><strong>${freshIds && freshIds.has(x.id) && html`<i class="fresh-dot" title="새 소식"></i>`}${x.pinned && html`<span class="pin-mark">${I('Pin', 12)}</span>`}${x.title}</strong></button><span class="tb-arow-meta">${ed ? html`<${TeamStatusPick} x=${x} busy=${busy} onPatch=${onPatch} />` : html`<span class=${'tb-stbadge dm-st st-' + x.status}><i></i>${statuses[x.status]}</span>`}<span class="tag tb-src ab-topic" title="카테고리">${topicName(x.topic_id)}</span>${x.priority !== 'share' && html`<span class=${'tag priority-tag ' + x.priority}>${taskPriorities[x.priority]}</span>`}<${ReqTag} item=${x} meId=${meId} /><${CLinkTag} item=${x} />${confirmIds && confirmIds.has(x.id) && html`<span class="tag confirm-tag">확인 요청 중</span>`}${x.collab === 'requested' && html`<span class="tag collab-tag requested">${x.collab_by === meId ? '협업 요청 중' : '협업 요청 받음'}</span>`}${x.foreign && html`<span class="tag ab-foreign" title="다른 보드에서 카테고리를 공유한 업무예요. 여기서는 볼 수만 있어요.">${I('Eye', 11)}${(window.PS_BOARD_NAMES || {})[x.home] || '다른 보드'}</span>`}${(s => s && html`<small>${s}</small>`)([teamStartLabel(x), x.progress ? `${x.progress}%` : '', cc ? `댓글 ${cc}` : ''].filter(Boolean).join(' · '))}${(st.total > 0 || ed) && html`<button type="button" class=${cx('tb-check-chip', checksOpen[x.id] && 'on', !st.total && 'empty')} aria-expanded=${!!checksOpen[x.id]} onClick=${() => setChecksOpen(o => ({...o, [x.id]: !o[x.id]}))}>${I('ListChecks', 12)}${st.total ? `세부 ${st.done}/${st.total}` : '세부 업무'}${I(checksOpen[x.id] ? 'ChevronUp' : 'ChevronDown', 12)}</button>`}</span></div>
+   <div class="tb-arow-main"><button type="button" class="tb-arow-title" onClick=${() => onOpen(x.id)}><strong>${freshIds && freshIds.has(x.id) && html`<i class="fresh-dot" title="새 소식"></i>`}${x.pinned && html`<span class="pin-mark">${I('Pin', 12)}</span>`}${x.title}</strong></button><span class="tb-arow-meta">${ed ? html`<${TeamStatusPick} x=${x} busy=${busy} onPatch=${onPatch} />` : html`<span class=${'tb-stbadge dm-st st-' + x.status}><i></i>${statuses[x.status]}</span>`}<span class="tag tb-src ab-topic" title="카테고리">${topicName(x.topic_id)}</span>${x.priority !== 'share' && html`<span class=${'tag priority-tag ' + x.priority}>${taskPriorities[x.priority]}</span>`}<${ReqTag} item=${x} meId=${meId} /><${CLinkTag} item=${x} />${confirmIds && confirmIds.has(x.id) && html`<span class="tag confirm-tag">확인 요청 중</span>`}${x.collab === 'requested' && html`<span class="tag collab-tag requested">${x.collab_by === meId ? '협업 요청 중' : '협업 요청 받음'}</span>`}${x.foreign && html`<span class="tag ab-foreign" title="다른 보드에서 카테고리를 공유한 업무예요. 여기서는 볼 수만 있어요.">${I('Eye', 11)}${(window.PS_BOARD_NAMES || {})[x.home] || '다른 보드'}</span>`}${(s => s && html`<small>${s}</small>`)([teamStartLabel(x), x.progress ? `${x.progress}%` : '', cc ? `댓글 ${cc}` : ''].filter(Boolean).join(' · '))}${(st.total > 0 || ed) && html`<button type="button" class=${cx('tb-check-chip', checksOpen[x.id] && 'on', !st.total && 'empty')} aria-expanded=${!!checksOpen[x.id]} onClick=${() => setChecksOpen(o => ({...o, [x.id]: !o[x.id]}))}>${I('ListChecks', 12)}${st.total ? `세부 ${st.done}/${st.total}` : '세부 업무'}${I(checksOpen[x.id] ? 'ChevronUp' : 'ChevronDown', 12)}</button>`}${clink && ed && !x.c_link && x.status !== 'done' && html`<button type="button" class=${cx('tb-check-chip ab-clink-chip', !linkOpen[x.id] && 'empty', linkOpen[x.id] && 'on')} aria-expanded=${!!linkOpen[x.id]} title="디자인팀 보드에 새 업무로 보내거나 이미 있는 업무에 잇기" onClick=${() => setLinkOpen(o => ({...o, [x.id]: !o[x.id]}))}>${I(linkOpen[x.id] ? 'ChevronUp' : 'Plus', 12)}디자인팀</button>`}</span></div>
    <div class="tb-assign-btns ab-who-btns" role="group" aria-label="담당 정하기">${names.map(n => { const onN = abHas(x, n), next = abToggleWho(x, n); return html`<button type="button" key=${n} class=${cx('tb-abtn', onN && 'on')} aria-pressed=${onN} disabled=${!ed || busy} title=${!next ? `${n} 담당 · 다른 사람을 켜면 함께가 돼요` : w === '함께' ? `누르면 ${next} 혼자 맡기` : onN ? `${n} 담당` : `${n}도 함께 맡기`} onClick=${() => { if (!next) { toast.info('담당은 한 명 이상이어야 해요. 다른 사람을 켜면 함께가 돼요.'); return; } if (next !== w) onPatch(x, {assignee: next}); }}>${n}</button>`; })}</div>
    ${checksOpen[x.id] && html`<div class="tb-arow-checks"><${Checklist} item=${x} editable=${ed} busy=${busy} onAct=${onChecklist} compact=${true} /></div>`}
+   ${clink && linkOpen[x.id] && !x.c_link && html`<div class="tb-arow-checks ab-clink-row">${clink.panel(x, () => setLinkOpen(o => ({...o, [x.id]: false})))}</div>`}
   </div>`;
  };
  return html`<section class="tb-assign ab-assign">
@@ -123,4 +125,27 @@ function AbPerson({seat, isMe, tasks, cmap = {}, checkin, latest, facts, reactio
   <div class="tb-sub"><span>지금 하는 일</span></div>${doing.length ? doing.map(mini) : html`<p class="tb-none">진행 중인 업무가 없어요.</p>`}
   ${wait.length > 0 && html`<${Fragment}><div class="tb-sub"><span>대기 · 보류</span></div>${wait.slice(0, 6).map(mini)}${wait.length > 6 && html`<button type="button" class="tb-more" onClick=${onList}>외 ${wait.length - 6}건 더 보기</button>`}<//>`}
  </article>`;
+}
+
+// 디자인팀(C) 연결 폼(이현성만: C 업무를 쓸 수 있는 사람). A·B 업무를 C 보드 새 업무로 보내거나(제목 · 설명 · 세부 업무 · 링크 · 상태 · 마감 그대로),
+// 이미 있는 C 업무에 잇는다(그 C 업무의 원본이 이 업무가 됨). 그 뒤로는 연결 맞추기(watchTeamLinks)가 상태 · 마감 · 시작일 · 중요도 · 세부 업무 · 진행률을 양쪽 같게 둔다.
+const abWords = t => String(t || '').toLowerCase().replace(/[\[\]()<>{}·,.:;!?'"“”‘’/\\_\-+]/g, ' ').split(/\s+/).filter(w => w.length >= 2);
+function CLinkForm({item, cTasks = [], cReady = false, cErr = '', busy, onSend, onLink, onClose, onNeed}) {
+ const [mode, setMode] = useState('new'), [who, setWho] = useState([]), [pick, setPick] = useState('');
+ useEffect(() => { if (onNeed) onNeed(); }, []);
+ const names = cNames(), mine = new Set(abWords(item.title));
+ const similar = c => abWords(c.title).some(w => mine.has(w) || [...mine].some(m => m.length >= 3 && (w.includes(m) || m.includes(w))));
+ const sorted = [...cTasks].sort((a, b) => Number(similar(b)) - Number(similar(a)) || teamOrder(a, b));
+ const opts = sorted.map(c => ({value: c.id, label: c.title, group: similar(c) ? '비슷한 디자인팀 업무' : '디자인팀 업무', meta: [cWho(c.assignee), C_ST[c.status], c.due ? dDay(c.due).label : ''].filter(Boolean).join(' · '), pct: c.progress || 0}));
+ const toggle = n => setWho(w => (w.includes(n) ? w.filter(v => v !== n) : [...w, n]));
+ const actions = (ok, label, icon, run) => html`<div class="ab-clink-actions"><button type="button" class="secondary-button small" onClick=${onClose}>취소</button><button type="button" class="primary-button small" disabled=${busy || !ok} onClick=${async () => { try { await run(); onClose(); } catch {} }}>${I(icon, 14)}${label}</button></div>`;
+ return html`<div class="ab-clink">
+  <div class="tb-fields ab-clink-fields">
+   <div><span>연결</span><div class="tb-chips" role="group" aria-label="연결 방법"><button type="button" class="chip" aria-pressed=${mode === 'new'} onClick=${() => setMode('new')}>새 업무로 보내기</button><button type="button" class="chip" aria-pressed=${mode === 'link'} onClick=${() => setMode('link')}>이미 있는 업무에 잇기</button></div></div>
+   ${mode === 'new' ? html`<div><span>담당</span><div class="tb-chips">${names.map(n => html`<button type="button" key=${n} class="chip" aria-pressed=${who.includes(n)} onClick=${() => toggle(n)}>${n}</button>`)}<small class="tb-multi-hint">${who.length ? '여러 명 선택 가능' : '안 고르면 미배정'}</small></div></div>`
+    : html`<div><span>업무</span><div class="tb-chips">${cErr ? html`<small class="ab-clink-hint">${cErr}</small>` : !cReady ? html`<small class="ab-clink-hint">${I('Loader2', 13, {class: 'spin'})}디자인팀 업무를 불러오는 중이에요</small>` : opts.length ? html`<${Pick} class="ab-clink-pick" label="이을 디자인팀 업무" value=${pick} options=${opts} placeholder="디자인팀 업무 고르기" onChange=${setPick} />` : html`<small class="ab-clink-hint">이을 수 있는 디자인팀 업무가 없어요(완료 · 이미 이 보드와 연결된 업무 제외)</small>`}</div></div>`}
+  </div>
+  <p class="ab-clink-hint">${mode === 'new' ? '제목 · 설명 · 세부 업무 · 링크 · 상태 · 마감을 그대로 보내요. 그다음부터 상태 · 마감 · 시작일 · 중요도 · 세부 업무 · 진행률이 양쪽 같이 바뀌어요.' : '이으면 상태 · 마감 · 시작일 · 중요도는 디자인팀 업무 기준으로 맞추고, 세부 업무는 합쳐요. 그다음부터 양쪽 같이 바뀌어요.'}</p>
+  ${mode === 'new' ? actions(true, '디자인팀 보드에 보내기', 'ArrowUpRight', () => onSend(item, who)) : actions(!!pick, '이 업무에 잇기', 'Link2', () => onLink(item, pick))}
+ </div>`;
 }
