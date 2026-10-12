@@ -1754,6 +1754,30 @@ p.ab-clink-hint{display:block}
 a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 0 0 2px #ffe680}
 @keyframes hl-in{0%{outline-offset:16px;outline-color:rgba(240,196,25,0)}55%{outline-offset:3px;outline-color:#f0c419}100%{outline-offset:4px;outline-color:#f0c419}}
 @media(prefers-reduced-motion:reduce){[data-hl]{animation:none}}
+/* 미팅 태그(10-12): 제목 맨 앞 [ ] → 색 태그(내부 · PRE · 채용 · 가이드 · 실무, 그 밖은 회색). 띠 · 줄 · 머리 건수 · 입력 칩 */
+.mt-in{--mt-bg:#e4ecff;--mt-bd:#b6c9fa;--mt-fg:#2a52c4}
+.mt-pre{--mt-bg:#f0eaff;--mt-bd:#d4c4fb;--mt-fg:#6340c4}
+.mt-hire{--mt-bg:#e3f4ea;--mt-bd:#b0dbc0;--mt-fg:#1f6f44}
+.mt-guide{--mt-bg:#fff0da;--mt-bd:#efcf99;--mt-fg:#94590b}
+.mt-work{--mt-bg:#fdecf2;--mt-bd:#f2c2d3;--mt-fg:#ad3762}
+.mt-etc{--mt-bg:#f1f3f8;--mt-bd:#dfe3ec;--mt-fg:#5f6b85}
+.mt-tag{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;height:20px;padding:0 7px;border-radius:3px;border:1px solid var(--mt-bd);background:var(--mt-bg);color:var(--mt-fg);font-size:11.5px;font-weight:700;line-height:1;white-space:nowrap;box-sizing:border-box}
+.mt-tag>b{font-weight:700;opacity:.7}
+.agenda-row.past .mt-tag{opacity:.55}
+.strip-block.mt-in,.strip-block.mt-pre,.strip-block.mt-hire,.strip-block.mt-guide,.strip-block.mt-work{background:var(--mt-bg);border:1px solid var(--mt-bd);border-left:3px solid var(--mt-fg);color:var(--mt-fg);font-weight:600}
+.mt-legend{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap}
+.mt-legend .mt-tag{height:20px;font-size:11px;padding:0 6px}
+.ab-day .tb-meet-head>small{margin-right:0}
+.ab-day .tb-meet-head>.mt-legend{margin-right:auto}
+.mt-pick{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap}
+.mt-pick-label{font-size:12px;font-weight:600;color:#8f95ab;margin-right:2px}
+.mt-opt{display:inline-flex;align-items:center;height:26px;padding:0 9px;border:1px solid #e1e4f3;border-radius:4px;background:#fff;color:var(--mt-fg);font-size:12px;font-weight:700;cursor:pointer}
+.mt-opt:hover:not(:disabled){border-color:var(--mt-bd);background:#fafbfe}
+.mt-opt[aria-pressed=true]{background:var(--mt-bg);border-color:var(--mt-fg)}
+.mt-opt:disabled{opacity:.5;cursor:default}
+.slot-form>.mt-pick{flex-basis:100%;padding:2px 0 1px}
+.composer .mt-row{display:flex;flex-direction:column;gap:7px;margin-top:-6px}
+.mt-detail{margin:-2px 0 10px}
 </style>
 </head><body>
 <div id="app"></div>
@@ -1763,6 +1787,6 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1791763209"></script>
-<script src="app.js?v=1791763209"></script>
+<script src="platform.js?v=1791765538"></script>
+<script src="app.js?v=1791765538"></script>
 </body></html>

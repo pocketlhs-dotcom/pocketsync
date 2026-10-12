@@ -113,6 +113,38 @@ function timeRangeLabel(item) { return item.start ? `${item.start}${item.end ? '
 function durationLabel(min) { const h = Math.floor(min / 60), m = min % 60; return h && m ? `${h}시간 ${m}분` : h ? `${h}시간` : `${m}분`; }
 const isMasked = (item, meId) => item.kind === 'event' && item.category === 'personal' && item.author_id !== meId;
 const displayTitle = (item, meId) => isMasked(item, meId) ? '개인 일정' : item.title;
+// 미팅 태그(10-12): 제목 맨 앞 [ ] 안의 말. 자주 쓰는 다섯 가지(내부 · PRE · 채용 · 가이드 · 실무)는 색으로 나누고, 그 밖의 [ ]는 회색 태그.
+// 따로 필드를 두지 않고 제목 그대로 저장한다([PRE 미팅] 넥톤) — A·B 일정 · 디자인팀 오늘 미팅 요약 · 예전 일정에도 그대로 통한다.
+const MEET_TAGS = [['in', '내부'], ['pre', 'PRE'], ['hire', '채용'], ['guide', '가이드'], ['work', '실무']];
+const MEET_TAG_RE = /^\s*[\[［【]([^\[\]［］【】]{1,20})[\]］】]\s*/;
+function meetTag(title) {
+ const t = String(title || ''), m = MEET_TAG_RE.exec(t);
+ if (!m) return {key: '', label: '', rest: t};
+ const inner = m[1].trim(), up = inner.toUpperCase(), hit = MEET_TAGS.find(([, l]) => up.startsWith(l.toUpperCase()));
+ const rest = t.slice(m[0].length).trim();
+ return hit ? {key: hit[0], label: hit[1], rest} : {key: 'etc', label: inner.slice(0, 12), rest};
+}
+// 태그 칩을 누르면: 맨 앞 [ ]를 그 태그로 바꾸거나 새로 붙이고, 이미 그 태그면 뺀다.
+function withMeetTag(title, key) {
+ const t = String(title || ''), m = MEET_TAG_RE.exec(t), rest = m ? t.slice(m[0].length) : t.replace(/^\s+/, '');
+ const l = (MEET_TAGS.find(([k]) => k === key) || [])[1];
+ return !l || meetTag(t).key === key ? rest : `[${l}] ${rest}`;
+}
+const meetName = t => (t.key ? t.rest || t.label : t.rest);
+const meetFilled = title => !!meetTag(title).rest.trim();
+const MeetTag = ({t}) => (t && t.key ? html`<span class=${'mt-tag mt-' + t.key}>${t.label}</span>` : '');
+// 입력 줄의 태그 칩(누르면 제목 앞 [ ]를 바꿈). 입력 칸 포커스가 빠지지 않게 mousedown은 막는다.
+// focus: 고른 뒤 제목 칸으로 돌아가 커서를 끝에 둘 입력 칸(함수로 넘김).
+function MeetTagPick({title, onChange, label = '태그', disabled = false, focus = null}) {
+ const cur = meetTag(title).key;
+ const pick = k => { onChange(withMeetTag(title, k)); if (focus) setTimeout(() => { const el = focus(); if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch {} } }, 0); };
+ return html`<span class="mt-pick" role="group" aria-label="미팅 태그">${label ? html`<span class="mt-pick-label">${label}</span>` : ''}${MEET_TAGS.map(([k, l]) => html`<button type="button" key=${k} class=${'mt-opt mt-' + k} aria-pressed=${cur === k} disabled=${disabled} title=${cur === k ? '한 번 더 누르면 태그를 빼요' : `제목 앞에 [${l}] 붙이기`} onMouseDown=${e => e.preventDefault()} onClick=${() => pick(k)}>${l}</button>`)}</span>`;
+}
+// 오늘 일정 · 미팅 머리: 태그별 건수(띠 색 설명 겸).
+function MeetTagLegend({titles}) {
+ const n = {}; titles.forEach(t => { const k = meetTag(t).key; if (k && k !== 'etc') n[k] = (n[k] || 0) + 1; });
+ return html`<span class="mt-legend">${MEET_TAGS.filter(([k]) => n[k]).map(([k, l]) => html`<span key=${k} class=${'mt-tag mt-' + k} title=${`${l} 미팅 ${n[k]}건`}>${l}<b>${n[k]}</b></span>`)}</span>`;
+}
 const authorLabel = item => item.demo ? '샘플' : personName(item.author_name);
 
 function personName(value) {
