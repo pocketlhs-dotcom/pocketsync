@@ -1780,6 +1780,29 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 .mt-detail{margin:-2px 0 10px}
 /* 업무 리스트 완료 탭: 지난 완료도 모두 · 30건씩 더 보기(10-14) */
 .tb-assign-list>.tb-done-more{display:block;margin:12px auto 14px}
+/* 팀원 업무 추가(10-15): 추가 전 비슷한 업무 · 'OOO 추가' · 이현성 화면 새로 추가 */
+.tb-sim{display:flex;flex-direction:column;gap:6px;margin:10px 20px 2px;padding:10px 12px;border:1px solid #e6e0fb;border-radius:6px;background:#faf8ff}
+.tb-add .tb-sim{margin:8px 0 0}
+.tb-sim-label{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:#6b4fcf}
+.tb-sim-list{display:flex;flex-direction:column;gap:4px}
+.tb-sim-opt{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;text-align:left;padding:7px 10px;border:1px solid #e1e4f3;border-radius:5px;background:#fff;cursor:pointer;font:inherit}
+.tb-sim-opt:hover:not(:disabled){border-color:#b9a9f2;background:#fdfcff}
+.tb-sim-main{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.tb-sim-main>strong{font-size:13.5px;color:#141a2e;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb-sim-main>small{font-size:12px;color:#8f95ab}
+.tb-sim-opt>em{font-style:normal;display:inline-flex;align-items:center;gap:3px;flex-shrink:0;font-size:12px;font-weight:700;color:#6b4fcf;background:#f0eaff;border-radius:3px;padding:3px 8px}
+.tb-sim-or{font-size:12px;color:#9aa1b5}
+.tb-newadd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 20px 2px;padding:9px 12px;border-radius:6px;background:#f2f6ff;border:1px solid #dbe5ff;color:#2f5bd1;font-size:13px}
+.tb-newadd>b{font-weight:700}
+.tb-newadd-list{display:inline-flex;gap:6px;flex-wrap:wrap;min-width:0;flex:1}
+.tb-newadd-chip{display:inline-flex;align-items:center;gap:6px;max-width:300px;height:26px;padding:0 9px;border:1px solid #cdd9fb;border-radius:4px;background:#fff;color:#2f5bd1;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.tb-newadd-chip>.fresh-dot{margin:0;box-shadow:none;width:6px;height:6px}
+.tb-newadd-chip>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;color:#33435c;font-weight:600}
+.tb-newadd-chip:hover{border-color:#9db6f1;background:#f8faff}
+.tb-newadd>small{color:#6b7d98}
+.tb-newadd>.text-button{margin-left:auto}
+.tag.tb-by{background:#f3f0ff;color:#6b4fcf}
+@media(max-width:640px){.tb-sim,.tb-newadd{margin-left:14px;margin-right:14px}.tb-sim-opt>em{padding:3px 6px}.tb-newadd>.text-button{margin-left:0}}
 </style>
 </head><body>
 <div id="app"></div>
@@ -1789,6 +1812,6 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1791938246"></script>
-<script src="app.js?v=1791938246"></script>
+<script src="platform.js?v=1792026745"></script>
+<script src="app.js?v=1792026745"></script>
 </body></html>
