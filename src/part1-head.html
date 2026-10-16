@@ -1802,4 +1802,52 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 .tb-newadd>.text-button{margin-left:auto}
 .tag.tb-by{background:#f3f0ff;color:#6b4fcf}
 @media(max-width:640px){.tb-sim,.tb-newadd{margin-left:14px;margin-right:14px}.tb-sim-opt>em{padding:3px 6px}.tb-newadd>.text-button{margin-left:0}}
+/* 10-16: 디자인팀 화면 A·B 흔적 숨김 · A·B 같은 업무 한 줄 · C에서 A·B 정리(이현성만) · A·B 이현성 카드 디자인팀 보드 */
+.tb-c-ab{font-style:normal;font-size:11px;font-weight:700;color:#8a6d2b;background:#fdf3dc;border-radius:3px;padding:1px 6px;white-space:nowrap}
+.tag.ab-also{display:inline-flex;align-items:center;gap:3px;background:#f2f4f8;color:#7d879c}
+.ab-tidy{background:#fff;border:1px solid #f0dcb8;border-radius:7px;display:flex;flex-direction:column;min-width:0;overflow:visible}
+.ab-tidy-head{display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;padding:11px 14px;border:0;border-radius:7px;background:#fffaf0;text-align:left;cursor:pointer;font:inherit;color:#8a5a12}
+.ab-tidy-head:hover{background:#fff5e3}
+.ab-tidy.open .ab-tidy-head{border-radius:7px 7px 0 0;border-bottom:1px solid #f5e6cb}
+.ab-tidy-head>b{font-size:14px;font-weight:700}
+.ab-tidy-head>small{font-size:12.5px;color:#a77b35;font-weight:600}
+.ab-tidy-only{margin-left:auto;font-size:11.5px;color:#b3a284;font-weight:600}
+.ab-tidy-head>svg{flex-shrink:0}
+.ab-tidy-list{list-style:none;margin:0;padding:0}
+.ab-tidy-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid #f1f2f7}
+.ab-tidy-row:first-child{border-top:0}
+.ab-tidy-main{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0;flex:1}
+.ab-tidy-main>strong{max-width:100%;font-size:14px;color:#141a2e;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ab-tidy-main>small{font-size:12px;color:#8f95ab}
+.ab-tidy-row.late .ab-tidy-main>small{color:#c0573f}
+.ab-tidy-where{font-size:11px;font-weight:700;color:#5f6b85;background:#f1f3f8;border-radius:3px;padding:1px 6px}
+.ab-tidy-acts{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.ab-tidy-acts .secondary-button{display:inline-flex;align-items:center;gap:4px;height:30px;min-height:0;padding:0 10px;font-size:12.5px}
+.ab-tidy-open{width:30px;height:30px}
+.ab-tidy-note{margin:0;padding:9px 14px 11px;font-size:12px;color:#a3aec0;border-top:1px solid #f1f2f7}
+@media(max-width:640px){.ab-tidy-head{flex-wrap:wrap}.ab-tidy-only{display:none}.ab-tidy-row{flex-wrap:wrap}.ab-tidy-acts{width:100%;flex-wrap:wrap}}
+.ab-cbox{border:1px solid #e6eaf6;background:#fbfcff;border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;margin-top:2px}
+.ab-cbox-head{display:flex;align-items:center;gap:8px}
+.ab-cbox-title{display:inline-flex;align-items:center;gap:5px;border:0;background:none;padding:0;font:inherit;font-size:13px;font-weight:700;color:#0b1c5c;cursor:pointer}
+.ab-cbox-title:hover{color:#315df8}
+.ab-cbox-head>small{margin-left:auto;font-size:11.5px;color:#a3aec0;font-weight:600}
+.ab-cbox-stats{display:flex;gap:5px;flex-wrap:wrap}
+.ab-cstat{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 8px;border:1px solid #e1e4f3;border-radius:4px;background:#fff;font:inherit;font-size:12px;font-weight:600;color:#6b7591;cursor:pointer}
+.ab-cstat>b{color:#0b1c5c;font-weight:700}
+.ab-cstat:hover{border-color:#b9c7f2}
+.ab-cstat.warn{border-color:#f2cdc3;color:#c0573f;background:#fff8f6}
+.ab-cstat.warn>b{color:#c0573f}
+.ab-crep{display:flex;flex-direction:column;gap:4px;width:100%;box-sizing:border-box;text-align:left;border:1px solid #eef0f7;background:#fff;border-radius:5px;padding:8px 10px;font:inherit;cursor:pointer}
+.ab-crep:hover{border-color:#d5ccf6}
+.ab-crep-head{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#6b4fcf}
+.ab-crep-head>small{font-weight:500;color:#a3aec0;margin-left:2px}
+.ab-crep-line{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#33435c;min-width:0}
+.ab-crep-line>i{width:4px;height:4px;border-radius:50%;background:#9aa6c4;flex-shrink:0}
+.ab-crep-line>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.ab-crep-line>b{font-size:12px;color:#315df8;font-weight:700;flex-shrink:0}
+.ab-crep-more{font-size:11.5px;color:#a3aec0}
+.ab-crep-none{margin:0;font-size:12.5px;color:#a3aec0}
+.ab-cbox .tb-sub{margin:2px 0 0}
+/* A·B 디자인팀 탭 모바일: 머리 줄이 넘치지 않게(보기 전용은 아이콘만, 보기 바꾸기는 옆으로 밀기) */
+@media(max-width:640px){.dm>.section-heading .heading-tools{min-width:0;max-width:100%}.dm-ro-txt{display:none}.dm-ro{padding:0 8px}.dm-head .view-toggle{min-width:0;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap}.dm-head .view-toggle::-webkit-scrollbar{display:none}.dm-head .view-toggle>button{flex-shrink:0}}
 </style>

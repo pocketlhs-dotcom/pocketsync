@@ -159,6 +159,17 @@
   const us = [sub('items', 'items'), sub('comments', 'comments'), sub('avatars', 'avatars')];
   return () => us.forEach(u => { try { u(); } catch (e) {} });
  };
+ // 이현성: 디자인팀(C) 화면의 'A·B 정리'에 쓸 A·B 업무(공통 'all' 포함)를 구독한다(10-16). 디자이너 화면에서는 부르지 않는다.
+ window.PS_WATCH_AB_TASKS = (cb, onErr) => {
+  if (session.seat !== 'lhs') return () => {};
+  const base = fs.collection('items').where('board', 'in', ['A', 'B', 'all']);
+  let un = () => {}, dead = false;
+  const take = s => { if (!dead) cb(s.docs.map(d => ({id: d.id, ...d.data()})).filter(v => v.kind === 'task')); };
+  const fail = e => { console.error('watch A·B tasks', e); if (onErr) onErr(e); };
+  // 색인이 없다는 오류가 나면 업무만 고르는 조건을 빼고 받아서 화면에서 거른다.
+  un = base.where('kind', '==', 'task').onSnapshot(take, e => { if (e && e.code === 'failed-precondition' && !dead) un = base.onSnapshot(take, fail); else fail(e); });
+  return () => { dead = true; try { un(); } catch (e) {} };
+ };
  // ===== C ⇄ A·B 연결 업무 맞추기 =====
  // 이현성 화면이 열려 있는 동안(어느 보드든) 돈다. 디자이너는 A·B에, 권중선·정규진은 C 업무에 쓸 수 없어서 양쪽 모두 쓸 수 있는 이현성 쪽에서 맞춘다.
  // 연결: C 업무의 src_id(A·B 원본: C에서 불러왔거나 A·B에서 보낸 · 이은 업무)와 out_links(C에서 보낸 업무). 맞추는 항목: 상태 · 마감 · 시작일 · 중요도 · 세부 업무 · 진행률(양방향).

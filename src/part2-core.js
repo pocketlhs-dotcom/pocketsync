@@ -151,6 +151,11 @@ function personName(value) {
  const aliases = {'현성 이': '이현성', '부대표': '이현성', 'pocket.lhs': '이현성', 'lhs': '이현성', '중선 권': '권중선', '개발이사': '권중선', 'kjs': '권중선', 'jgj': '정규진', '규진 정': '정규진', 'ksy': '강승연', 'aej': '안은지'};
  return aliases[value] || value || '';
 }
+// 디자이너(C 보드만 쓰는 강승연 · 안은지) 화면에서는 A·B 보드와 권중선 · 정규진을 드러내지 않는다(10-16).
+// cOnly: 지금 사람이 C 보드만 쓰는지. cPerson: C 자리(이현성 · 강승연 · 안은지) 사람인지. cSeenName: 디자이너 화면이면 이름 목록('·')에서 C 사람만 남긴다.
+const cOnly = () => { const b = window.PS_BOARDS || []; return b.length > 0 && b.every(x => x === 'C'); };
+const cPerson = n => (window.PS_C_SEATS || []).some(s => s.name === personName(String(n || '').trim()));
+const cSeenName = n => { const v = String(n || ''); if (!v || !cOnly()) return v; return v.split('·').map(t => t.trim()).filter(cPerson).join('·'); };
 const seoulDate = d => new Intl.DateTimeFormat('en-CA', {timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'}).format(d);
 function today() { return seoulDate(new Date()); }
 function offsetDate(date, n) { const d = new Date(date + 'T12:00:00+09:00'); d.setDate(d.getDate() + n); return seoulDate(d); }
