@@ -960,7 +960,7 @@ function WhoAvatars({name}) { const n = personName(name); return n === '함께' 
 
 /* ---------- Inline editing ---------- */
 function AutoText({value, onCommit, class: cls = '', placeholder = '', single = false, disabled = false, maxLength, label, id}) {
- const ref = useRef(null), focused = useRef(false), cancel = useRef(false), origin = useRef(value);
+ const ref = useRef(null), focused = useRef(false), origin = useRef(value);
  const [text, setText] = useState(value);
  useEffect(() => { if (!focused.current) { setText(value); origin.current = value; } }, [value]);
  const fit = useCallback(() => { const el = ref.current; if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }, []);
@@ -968,13 +968,12 @@ function AutoText({value, onCommit, class: cls = '', placeholder = '', single = 
  useEffect(() => { const r = () => fit(); window.addEventListener('resize', r); const t = setTimeout(fit, 60); return () => { window.removeEventListener('resize', r); clearTimeout(t); }; }, [fit]);
  async function commit() {
   focused.current = false;
-  if (cancel.current) { cancel.current = false; setText(origin.current); return; }
   const raw = ref.current ? ref.current.value : text;
   const next = single ? raw.replace(/\s*\n\s*/g, ' ').trim() : raw.replace(/\s+$/, '');
   if (next === origin.current || (single && !next)) { setText(origin.current); return; }
   try { await onCommit(next, origin.current); origin.current = next; } catch {}
  }
- return html`<textarea ref=${ref} id=${id} class=${cls} rows="1" aria-label=${label} placeholder=${placeholder} value=${text} maxLength=${maxLength} disabled=${disabled} onFocus=${() => { focused.current = true; origin.current = value; }} onInput=${e => setText(e.target.value)} onBlur=${commit} onKeyDown=${e => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); cancel.current = true; e.currentTarget.blur(); } else if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229 && (single || e.metaKey || e.ctrlKey)) { e.preventDefault(); e.currentTarget.blur(); } }}></textarea>`;
+ return html`<textarea ref=${ref} id=${id} class=${cls} rows="1" aria-label=${label} placeholder=${placeholder} value=${text} maxLength=${maxLength} disabled=${disabled} onFocus=${() => { focused.current = true; origin.current = value; }} onInput=${e => setText(e.target.value)} onBlur=${commit} onKeyDown=${e => { if (e.key === 'Escape') { if (e.isComposing || e.keyCode === 229) return; e.stopPropagation(); e.preventDefault(); e.currentTarget.blur(); } else if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229 && (single || e.metaKey || e.ctrlKey)) { e.preventDefault(); e.currentTarget.blur(); } }}></textarea>`;
 }
 
 /* Compact link chips: add/remove in place, no nested <form> (works inside other forms). */
