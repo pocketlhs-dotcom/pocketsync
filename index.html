@@ -1861,6 +1861,13 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 .tb-full-left-acts>.tb-pull{margin-left:0}
 .tb-full-left ul{list-style:disc;margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px;font-size:13.5px;color:#33435c}
 .tb-saved{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:600;color:#3f8c66}
+/* 새 업무 NEW(10-30): 업무 리스트 제목 바로 옆 작은 표시(등록 7시간 안). 제목이 길면 제목만 줄이고 NEW는 남긴다. 모바일은 제목 끝에 이어서 */
+.tb-arow-title{display:flex;align-items:center}.tb-arow-title strong{min-width:0}
+.tb-new{flex:none;display:inline-flex;align-items:center;height:16px;margin-left:6px;padding:0 5px;border-radius:3px;background:#3865e8;color:#fff;font-size:10px;font-weight:800;letter-spacing:.04em;line-height:1}
+@media(max-width:640px){.tb-arow-title{display:block}.tb-arow-title strong{display:inline}.tb-new{vertical-align:2px}}
+/* 팀원이 새로 추가한 업무 칩: 좁은 화면에서 칩이 줄 밖으로 밀려 가로 스크롤이 생기던 것 → 칩은 줄여서 말줄임, 모바일은 칩을 다음 줄 전체로 */
+.tb-newadd-chip{min-width:0}
+@media(max-width:640px){.tb-newadd-list{order:2;flex-basis:100%}.tb-newadd>.text-button{margin-left:auto}.tb-newadd-chip{max-width:100%}}
 </style>
 </head><body>
 <div id="app"></div>
@@ -1870,6 +1877,6 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1792564274"></script>
-<script src="app.js?v=1792564274"></script>
+<script src="platform.js?v=1793347747"></script>
+<script src="app.js?v=1793347747"></script>
 </body></html>
