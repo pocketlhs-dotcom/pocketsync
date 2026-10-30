@@ -105,6 +105,15 @@ function boardFields(cur, p, topicId, topics) {
 const doneAt = t => t.done_at || t.updated_at || '';
 const ARCHIVE_DAYS = 7;
 const isArchived = t => t.kind === 'task' && t.status === 'done' && doneAt(t) && (Date.now() - Date.parse(doneAt(t))) > ARCHIVE_DAYS * 864e5;
+// 완료 월별 보기(10-30): 위 '완료' 탭은 이번 달 완료부터 보여 주고, 달 칩으로 지난 달을 고른다. 달 = 완료 시각의 서울 날짜(YYYY-MM).
+const doneMonth = t => inSeoul(doneAt(t)).slice(0, 7);
+const thisMonth = () => today().slice(0, 7);
+const monthLabel = (m, full = false) => { if (!m) return '날짜 없음'; const [y, mo] = m.split('-'); return full || y !== thisMonth().slice(0, 4) ? `${y}년 ${Number(mo)}월` : `${Number(mo)}월`; };
+// 달 칩: 완료가 있는 달 + 이번 달을 최근 달부터(counts = {YYYY-MM: 건수}). 많아지면 옆으로 밀어 본다.
+function DoneMonths({counts, value, onChange}) {
+ const cur = thisMonth(), keys = [...new Set([cur, ...Object.keys(counts)])].sort().reverse();
+ return html`<div class="dv-who dv-months" role="group" aria-label="완료한 달">${keys.map(k => html`<button type="button" key=${k || 'none'} class="chip" aria-pressed=${value === k} title=${k === cur ? '이번 달' : monthLabel(k, true)} onClick=${() => onChange(k)}>${monthLabel(k)}<span>${counts[k] || 0}</span></button>`)}</div>`;
+}
 const ackMode = item => item.kind !== 'daily' || !item.ack ? 'none' : (item.priority === 'share' ? 'share' : item.priority);
 const fromAckMode = mode => mode === 'none' ? {ack: false, priority: 'share'} : {ack: true, priority: mode};
 const toMin = t => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };
@@ -1283,7 +1292,7 @@ function Board() {
    {value: 'work', content: html`<${Fragment}>업무 현황${forMeN > 0 ? html`<span class="tab-count notification" title="나에게 온 업무 요청 · 협업 요청">${forMeN}</span>` : ''}<//>`},
    {value: 'notices', content: html`<${Fragment}>확인 요청 · 이야기${unread.length > 0 ? html`<span class="tab-count notification" title="내가 확인할 요청">${unread.length}</span>` : html`<span class="tab-count" title="확인을 기다리는 요청">${askItems.filter(askWaiting).length}</span>`}<//>`},
    {value: 'due', content: html`<${Fragment}>마감${lateN > 0 ? html`<span class="tab-count notification" title="마감이 지난 업무">${lateN}</span>` : ''}<//>`},
-   {value: 'done', content: html`<${Fragment}>완료<span class="tab-count" title="최근 7일 동안 완료한 업무">${tasks.filter(t => t.status === 'done' && !isArchived(t)).length}</span><//>`},
+   {value: 'done', content: html`<${Fragment}>완료<span class="tab-count" title="이번 달 완료한 업무">${tasks.filter(t => t.status === 'done' && doneMonth(t) === thisMonth()).length}</span><//>`},
    ...(cMirrorOn ? [{value: 'design', content: html`<${Fragment}>디자인팀${cMirror.ready && !cMirror.err ? html`<span class="tab-count" title="디자인팀 남은 업무">${cMirror.items.filter(x => x.kind === 'task' && x.status !== 'done').length}</span>` : ''}<//>`}] : []),
    {value: 'weekly', content: '주간 회의'}
   ]} />${view !== 'design' && html`<button type="button" class="primary-button ab-compose" disabled=${loading || !writable} title="일정 · 전할 말 · 업무를 내용 · 링크와 함께 남기기" onClick=${() => setCompose(view === 'notices' || view === 'weekly' ? {kind: 'daily', ackMode: 'none'} : {kind: 'task', assignee: myName || '함께'})}>${I('Plus', 16)}<span>새로 남기기</span></button>`}</div>
@@ -1723,10 +1732,15 @@ function Checklist({item, editable, busy, onAct, compact = false}) {
 }
 // tools: 머리 오른쪽에 붙일 것(카테고리 고르기).
 function DoneView({tasks, topicName, comments, meName, writable, onOpen, onField, tools = null}) {
- const [who, setWho] = useState('all'), [limit, setLimit] = useState(60);
+ const [who, setWho] = useState('all'), [limit, setLimit] = useState(60), [month, setMonth] = useState(thisMonth);
  const all = tasks.filter(x => x.status === 'done').sort((a, b) => doneAt(b).localeCompare(doneAt(a)));
  const people = [...SEATS.map(s => s.name), '함께'];
- const list = who === 'all' ? all : all.filter(x => personName(x.assignee) === who);
+ // 월별(10-30): 이번 달 완료부터, 달 칩으로 지난 달. 담당 칩 숫자는 고른 달 기준, 달 칩 숫자는 고른 담당 기준.
+ const mine = x => who === 'all' || personName(x.assignee) === who;
+ const counts = {}; for (const x of all) if (mine(x)) { const k = doneMonth(x); counts[k] = (counts[k] || 0) + 1; }
+ const inMonth = all.filter(x => doneMonth(x) === month);
+ const list = inMonth.filter(mine);
+ const late = list.filter(x => x.due && inSeoul(doneAt(x)) > x.due).length;
  const t = today(), y = offsetDate(t, -1), weekAgo = offsetDate(t, -6);
  const dayLabel = d => d === t ? '오늘' : d === y ? '어제' : `${shortDate(d)} (${'일월화수목금토'[new Date(d + 'T12:00:00Z').getUTCDay()]})`;
  const clock = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('ko-KR', {timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false}); };
@@ -1734,8 +1748,10 @@ function DoneView({tasks, topicName, comments, meName, writable, onOpen, onField
  const week = all.filter(x => inSeoul(doneAt(x)) >= weekAgo).length, todayN = all.filter(x => inSeoul(doneAt(x)) === t).length;
  return html`<section class="done-view">
   <div class="dv-head"><div class="dv-stats"><span>오늘 <b>${todayN}</b></span><span>최근 7일 <b>${week}</b></span><span>전체 <b>${all.length}</b></span>${tools && html`<span class="dv-tools">${tools}</span>`}</div>
-   <div class="dv-who" role="group" aria-label="담당 필터">${[['all', '전체'], ...people.map(n => [n, n === meName ? `${n} (나)` : n])].map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${who === v} onClick=${() => { setWho(v); setLimit(60); }}>${l}<span>${v === 'all' ? all.length : all.filter(x => personName(x.assignee) === v).length}</span></button>`)}</div></div>
-  ${!list.length ? html`<p class="dv-empty">아직 완료한 업무가 없어요.</p>` : groups.map(g => html`<div class="pl-group dv-group" key=${g.day}><div class="pl-group-head"><span>${dayLabel(g.day)}</span><small>${g.items.length}건</small></div>${g.items.map(x => { const n = comments.filter(c => c.item_id === x.id).length, desc = String(x.body || '').split('\n').map(l => l.trim()).find(Boolean) || '', who2 = personName(x.assignee); return html`<div class="dv-row" key=${x.id}>
+   <div class="dv-who" role="group" aria-label="담당 필터">${[['all', '전체'], ...people.map(n => [n, n === meName ? `${n} (나)` : n])].map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${who === v} onClick=${() => { setWho(v); setLimit(60); }}>${l}<span>${v === 'all' ? inMonth.length : inMonth.filter(x => personName(x.assignee) === v).length}</span></button>`)}</div></div>
+  <div class="dv-head dv-head-month"><${DoneMonths} counts=${counts} value=${month} onChange=${k => { setMonth(k); setLimit(60); }} /></div>
+  <p class="dv-sum"><strong>${monthLabel(month, true)}</strong><span>${who !== 'all' ? `${who} · ` : ''}완료 <b>${list.length}</b>건</span>${late ? html`<small>늦게 완료 ${late}건</small>` : ''}</p>
+  ${!list.length ? html`<p class="dv-empty">${month === thisMonth() ? '이번 달에 완료한 업무가 아직 없어요.' : `${monthLabel(month, true)}에 완료한 업무가 없어요.`}</p>` : groups.map(g => html`<div class="pl-group dv-group" key=${g.day}><div class="pl-group-head"><span>${dayLabel(g.day)}</span><small>${g.items.length}건</small></div>${g.items.map(x => { const n = comments.filter(c => c.item_id === x.id).length, desc = String(x.body || '').split('\n').map(l => l.trim()).find(Boolean) || '', who2 = personName(x.assignee); return html`<div class="dv-row" key=${x.id}>
     <span class="dv-check">${I('Check', 14)}</span>
     <div class="dv-main"><button type="button" class="dv-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong>${x.due ? html`<span class="pl-date">${shortDate(x.due)} 마감${inSeoul(doneAt(x)) > x.due ? ' · 늦게 완료' : ''}</span>` : ''}</button>${desc && html`<button type="button" class="pl-desc" title=${x.body} onClick=${() => onOpen(x.id)}>${desc}</button>`}
      <span class="pl-tags"><${TopicBadge} name=${topicName(x.topic_id)} /><span class=${cx('tag', who2 === '함께' && 'joint')}>${who2 === '함께' ? SEATS.map(z => z.name).join('·') : who2}</span>${n > 0 && html`<span class="tag">댓글 ${n}</span>`}</span></div>
@@ -2116,7 +2132,7 @@ function TeamBoard() {
    ${myBoards.length > 1 && html`<div class="board-switch" role="group" aria-label="보드 전환">${myBoards.map(b => html`<button type="button" key=${b} class=${cx('board-tab', b === 'C' && 'on')} aria-pressed=${b === 'C'} onClick=${() => { if (b !== 'C' && window.PS_SWITCH_BOARD) window.PS_SWITCH_BOARD(b); }}>${boardLabel(b, boardNames)}</button>`)}</div>`}
    <div class="header-actions"><div class="tb-account"><button type="button" class="header-profile" aria-haspopup="menu" aria-expanded=${menu} onClick=${() => setMenu(v => !v)}><${Av} name=${me.name} /><strong>${me.name || '로그인'}</strong>${I('ChevronDown', 13)}</button>${menu && html`<div class="tb-menu" role="menu"><p>${window.PS_EMAIL || ''}</p><label class="tb-menu-item" role="menuitem">${I('UserRound', 14)}프로필 사진 바꾸기<input type="file" accept="image/*" hidden onChange=${e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) { setMenu(false); setAvatar(f); } }} /></label>${avatars[me.name] && html`<button type="button" role="menuitem" onClick=${() => { setMenu(false); setAvatar(null); }}>${I('X', 14)}사진 지우기</button>`}<button type="button" role="menuitem" onClick=${() => window.PS_SIGNOUT && window.PS_SIGNOUT()}>${I('LogOut', 14)}로그아웃</button></div>`}</div></div></div></header>
   <main class="board-main team-main" id="top">
-   <div class="board-tabs"><${TabsList} class="top-tabs" label="디자인팀 보드 보기" value=${tab} onChange=${v => go(v)} tabs=${Object.entries(TEAM_TABS).map(([k, l]) => ({value: k, content: html`<${Fragment}>${l}${k === 'orders' ? html`<span class="tab-count">${open.length}</span>` : k === 'issues' ? html`<span class=${cx('tab-count', (asksForMe.length + issues.length) && 'notification')} title="나에게 온 확인 요청 + 열린 특이사항">${asksForMe.length + issues.length}</span>` : k === 'report' ? html`<span class="tab-count">${reports.filter(r => r.day === today() && r.lines.length).length}</span>` : k === 'done' ? html`<span class="tab-count" title="최근 7일 동안 완료한 업무">${done.filter(x => !isArchived(x)).length}</span>` : k === 'links' ? html`<span class="tab-count" title="모인 링크 수">${linkPool.length}</span>` : ''}<//>`}))} /></div>
+   <div class="board-tabs"><${TabsList} class="top-tabs" label="디자인팀 보드 보기" value=${tab} onChange=${v => go(v)} tabs=${Object.entries(TEAM_TABS).map(([k, l]) => ({value: k, content: html`<${Fragment}>${l}${k === 'orders' ? html`<span class="tab-count">${open.length}</span>` : k === 'issues' ? html`<span class=${cx('tab-count', (asksForMe.length + issues.length) && 'notification')} title="나에게 온 확인 요청 + 열린 특이사항">${asksForMe.length + issues.length}</span>` : k === 'report' ? html`<span class="tab-count">${reports.filter(r => r.day === today() && r.lines.length).length}</span>` : k === 'done' ? html`<span class="tab-count" title="이번 달 완료한 업무">${done.filter(x => doneMonth(x) === thisMonth()).length}</span>` : k === 'links' ? html`<span class="tab-count" title="모인 링크 수">${linkPool.length}</span>` : ''}<//>`}))} /></div>
    ${loading ? html`<div class="loading">${I('Loader2', 22, {class: 'spin'})}보드를 불러오고 있어요.</div>` : html`<div class="team-body">
     ${tab === 'status' && html`<${TeamStatus} meet=${meet} onMeetAdd=${addMeeting} onMeetRemove=${removeMeeting} onMeetEdit=${editMeeting} stab=${stab} onStab=${pickStab} items=${open} doneItems=${done} kpi=${kpi} issues=${issues} onGo=${go} isAdmin=${isAdmin} onPatch=${patch} onImport=${() => setImportOpen(true)} onCreate=${d => run(() => create(d), '업무를 추가했어요.')} onReorder=${reorder} who=${who} onWho=${setWho} onChecklist=${checklistAct} onAvatar=${setAvatar} onSeen=${isAdmin ? markSeen : null} abTidy=${isAdmin && abRows && db ? html`<${AbTidy} rows=${abRows} db=${db} me=${me} />` : null} ...${common} />`}
     ${tab === 'orders' && html`<${TeamOrders} items=${open} who=${who} onWho=${setWho} isAdmin=${isAdmin} onCreate=${d => run(() => create(d), '오더를 등록했어요.')} onImport=${() => setImportOpen(true)} onPatch=${patch} onChecklist=${checklistAct} ...${common} />`}
@@ -2488,11 +2504,18 @@ function TeamIssues({items, comments, all, cmap, onOpen, onPatch, busy}) {
  </section>`;
 }
 
+// 완료(10-30 월별): 이번 달 완료부터, 달 칩(완료가 있는 달 + 이번 달)으로 지난 달. 담당 칩 숫자는 고른 달 기준, 달 칩 숫자는 고른 담당 기준.
 function TeamDone({items, cmap, onOpen, onPatch, busy}) {
- const [limit, setLimit] = useState(60);
- const list = [...items].sort((a, b) => doneAt(b).localeCompare(doneAt(a)));
+ const [limit, setLimit] = useState(60), [month, setMonth] = useState(thisMonth), [who, setWho] = useState('all');
+ const names = teamNames(), mine = x => who === 'all' || teamHas(x, who);
+ const counts = {}; for (const x of items) if (mine(x)) { const k = doneMonth(x); counts[k] = (counts[k] || 0) + 1; }
+ const inMonth = items.filter(x => doneMonth(x) === month);
+ const list = inMonth.filter(mine).sort((a, b) => doneAt(b).localeCompare(doneAt(a)));
+ const late = list.filter(x => x.due && inSeoul(doneAt(x)) > x.due).length;
  const groups = []; list.slice(0, limit).forEach(x => { const d = inSeoul(doneAt(x)) || '날짜 없음'; const g = groups[groups.length - 1]; if (g && g.day === d) g.items.push(x); else groups.push({day: d, items: [x]}); });
- return html`<section class="done-view">${!list.length && html`<p class="dv-empty">아직 완료한 업무가 없어요.</p>`}${groups.map(g => html`<div class="pl-group dv-group" key=${g.day}><div class="pl-group-head"><span>${teamDay(g.day)}</span><small>${g.items.length}건</small></div>${g.items.map(x => html`<div class="dv-row" key=${x.id}><span class="dv-check">${I('Check', 14)}</span><div class="dv-main"><button type="button" class="dv-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong>${x.due ? html`<span class="pl-date">${shortDate(x.due)} 마감${inSeoul(doneAt(x)) > x.due ? ' · 늦게 완료' : ''}</span>` : ''}</button><span class="pl-tags"><span class="tag">${teamWho(x.assignee)}</span>${x.src_board && !cOnly() && html`<span class="tag tb-src">${x.src_board}${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${cmap[x.id] ? html`<span class="tag">댓글 ${cmap[x.id]}</span>` : ''}</span></div><span class="dv-time">${teamClock(doneAt(x))}</span><button type="button" class="dv-undo" disabled=${busy} onClick=${() => onPatch(x, {status: 'doing'}, '완료 취소')}>되돌리기</button></div>`)}</div>`)}${list.length > limit && html`<button type="button" class="dv-more" onClick=${() => setLimit(l => l + 60)}>이전 완료 더 보기 (${list.length - limit}건)</button>`}</section>`;
+ return html`<section class="done-view"><div class="dv-head"><${DoneMonths} counts=${counts} value=${month} onChange=${k => { setMonth(k); setLimit(60); }} /><div class="dv-who" role="group" aria-label="담당 필터">${[['all', '전체'], ...names.map(n => [n, n])].map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${who === v} onClick=${() => { setWho(v); setLimit(60); }}>${l}<span>${v === 'all' ? inMonth.length : inMonth.filter(x => teamHas(x, v)).length}</span></button>`)}</div></div>
+  <p class="dv-sum"><strong>${monthLabel(month, true)}</strong><span>${who !== 'all' ? `${who} · ` : ''}완료 <b>${list.length}</b>건</span>${late ? html`<small>늦게 완료 ${late}건</small>` : ''}</p>
+  ${!list.length && html`<p class="dv-empty">${month === thisMonth() ? '이번 달에 완료한 업무가 아직 없어요.' : `${monthLabel(month, true)}에 완료한 업무가 없어요.`}</p>`}${groups.map(g => html`<div class="pl-group dv-group" key=${g.day}><div class="pl-group-head"><span>${teamDay(g.day)}</span><small>${g.items.length}건</small></div>${g.items.map(x => html`<div class="dv-row" key=${x.id}><span class="dv-check">${I('Check', 14)}</span><div class="dv-main"><button type="button" class="dv-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong>${x.due ? html`<span class="pl-date">${shortDate(x.due)} 마감${inSeoul(doneAt(x)) > x.due ? ' · 늦게 완료' : ''}</span>` : ''}</button><span class="pl-tags"><span class="tag">${teamWho(x.assignee)}</span>${x.src_board && !cOnly() && html`<span class="tag tb-src">${x.src_board}${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${cmap[x.id] ? html`<span class="tag">댓글 ${cmap[x.id]}</span>` : ''}</span></div><span class="dv-time">${teamClock(doneAt(x))}</span><button type="button" class="dv-undo" disabled=${busy} onClick=${() => onPatch(x, {status: 'doing'}, '완료 취소')}>되돌리기</button></div>`)}</div>`)}${list.length > limit && html`<button type="button" class="dv-more" onClick=${() => setLimit(l => l + 60)}>이전 완료 더 보기 (${list.length - limit}건)</button>`}</section>`;
 }
 
 function TeamDetail({focus = null, handoffFrom = null, item: x, comments, me, isAdmin, busy, onClose, onPatch, onChecklist, onComment, onEditComment, onDeleteComment, onMark, onRemove, onAddLink, onRemoveLink, onRefreshSource, onSendTo, onUnlink}) {

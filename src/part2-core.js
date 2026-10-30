@@ -104,6 +104,15 @@ function boardFields(cur, p, topicId, topics) {
 const doneAt = t => t.done_at || t.updated_at || '';
 const ARCHIVE_DAYS = 7;
 const isArchived = t => t.kind === 'task' && t.status === 'done' && doneAt(t) && (Date.now() - Date.parse(doneAt(t))) > ARCHIVE_DAYS * 864e5;
+// 완료 월별 보기(10-30): 위 '완료' 탭은 이번 달 완료부터 보여 주고, 달 칩으로 지난 달을 고른다. 달 = 완료 시각의 서울 날짜(YYYY-MM).
+const doneMonth = t => inSeoul(doneAt(t)).slice(0, 7);
+const thisMonth = () => today().slice(0, 7);
+const monthLabel = (m, full = false) => { if (!m) return '날짜 없음'; const [y, mo] = m.split('-'); return full || y !== thisMonth().slice(0, 4) ? `${y}년 ${Number(mo)}월` : `${Number(mo)}월`; };
+// 달 칩: 완료가 있는 달 + 이번 달을 최근 달부터(counts = {YYYY-MM: 건수}). 많아지면 옆으로 밀어 본다.
+function DoneMonths({counts, value, onChange}) {
+ const cur = thisMonth(), keys = [...new Set([cur, ...Object.keys(counts)])].sort().reverse();
+ return html`<div class="dv-who dv-months" role="group" aria-label="완료한 달">${keys.map(k => html`<button type="button" key=${k || 'none'} class="chip" aria-pressed=${value === k} title=${k === cur ? '이번 달' : monthLabel(k, true)} onClick=${() => onChange(k)}>${monthLabel(k)}<span>${counts[k] || 0}</span></button>`)}</div>`;
+}
 const ackMode = item => item.kind !== 'daily' || !item.ack ? 'none' : (item.priority === 'share' ? 'share' : item.priority);
 const fromAckMode = mode => mode === 'none' ? {ack: false, priority: 'share'} : {ack: true, priority: mode};
 const toMin = t => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };

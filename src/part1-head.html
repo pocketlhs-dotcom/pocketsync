@@ -1867,4 +1867,10 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 /* 팀원이 새로 추가한 업무 칩: 좁은 화면에서 칩이 줄 밖으로 밀려 가로 스크롤이 생기던 것 → 칩은 줄여서 말줄임, 모바일은 칩을 다음 줄 전체로 */
 .tb-newadd-chip{min-width:0}
 @media(max-width:640px){.tb-newadd-list{order:2;flex-basis:100%}.tb-newadd>.text-button{margin-left:auto}.tb-newadd-chip{max-width:100%}}
+/* 완료 월별(10-30): 달 칩(한 줄, 많으면 옆으로 밀기) · 고른 달 요약 줄 */
+.dv-months{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;min-width:0;max-width:100%}.dv-months::-webkit-scrollbar{display:none}.dv-months>.chip{flex:none}
+.dv-sum{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 6px;margin:0;font-size:14px;font-weight:600;color:#8f95ab}
+.dv-sum>strong{font-size:17px;font-weight:700;color:#0b1c5c;letter-spacing:-.4px}
+.dv-sum b{color:#0b1c5c;font-size:15px}
+.dv-sum>small{margin-left:4px;padding:2px 7px;border-radius:3px;background:#fff3ef;color:#d1603f;font-size:12px;font-weight:600}
 </style>
