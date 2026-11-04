@@ -1875,4 +1875,13 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 .dv-sum>small{margin-left:4px;padding:2px 7px;border-radius:3px;background:#fff3ef;color:#d1603f;font-size:12px;font-weight:600}
 /* 직책 표시(11-03): 사람 카드 · 업무보고 카드 이름 옆 */
 .tb-role{display:inline-flex;align-items:center;height:18px;margin-left:6px;padding:0 6px;border-radius:3px;background:#eef2ff;color:#3a5bd9;font-size:11px;font-weight:700;letter-spacing:0;vertical-align:2px;line-height:1}
+/* 사람 카드 업무(11-04): 제목이 길면 제목만 말줄임(함께 칩은 그대로), 마감 지난 업무는 붉게 */
+.tb-mini-main strong>.tb-mini-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb-mini.late{background:#fff4f1;border-color:#ffd4ca;box-shadow:inset 3px 0 0 #f0573a;opacity:1}
+.tb-mini.late:hover{background:#ffebe5;border-color:#ffbfb0}
+.tb-mini.late>.dday.late{background:#ffe0d8;color:#d22f22}
+.tb-mini.late .tb-mini-main strong{color:#8f1d14}
+.tb-mini.late .tb-mini-main small{color:#d0756a}
+.tb-mini.late .tb-prog b{background:#f0573a}
+.tb-row.late{background:#fff8f6;box-shadow:inset 3px 0 0 #f0573a}.tb-row.late:hover{background:#fff2ee}.tb-row.late .pl-title>strong{color:#8f1d14}
 </style>

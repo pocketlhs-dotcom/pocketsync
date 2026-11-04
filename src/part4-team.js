@@ -338,9 +338,9 @@ function TeamDuePick({x, busy, onPatch}) {
 }
 function TeamMini({x, cmap, onOpen, showWho = true, extra, self = ''}) {
  const d = dDay(x.due), co = self ? teamList(x.assignee).filter(n => n !== self) : [];
- return html`<button type="button" class=${cx('tb-mini', x.status === 'doing' && 'doing', x.issue && 'has-issue')} onClick=${() => onOpen(x.id)}>
+ return html`<button type="button" class=${cx('tb-mini', x.status === 'doing' && 'doing', x.issue && 'has-issue', teamLate(x) && 'late')} title=${teamLate(x) ? `마감 ${shortDate(x.due)} 지남` : undefined} onClick=${() => onOpen(x.id)}>
   <span class=${cx('dday', d.cls)}>${d.label}</span>
-  <span class="tb-mini-main"><strong>${x.title}${co.length > 0 && html`<span class="tb-co" title=${`함께: ${co.join(', ')}`}>${I('Users', 12)}${co.map(n => html`<i key=${n}>${n.slice(0, 1)}</i>`)}</span>`}</strong><small>${[showWho && teamWho(x.assignee), teamStartLabel(x) || statuses[x.status], x.checklist.length ? `세부 ${checkStat(x).done}/${x.checklist.length}` : '', cmap[x.id] ? `댓글 ${cmap[x.id]}` : ''].filter(Boolean).join(' · ')}</small></span>
+  <span class="tb-mini-main"><strong><span class="tb-mini-t">${x.title}</span>${co.length > 0 && html`<span class="tb-co" title=${`함께: ${co.join(', ')}`}>${I('Users', 12)}${co.map(n => html`<i key=${n}>${n.slice(0, 1)}</i>`)}</span>`}</strong><small>${[showWho && teamWho(x.assignee), teamStartLabel(x) || statuses[x.status], x.checklist.length ? `세부 ${checkStat(x).done}/${x.checklist.length}` : '', cmap[x.id] ? `댓글 ${cmap[x.id]}` : ''].filter(Boolean).join(' · ')}</small></span>
   ${x.issue && html`<span class=${'tb-issue ' + x.issue}>${I('AlertCircle', 12)}${TEAM_ISSUES[x.issue]}</span>`}
   ${extra}
   <span class="tb-prog"><i><b style=${`width:${x.progress || 0}%`}></b></i><em>${x.progress || 0}%</em></span>
@@ -626,7 +626,7 @@ function TeamOrders({items, who, onWho, isAdmin, cmap, onOpen, onCreate, onImpor
     <div class="chip-group" role="group" aria-label="중요도"><span>중요도</span>${Object.entries(taskPriorities).map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${priority === v} onClick=${() => setPriority(v)}>${l}</button>`)}</div>
    </div></form>
   <div class="tb-bar"><div class="dv-who" role="group" aria-label="담당 필터">${filters.map(([v, l, n]) => html`<button type="button" key=${v} class="chip" aria-pressed=${who === v} onClick=${() => onWho(v)}>${l}<span>${n}</span></button>`)}</div>${isAdmin && html`<button type="button" class="tb-import-btn" onClick=${onImport}>${I('Download', 15)}A 보드에서 불러오기</button>`}</div>
-  <div class="pl-group tb-list">${!list.length ? html`<p class="tb-none pad">${who === 'all' ? (isAdmin ? '아직 오더가 없어요. 위에서 적거나 A 보드에서 불러와 주세요.' : '아직 오더가 없어요. 위에서 적어 주세요.') : '해당하는 업무가 없어요.'}</p>` : list.map(x => { const d = dDay(x.due), st = checkStat(x); return html`<div class=${cx('tb-row', x.issue && 'has-issue', x.priority !== 'share' && 'prio-' + x.priority)} key=${x.id}>
+  <div class="pl-group tb-list">${!list.length ? html`<p class="tb-none pad">${who === 'all' ? (isAdmin ? '아직 오더가 없어요. 위에서 적거나 A 보드에서 불러와 주세요.' : '아직 오더가 없어요. 위에서 적어 주세요.') : '해당하는 업무가 없어요.'}</p>` : list.map(x => { const d = dDay(x.due), st = checkStat(x); return html`<div class=${cx('tb-row', x.issue && 'has-issue', x.priority !== 'share' && 'prio-' + x.priority, teamLate(x) && 'late')} key=${x.id}>
    <${TeamDuePick} x=${x} busy=${busy} onPatch=${onPatch} />
    <div class="tb-row-main"><button type="button" class="pl-title" onClick=${() => onOpen(x.id)}><strong>${isAdmin && teamIsNew(x) ? html`<i class="fresh-dot" title=${`${x.author_name}님이 새로 추가`}></i>` : ''}${x.title}</strong>${x.due ? html`<span class="pl-date">${shortDate(x.due)} 마감</span>` : ''}</button>${descLine(x) && html`<button type="button" class="pl-desc" onClick=${() => onOpen(x.id)}>${descLine(x)}</button>`}
     <span class="pl-tags">${teamByMember(x) && html`<span class="tag tb-by">${x.author_name} 추가</span>`}${teamStartLabel(x) && html`<span class=${cx('tag tb-start', x.start_on < today() && 'late')}>${I('CalendarDays', 12)}${teamStartLabel(x)}</span>`}${x.src_board && !cOnly() && html`<span class="tag tb-src" title=${`${x.src_board} 보드 원본: ${x.src_title}`}>${I('Link2', 12)}${x.src_board}${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${x.issue && html`<span class=${'tag tb-issue ' + x.issue}>${I('AlertCircle', 12)}${TEAM_ISSUES[x.issue]}</span>`}<button type="button" class=${cx('tag tb-check-chip', checksOpen[x.id] && 'on', !st.total && 'empty')} aria-expanded=${!!checksOpen[x.id]} onClick=${() => setChecksOpen(o => ({...o, [x.id]: !o[x.id]}))}>${I('ListChecks', 12)}${st.total ? `세부 ${st.done}/${st.total}` : '세부 업무'}${I(checksOpen[x.id] ? 'ChevronUp' : 'ChevronDown', 12)}</button><button type="button" class=${cx('reply-chip', cmap[x.id] && 'has')} onClick=${() => onOpen(x.id)}>${I('MessageCircle', 12)}${cmap[x.id] ? `댓글 ${cmap[x.id]}` : '댓글'}</button></span></div>
@@ -1283,6 +1283,7 @@ const cWho = a => { const l = cList(a); return !l.length ? '미배정' : l.lengt
 const C_ST = {todo: '예정', doing: '진행 중', hold: '보류', done: '완료'};
 const dmPref = (k, ok, def) => { try { const v = localStorage.getItem(k); return ok.includes(v) ? v : def; } catch { return def; } };
 const dmKeep = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+let dmNavDone = 0;
 function DesignMirror({data, me, db, writable, nav = null}) {
  const [sub, setSubS] = useState(() => dmPref('ps.dmSub', ['status', 'report', 'links'], 'status'));
  const [view, setViewS] = useState(() => dmPref('ps.dmView', ['list', 'timeline'], 'list'));
@@ -1291,7 +1292,8 @@ function DesignMirror({data, me, db, writable, nav = null}) {
  const setSub = v => { setSubS(v); dmKeep('ps.dmSub', v); if (v !== 'report') setRepDay(''); setRepFocus(null); }, setView = v => { setViewS(v); dmKeep('ps.dmView', v); }, setStab = v => { setStabS(v); dmKeep('ps.dmStab', v); };
  const [who, setWho] = useState('all'), [sel, setSel] = useState(null), [busy, setBusy] = useState(false), [checksOpen, setChecksOpen] = useState({}), [doneMore, setDoneMore] = useState(30);
  // 업무 현황 이현성 카드의 '디자인팀 보드' 칸에서 눌러 들어오면 그 보기 · 업무 · 날짜로(10-16).
- useEffect(() => { if (!nav) return; if (nav.sub) setSub(nav.sub); if (nav.sub === 'report') setRepDay(nav.day || ''); if (nav.id) setSel(nav.id); }, [nav ? nav.n : 0]);
+ // 한 번 적용한 이동(nav.n)은 다시 적용하지 않는다(11-04: 다른 탭에 갔다가 디자인팀 탭을 다시 열면 같은 업무가 또 열리던 것).
+ useEffect(() => { if (!nav || nav.n <= dmNavDone) return; dmNavDone = nav.n; if (nav.sub) setSub(nav.sub); if (nav.sub === 'report') setRepDay(nav.day || ''); if (nav.id) setSel(nav.id); }, [nav ? nav.n : 0]);
  const can = !!(writable && db);
  const all = data.items.filter(x => x.kind === 'task').map(normTeam);
  const open = all.filter(x => x.status !== 'done');
@@ -1324,7 +1326,7 @@ function DesignMirror({data, me, db, writable, nav = null}) {
   <div class="dm-who">${ppl.length ? ppl.map(n => html`<span class="dm-person" key=${n}><${Av} name=${n} mini=${true} />${n}</span>`) : html`<span class="dm-none">미배정</span>`}</div>
   ${checksOpen[x.id] && st.total > 0 && html`<div class="tb-arow-checks"><${Checklist} item=${x} editable=${false} busy=${false} onAct=${() => {}} compact=${true} /></div>`}
  </div>`; };
- const mini = (x, self) => { const d = dDay(x.due), co = cList(x.assignee).filter(n => n !== self); return html`<button type="button" key=${x.id} class=${cx('tb-mini', x.status === 'doing' && 'doing', x.issue && 'has-issue')} onClick=${() => setSel(x.id)}><span class=${cx('dday', d.cls)}>${d.label}</span><span class="tb-mini-main"><strong>${x.title}${co.length > 0 && html`<span class="tb-co" title=${`함께: ${co.join(', ')}`}>${I('Users', 12)}${co.map(n => html`<i key=${n}>${n.slice(0, 1)}</i>`)}</span>`}</strong><small>${[teamStartLabel(x) || C_ST[x.status], x.checklist.length ? `세부 ${checkStat(x).done}/${x.checklist.length}` : '', cmap[x.id] ? `댓글 ${cmap[x.id]}` : ''].filter(Boolean).join(' · ')}</small></span>${x.issue && html`<span class=${'tb-issue ' + x.issue}>${I('AlertCircle', 12)}${TEAM_ISSUES[x.issue]}</span>`}<span class="tb-prog"><i><b style=${`width:${x.progress || 0}%`}></b></i><em>${x.progress || 0}%</em></span></button>`; };
+ const mini = (x, self) => { const d = dDay(x.due), co = cList(x.assignee).filter(n => n !== self); return html`<button type="button" key=${x.id} class=${cx('tb-mini', x.status === 'doing' && 'doing', x.issue && 'has-issue', teamLate(x) && 'late')} title=${teamLate(x) ? `마감 ${shortDate(x.due)} 지남` : undefined} onClick=${() => setSel(x.id)}><span class=${cx('dday', d.cls)}>${d.label}</span><span class="tb-mini-main"><strong><span class="tb-mini-t">${x.title}</span>${co.length > 0 && html`<span class="tb-co" title=${`함께: ${co.join(', ')}`}>${I('Users', 12)}${co.map(n => html`<i key=${n}>${n.slice(0, 1)}</i>`)}</span>`}</strong><small>${[teamStartLabel(x) || C_ST[x.status], x.checklist.length ? `세부 ${checkStat(x).done}/${x.checklist.length}` : '', cmap[x.id] ? `댓글 ${cmap[x.id]}` : ''].filter(Boolean).join(' · ')}</small></span>${x.issue && html`<span class=${'tb-issue ' + x.issue}>${I('AlertCircle', 12)}${TEAM_ISSUES[x.issue]}</span>`}<span class="tb-prog"><i><b style=${`width:${x.progress || 0}%`}></b></i><em>${x.progress || 0}%</em></span></button>`; };
  const people = names.map(n => ({name: n, list: open.filter(x => cList(x.assignee).includes(n))}));
  const selItem = sel && all.find(t => t.id === sel);
  const issues = open.filter(x => x.issue);

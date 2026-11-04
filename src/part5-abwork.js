@@ -12,9 +12,9 @@ const abLane = n => (abNames().indexOf(n) === 0 ? 'lhs' : 'kjs');
 // 사람 카드 · 마감 탭의 작은 줄(C의 TeamMini와 같은 모양, A·B 담당 표시).
 function AbMini({x, cmap = {}, onOpen, showWho = true, extra, self = ''}) {
  const d = dDay(x.due), w = abWho(x), co = self && w === '함께' ? abNames().filter(n => n !== self) : [];
- return html`<button type="button" class=${cx('tb-mini', x.status === 'doing' && 'doing')} onClick=${() => onOpen(x.id)}>
+ return html`<button type="button" class=${cx('tb-mini', x.status === 'doing' && 'doing', teamLate(x) && 'late')} title=${teamLate(x) ? `마감 ${shortDate(x.due)} 지남` : undefined} onClick=${() => onOpen(x.id)}>
   <span class=${cx('dday', x.status === 'done' ? 'none' : d.cls)}>${x.status === 'done' ? '완료' : d.label}</span>
-  <span class="tb-mini-main"><strong>${x.title}${co.length > 0 && html`<span class="tb-co" title=${`함께: ${co.join(', ')}`}>${I('Users', 12)}${co.map(n => html`<i key=${n}>${n.slice(0, 1)}</i>`)}</span>`}</strong><small>${[showWho && w, teamStartLabel(x) || statuses[x.status], x.checklist.length ? `세부 ${checkStat(x).done}/${x.checklist.length}` : '', cmap[x.id] ? `댓글 ${cmap[x.id]}` : ''].filter(Boolean).join(' · ')}</small></span>
+  <span class="tb-mini-main"><strong><span class="tb-mini-t">${x.title}</span>${co.length > 0 && html`<span class="tb-co" title=${`함께: ${co.join(', ')}`}>${I('Users', 12)}${co.map(n => html`<i key=${n}>${n.slice(0, 1)}</i>`)}</span>`}</strong><small>${[showWho && w, teamStartLabel(x) || statuses[x.status], x.checklist.length ? `세부 ${checkStat(x).done}/${x.checklist.length}` : '', cmap[x.id] ? `댓글 ${cmap[x.id]}` : ''].filter(Boolean).join(' · ')}</small></span>
   <span class="ab-mini-side">${x.priority !== 'share' && html`<span class=${'tag priority-tag ' + x.priority}>${taskPriorities[x.priority]}</span>`}${extra}</span>
   <span class="tb-prog"><i><b style=${`width:${x.progress || 0}%`}></b></i><em>${x.progress || 0}%</em></span>
  </button>`;
