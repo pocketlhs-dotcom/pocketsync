@@ -108,10 +108,10 @@ const isArchived = t => t.kind === 'task' && t.status === 'done' && doneAt(t) &&
 const doneMonth = t => inSeoul(doneAt(t)).slice(0, 7);
 const thisMonth = () => today().slice(0, 7);
 const monthLabel = (m, full = false) => { if (!m) return '날짜 없음'; const [y, mo] = m.split('-'); return full || y !== thisMonth().slice(0, 4) ? `${y}년 ${Number(mo)}월` : `${Number(mo)}월`; };
-// 달 칩: 완료가 있는 달 + 이번 달을 최근 달부터(counts = {YYYY-MM: 건수}). 많아지면 옆으로 밀어 본다.
+// 달 칩: 맨 앞 '전체'(11-04) + 완료가 있는 달 + 이번 달을 최근 달부터(counts = {YYYY-MM: 건수}). 많아지면 옆으로 밀어 본다. value 'all' = 모든 달.
 function DoneMonths({counts, value, onChange}) {
- const cur = thisMonth(), keys = [...new Set([cur, ...Object.keys(counts)])].sort().reverse();
- return html`<div class="dv-who dv-months" role="group" aria-label="완료한 달">${keys.map(k => html`<button type="button" key=${k || 'none'} class="chip" aria-pressed=${value === k} title=${k === cur ? '이번 달' : monthLabel(k, true)} onClick=${() => onChange(k)}>${monthLabel(k)}<span>${counts[k] || 0}</span></button>`)}</div>`;
+ const cur = thisMonth(), keys = [...new Set([cur, ...Object.keys(counts)])].sort().reverse(), total = Object.values(counts).reduce((a, b) => a + b, 0);
+ return html`<div class="dv-who dv-months" role="group" aria-label="완료한 달"><button type="button" key="all" class="chip" aria-pressed=${value === 'all'} title="모든 달 완료" onClick=${() => onChange('all')}>전체<span>${total}</span></button>${keys.map(k => html`<button type="button" key=${k || 'none'} class="chip" aria-pressed=${value === k} title=${k === cur ? '이번 달' : monthLabel(k, true)} onClick=${() => onChange(k)}>${monthLabel(k)}<span>${counts[k] || 0}</span></button>`)}</div>`;
 }
 const ackMode = item => item.kind !== 'daily' || !item.ack ? 'none' : (item.priority === 'share' ? 'share' : item.priority);
 const fromAckMode = mode => mode === 'none' ? {ack: false, priority: 'share'} : {ack: true, priority: mode};

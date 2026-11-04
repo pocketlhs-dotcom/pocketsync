@@ -1899,6 +1899,37 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 .tl-ext.hold{border-color:#c3c9d4;background:#f6f7f9}
 /* 사람 카드 · 마감 탭 업무 줄(11-04 고침): 특이사항 태그 + 날짜 + 진행률처럼 칸이 늘어도 한 줄에(전엔 진행률이 다음 줄로 내려가 D-day가 늘어남) */
 .tb-mini{grid-auto-flow:column;grid-auto-columns:auto}.tb-mini>.dday{justify-self:start}
+/* '지연중' 태그(11-04): NEW처럼 제목 바로 옆 작은 빨간 표시 */
+.tb-late-tag{flex:none;display:inline-flex;align-items:center;height:16px;margin-left:6px;padding:0 5px;border-radius:3px;background:#f0573a;color:#fff;font-size:10px;font-weight:800;letter-spacing:0;line-height:1;white-space:nowrap}
+.tb-mini-main strong>.tb-late-tag{margin-left:0}
+.pl-title>.tb-late-tag{margin-left:0;align-self:center}
+@media(max-width:640px){.tb-late-tag{vertical-align:2px}}
+/* 완료 탭 '월별 KPI'(11-04, 이현성만) */
+.dv-left{display:flex;align-items:center;gap:10px;min-width:0;max-width:100%}
+.dv-kpi-tag{flex:none;display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 11px;border-radius:3px;border:1px solid #c9d3f5;background:#f3f6ff;color:#2f4fc4;font-size:13px;font-weight:700;letter-spacing:-.3px}
+.dv-kpi-tag:hover{border-color:#95a8eb}
+.dv-kpi-tag.on{background:#315df8;border-color:#315df8;color:#fff}
+.kpi{display:flex;flex-direction:column;gap:10px}
+.kpi-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.kpi-head>strong{font-size:17px;font-weight:700;color:#0b1c5c}
+.kpi-head>small{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#8f95ab}
+.kpi-head>.kpi-back{margin-left:auto}
+.kpi-scroll{overflow-x:auto;border:1px solid #e5e8f5;border-radius:7px;background:#fff}
+.kpi-table{width:100%;border-collapse:collapse;min-width:520px}
+.kpi-table th,.kpi-table td{padding:11px 14px;border-top:1px solid #eef0f7;text-align:left;vertical-align:middle;white-space:nowrap}
+.kpi-table thead th{border-top:0;background:#f7f8fc;font-size:12.5px;font-weight:700;color:#6b7590}
+.kpi-table tbody th{font-size:14px;font-weight:700;color:#141a2e}
+.kpi-table td>b{display:block;font-size:18px;font-weight:800;color:#0b1c5c;line-height:1.2}
+.kpi-rate{display:inline-flex;align-items:baseline;gap:4px;font-size:12px;font-weight:600;color:#5b6fa8}
+.kpi-rate>em{font-style:normal;font-weight:500;color:#a0a6b8}
+.kpi-rate.full{color:#3f8c66}
+.kpi-rate.none{color:#b4b9c6;font-weight:500}
+.kpi-all{background:#fafbff}.kpi-all th{color:#315df8!important}
+.kpi-cur th .kpi-month{color:#315df8}
+.kpi-month{display:inline-flex;align-items:center;gap:2px;font:inherit;color:inherit;font-weight:700}
+.kpi-month:hover{color:#315df8;text-decoration:underline}
+.kpi-note{margin:0;font-size:12px;color:#a0a6b8}
+@media(max-width:640px){.dv-left{flex-wrap:wrap}.kpi-table th,.kpi-table td{padding:9px 10px}}
 </style>
 </head><body>
 <div id="app"></div>
@@ -1908,6 +1939,6 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1793756025"></script>
-<script src="app.js?v=1793756025"></script>
+<script src="platform.js?v=1793760306"></script>
+<script src="app.js?v=1793760306"></script>
 </body></html>

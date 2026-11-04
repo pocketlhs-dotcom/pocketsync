@@ -1309,7 +1309,7 @@ function DoneView({tasks, topicName, comments, meName, writable, onOpen, onField
  // 월별(10-30): 이번 달 완료부터, 달 칩으로 지난 달. 담당 칩 숫자는 고른 달 기준, 달 칩 숫자는 고른 담당 기준.
  const mine = x => who === 'all' || personName(x.assignee) === who;
  const counts = {}; for (const x of all) if (mine(x)) { const k = doneMonth(x); counts[k] = (counts[k] || 0) + 1; }
- const inMonth = all.filter(x => doneMonth(x) === month);
+ const inMonth = month === 'all' ? all : all.filter(x => doneMonth(x) === month), mLabel = month === 'all' ? '전체 기간' : monthLabel(month, true);
  const list = inMonth.filter(mine);
  const late = list.filter(x => x.due && inSeoul(doneAt(x)) > x.due).length;
  const t = today(), y = offsetDate(t, -1), weekAgo = offsetDate(t, -6);
@@ -1321,8 +1321,8 @@ function DoneView({tasks, topicName, comments, meName, writable, onOpen, onField
   <div class="dv-head"><div class="dv-stats"><span>오늘 <b>${todayN}</b></span><span>최근 7일 <b>${week}</b></span><span>전체 <b>${all.length}</b></span>${tools && html`<span class="dv-tools">${tools}</span>`}</div>
    <div class="dv-who" role="group" aria-label="담당 필터">${[['all', '전체'], ...people.map(n => [n, n === meName ? `${n} (나)` : n])].map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${who === v} onClick=${() => { setWho(v); setLimit(60); }}>${l}<span>${v === 'all' ? inMonth.length : inMonth.filter(x => personName(x.assignee) === v).length}</span></button>`)}</div></div>
   <div class="dv-head dv-head-month"><${DoneMonths} counts=${counts} value=${month} onChange=${k => { setMonth(k); setLimit(60); }} /></div>
-  <p class="dv-sum"><strong>${monthLabel(month, true)}</strong><span>${who !== 'all' ? `${who} · ` : ''}완료 <b>${list.length}</b>건</span>${late ? html`<small>늦게 완료 ${late}건</small>` : ''}</p>
-  ${!list.length ? html`<p class="dv-empty">${month === thisMonth() ? '이번 달에 완료한 업무가 아직 없어요.' : `${monthLabel(month, true)}에 완료한 업무가 없어요.`}</p>` : groups.map(g => html`<div class="pl-group dv-group" key=${g.day}><div class="pl-group-head"><span>${dayLabel(g.day)}</span><small>${g.items.length}건</small></div>${g.items.map(x => { const n = comments.filter(c => c.item_id === x.id).length, desc = String(x.body || '').split('\n').map(l => l.trim()).find(Boolean) || '', who2 = personName(x.assignee); return html`<div class="dv-row" key=${x.id}>
+  <p class="dv-sum"><strong>${mLabel}</strong><span>${who !== 'all' ? `${who} · ` : ''}완료 <b>${list.length}</b>건</span>${late ? html`<small>늦게 완료 ${late}건</small>` : ''}</p>
+  ${!list.length ? html`<p class="dv-empty">${month === 'all' ? '아직 완료한 업무가 없어요.' : month === thisMonth() ? '이번 달에 완료한 업무가 아직 없어요.' : `${mLabel}에 완료한 업무가 없어요.`}</p>` : groups.map(g => html`<div class="pl-group dv-group" key=${g.day}><div class="pl-group-head"><span>${dayLabel(g.day)}</span><small>${g.items.length}건</small></div>${g.items.map(x => { const n = comments.filter(c => c.item_id === x.id).length, desc = String(x.body || '').split('\n').map(l => l.trim()).find(Boolean) || '', who2 = personName(x.assignee); return html`<div class="dv-row" key=${x.id}>
     <span class="dv-check">${I('Check', 14)}</span>
     <div class="dv-main"><button type="button" class="dv-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong>${x.due ? html`<span class="pl-date">${shortDate(x.due)} 마감${inSeoul(doneAt(x)) > x.due ? ' · 늦게 완료' : ''}</span>` : ''}</button>${desc && html`<button type="button" class="pl-desc" title=${x.body} onClick=${() => onOpen(x.id)}>${desc}</button>`}
      <span class="pl-tags"><${TopicBadge} name=${topicName(x.topic_id)} /><span class=${cx('tag', who2 === '함께' && 'joint')}>${who2 === '함께' ? SEATS.map(z => z.name).join('·') : who2}</span>${n > 0 && html`<span class="tag">댓글 ${n}</span>`}</span></div>
