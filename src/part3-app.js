@@ -426,7 +426,7 @@ function Board() {
   const mineEv = items.filter(e => e.kind === 'event' && e.day === day && involves(e, name)), allDay = mineEv.some(e => !e.start);
   const busyMin = allDay ? WORK_END - WORK_START : mergeSpans(mineEv.filter(e => e.start).map(e => { const [a, b] = eventSpan(e); return [Math.max(a, WORK_START), Math.min(b, WORK_END)]; })).reduce((t, [a, b]) => t + b - a, 0);
   const open = tasks.filter(t => t.status !== 'done' && personName(t.assignee) === name), joint = tasks.filter(t => t.status !== 'done' && personName(t.assignee) === '함께');
-  return {events: mineEv.length, allDay, busyMin, open: open.length, joint: joint.length, dueToday: open.filter(t => t.due === day).length + joint.filter(t => t.due === day).length, overdue: open.filter(t => t.due && t.due < day).length};
+  return {events: mineEv.length, allDay, busyMin, open: open.length, joint: joint.length, dueToday: open.filter(t => t.due === day).length + joint.filter(t => t.due === day).length, overdue: open.filter(t => t.due && t.due < day && t.status !== 'hold').length};
  };
  const myFacts = myName ? factsFor(myName, today()) : null;
  const myCheckin = me.id ? checkins.find(c => c.seat === me.id && c.day === today()) : null;

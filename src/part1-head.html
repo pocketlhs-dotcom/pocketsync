@@ -1884,4 +1884,18 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 .tb-mini.late .tb-mini-main small{color:#d0756a}
 .tb-mini.late .tb-prog b{background:#f0573a}
 .tb-row.late{background:#fff8f6;box-shadow:inset 3px 0 0 #f0573a}.tb-row.late:hover{background:#fff2ee}.tb-row.late .pl-title>strong{color:#8f1d14}
+/* 보류(11-04, 사용자 '보류는 회색 모노톤, 일정 지연만 빨강'): 마감이 지났어도 보류는 회색. 상태 배지 · 태그 · 점도 회색으로 */
+.dday.hold{background:#eef0f4;color:#8a90a2}
+.tb-mini.hold{background:#f5f6f8;border-color:transparent}.tb-mini.hold:hover{background:#eef0f3;border-color:#e2e5eb}
+.tb-mini.hold .tb-mini-main strong{color:#6b7182}.tb-mini.hold .tb-mini-main small{color:#a5aab6}
+.tb-mini.hold .tb-prog b{background:#b4bac6}.tb-mini.hold .tb-prog em{color:#7d8394}
+.tb-mini.hold .tb-co{background:#eceef2;color:#7d8394}.tb-mini.hold .tb-co i{color:#7d8394}
+.tb-row.hold{background:#f8f9fa}.tb-row.hold .pl-title>strong{color:#6b7182}
+.tb-arow.st-hold .tb-arow-title strong{color:#6b7182}
+.tb-stbadge.st-hold{background:#eef0f4;color:#6b7182}
+.tag.hold{background:#eef0f4;color:#6b7182}
+.st-hold i{background:#a5abb8!important}
+.tl-ext.hold{border-color:#c3c9d4;background:#f6f7f9}
+/* 사람 카드 · 마감 탭 업무 줄(11-04 고침): 특이사항 태그 + 날짜 + 진행률처럼 칸이 늘어도 한 줄에(전엔 진행률이 다음 줄로 내려가 D-day가 늘어남) */
+.tb-mini{grid-auto-flow:column;grid-auto-columns:auto}.tb-mini>.dday{justify-self:start}
 </style>
