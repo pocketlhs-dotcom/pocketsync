@@ -160,8 +160,8 @@ function TeamBoard() {
  async function create(draft) {
   const id = uuid(), now = nowIso();
   // A에서 불러올 때는 상태 · 진행률 · 시작일 · 세부 업무(id 포함)를 원본 그대로 가져와 처음부터 A와 같게 둔다(연결 맞추기 기준).
-  const imp = !!draft.src_id, st0 = imp && statuses[draft.status] ? draft.status : 'todo', cl0 = imp ? normChecklist(draft.checklist) : normChecklist(draft.checklist).map(c => ({...c, id: newCheckId()}));
-  const doc = {kind: 'task', title: draft.title, body: draft.body || '', due: draft.due || '', priority: draft.priority || 'share', status: st0, progress: imp && draft.progress !== undefined ? Math.max(0, Math.min(100, Math.round(Number(draft.progress) || 0))) : cl0.length ? checkStat({checklist: cl0}).pct : 0, checklist: cl0, start_on: DATE_RE.test(draft.start_on || '') ? draft.start_on : '', assignee: draft.assignee || '', day: today(), topic_id: '', topic_label: draft.topic_label || '', src_board: draft.src_board || '', src_id: draft.src_id || '', src_title: draft.src_title || '', src_body: draft.src_body || '', src_checks: normChecklist(draft.src_checks), src_links: teamLinks(draft.src_links), src_synced_at: draft.src_id ? now : '', spec: [], issue: '', issue_note: '', issue_at: '', issue_by: '', links: teamLinks(draft.links), category: 'work', ack: false, start: '', end: '', pinned: false, prio_no: 0, req: '', demo: 0, board: 'C', home: 'C', author_id: me.id, author_name: me.name, created_at: now, updated_at: now, updated_by: me.id, updated_by_name: me.name, last_change: draft.src_id ? 'A 보드에서 불러옴' : '오더', done_at: st0 === 'done' ? (draft.done_at || now) : '', history: [{at: now, by: me.name, text: draft.src_id ? 'A 보드에서 불러옴' : '등록', kind: 'create'}], handoffs: []};
+  const imp = !!draft.src_id, st0 = statuses[draft.status] && (imp || draft.status === 'doing') ? draft.status : 'todo', cl0 = imp ? normChecklist(draft.checklist) : normChecklist(draft.checklist).map(c => ({...c, id: newCheckId()}));
+  const doc = {kind: 'task', title: draft.title, body: draft.body || '', due: draft.due || '', priority: draft.priority || 'share', status: st0, progress: imp && draft.progress !== undefined ? Math.max(0, Math.min(100, Math.round(Number(draft.progress) || 0))) : cl0.length ? checkStat({checklist: cl0}).pct : 0, checklist: cl0, start_on: DATE_RE.test(draft.start_on || '') ? draft.start_on : '', assignee: draft.assignee || '', day: today(), topic_id: '', topic_label: draft.topic_label || '', src_board: draft.src_board || '', src_id: draft.src_id || '', src_title: draft.src_title || '', src_body: draft.src_body || '', src_checks: normChecklist(draft.src_checks), src_links: teamLinks(draft.src_links), src_synced_at: draft.src_id ? now : '', spec: [], issue: '', issue_note: '', issue_at: '', issue_by: '', links: teamLinks(draft.links), category: 'work', ack: false, start: '', end: '', pinned: false, prio_no: 0, req: '', demo: 0, board: 'C', home: 'C', author_id: me.id, author_name: me.name, created_at: now, updated_at: now, updated_by: me.id, updated_by_name: me.name, last_change: draft.src_id ? 'A 보드에서 불러옴' : (draft.via || '오더'), done_at: st0 === 'done' ? (draft.done_at || now) : '', history: [{at: now, by: me.name, text: draft.src_id ? 'A 보드에서 불러옴' : '등록', kind: 'create'}], handoffs: []};
   await db.doc('items/' + id).set(doc);
   if (isAdmin && doc.src_board && doc.src_id) { try { await db.doc('items/' + doc.src_id).update({c_link: teamLinkOf({...doc, id})}); } catch (e) { console.error('link A', e); } }
   return id;
@@ -310,7 +310,7 @@ function TeamBoard() {
     ${tab === 'orders' && html`<${TeamOrders} items=${open} who=${who} onWho=${setWho} isAdmin=${isAdmin} onCreate=${d => run(() => create(d), '오더를 등록했어요.')} onImport=${() => setImportOpen(true)} onPatch=${patch} onChecklist=${checklistAct} ...${common} />`}
     ${tab === 'due' && html`<${TeamDue} items=${open} done=${done} ...${common} />`}
     ${tab === 'issues' && html`<${Fragment}><${TeamAsks} focus=${askFocus} asks=${asks} tasks=${open} comments=${comments} me=${me} busy=${busy} onCreate=${createAsk} onUpdate=${updateAsk} onDelete=${deleteAsk} onComment=${comment} onMark=${markComment} onEditComment=${editComment} onDeleteComment=${deleteComment} onOpenTask=${setSel} /><${TeamIssues} items=${issues} comments=${comments} all=${items} onPatch=${patch} ...${common} /><//>`}
-    ${tab === 'report' && html`<${TeamReport} key=${'rep-' + (repDay || 'today')} initialDay=${repDay} focus=${repFocus} reports=${shownReports} tasks=${items} comments=${comments} me=${me} busy=${busy} onAct=${reportAct} onCheck=${checklistAct} onProgress=${(x, v) => patch(x, {progress: v}, `진행률 ${v}%`)} onComment=${comment} onMark=${markComment} onEditComment=${editComment} onDeleteComment=${deleteComment} onOpenTask=${setSel} onAvatar=${setAvatar} />`}
+    ${tab === 'report' && html`<${TeamReport} key=${'rep-' + (repDay || 'today')} initialDay=${repDay} focus=${repFocus} reports=${shownReports} tasks=${items} comments=${comments} me=${me} busy=${busy} onAct=${reportAct} onCheck=${checklistAct} onProgress=${(x, v) => patch(x, {progress: v}, `진행률 ${v}%`)} onComment=${comment} onMark=${markComment} onEditComment=${editComment} onDeleteComment=${deleteComment} onOpenTask=${setSel} onAvatar=${setAvatar} onCreate=${d => run(() => create(d), '업무를 추가했어요.')} />`}
     ${tab === 'done' && html`<${TeamDone} items=${done} onPatch=${patch} isAdmin=${isAdmin} ...${common} />`}
     ${tab === 'links' && html`<${TeamLinks} pool=${linkPool} onOpen=${openLinked} onReport=${openReport} onAsk=${openAsk} />`}
    </div>`}
@@ -994,16 +994,21 @@ function ReportCalendar({reports, seats, day, onPick, onClose}) {
 // 넓은 창 하나에 프로젝트(업무) → 세부 업무를 세부 업무 목록과 같은 모양으로. 체크한 것들을 '오늘 보고에 넣기'로 한 번에 넣고, 고른 줄은 그 자리에서 오늘 %를 맞춘다.
 // 프로젝트 칸 체크 = 보이는 남은 세부 업무 모두(세부 업무가 없으면 업무만). 프로젝트마다 맨 아래 칸에 적고 Enter = 세부 업무로 바로 추가 + 체크.
 // 연필 = 이름 · % 고치기 · 지우기(고치면 '조정됨'). 찾기: 업무 · 세부 업무 이름으로 좁히고, 없으면 적은 글을 업무 없이 한 줄로. 위 · 아래 화살표로 줄 이동.
-// 순서: 진행 중 → 예정 → 보류 → (그날) 완료, 같은 상태 안에서는 보드 순서. 처음에는 내 진행 중 · 예정 업무 중 세부 업무가 있는 것만 펼친다.
+// 순서: 오늘 내가 바꾼 업무('오늘 손댐', 최근 것부터) → 진행 중 → 예정 → 보류 → (그날) 완료, 같은 상태 안에서는 보드 순서.
+// 처음에는 내 업무 중 세부 업무가 있는 진행 중 · 예정 · 오늘 손댄 업무만 펼친다.
 const wpRank = x => ({doing: 0, todo: 1, hold: 2}[x.status] ?? 3);
-function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '', draft = '', onClose, onInsert, onAddSub, onSaveSub, onRemoveSub, onFreeLine}) {
- const sortW = list => [...list].sort((a, b) => wpRank(a) - wpRank(b) || teamOrder(a, b));
+function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '', draft = '', onClose, onInsert, onAddSub, onSaveSub, onRemoveSub, onFreeLine, onCreate = null, similarOf = null, isTouched = null}) {
+ const hot = x => !!(isTouched && isTouched(x));
+ const sortW = list => [...list].sort((a, b) => Number(hot(b)) - Number(hot(a)) || (hot(a) && hot(b) ? String(b.updated_at || '').localeCompare(String(a.updated_at || '')) : wpRank(a) - wpRank(b) || teamOrder(a, b)));
  const mine = sortW(mine0), others = sortW(others0), all = [...mine, ...others];
- const [q, setQ] = useState(''), [open, setOpen] = useState(() => new Set([...mine.filter(x => x.checklist.length && wpRank(x) < 2).map(x => x.id), ...(focus ? [focus] : [])])), [sel, setSel] = useState(() => new Map());
+ const [q, setQ] = useState(''), [open, setOpen] = useState(() => new Set([...mine.filter(x => x.checklist.length && (wpRank(x) < 2 || hot(x))).map(x => x.id), ...(focus ? [focus] : [])])), [sel, setSel] = useState(() => new Map());
+ // 추가하기(11-05): 새 업무(내 업무 · 진행 중) / 비슷한 업무의 세부 업무로 / 업무 없이 한 줄. 만든 뒤에는 그 업무를 펼치고 세부 업무 칸에 바로 적게(focusTid).
+ const [addOpen, setAddOpen] = useState(false), [newText, setNewText] = useState(''), focusTid = useRef('');
  const [edit, setEdit] = useState(null), [drafts, setDrafts] = useState(() => (focus && draft ? {[focus]: draft} : {})), [saving, setSaving] = useState(false);
  const bodyRef = useRef(null), findRef = useRef(null);
  const busyAll = busy || saving, K = (tid, cid = '') => tid + ':' + cid;
  useFreshTick(all);
+ useEffect(() => { const id = focusTid.current, b = bodyRef.current; if (!id || busyAll || !b) return; const blk = b.querySelector(`[data-tid="${id}"]`); if (!blk) return; focusTid.current = ''; b.scrollTop = Math.max(0, blk.offsetTop - b.offsetTop - 8); const inp = blk.querySelector('.wp-add input'); if (inp) inp.focus(); });
  // 열 때: 고른 업무(오늘 손댄 업무 · 비슷한 업무 · 보고의 업무에서 왔을 때)가 보이게 스크롤하고, 적어 둔 글이 있으면 그 업무 추가 칸에. 아니면 찾기 칸(마우스 화면만 — 모바일은 자판이 목록을 가림).
  useEffect(() => {
   const b = bodyRef.current, coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
@@ -1041,7 +1046,14 @@ function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '
  }
  async function save(e, x, c) { e.preventDefault(); const t = String((edit && edit.text) || '').trim(), v = edit ? edit.pct : c.pct; if (!t || busyAll) return; setSaving(true); try { await onSaveSub(x, c, {text: t.slice(0, 200), pct: v}); setEdit(null); setPct(K(x.id, c.id), v); } catch {} finally { setSaving(false); } }
  async function remove(x, c) { if (busyAll) return; setSaving(true); try { if (await onRemoveSub(x, c)) { setEdit(null); setSel(m => { if (!m.has(K(x.id, c.id))) return m; const nn = new Map(m); nn.delete(K(x.id, c.id)); return nn; }); } } catch {} finally { setSaving(false); } }
- async function free() { const t = q.trim(); if (!t || busyAll) return; setSaving(true); try { await onFreeLine(t.slice(0, 300)); setQ(''); if (findRef.current) findRef.current.focus(); } catch {} finally { setSaving(false); } }
+ const doneAdd = () => { setNewText(''); setAddOpen(false); setQ(''); };
+ async function addFree(text) { const t = String(text || '').trim(); if (!t || busyAll) return; setSaving(true); try { await onFreeLine(t.slice(0, 300)); doneAdd(); if (findRef.current) findRef.current.focus(); } catch {} finally { setSaving(false); } }
+ const free = () => addFree(q);
+ // 새 업무로 추가: 내 업무 · 진행 중으로 만들고 바로 고름(세부 업무 없이 업무로), 펼쳐서 세부 업무 칸에 바로 적게.
+ async function createNew(text) { const t = String(text || '').trim(); if (!t || busyAll || !onCreate) return; setSaving(true); try { const id = await onCreate(t.slice(0, 200)); if (id) { setOpen(s0 => new Set(s0).add(id)); setSel(m => new Map(m).set(K(id), {tid: id, cid: '', pct: 0})); focusTid.current = id; } doneAdd(); } catch {} finally { setSaving(false); } }
+ // 비슷한 업무를 고르면: 적은 글을 그 업무의 세부 업무로 추가하고 고름.
+ async function addToTask(x, text) { const t = String(text || '').trim(); if (!t || busyAll) return; setSaving(true); try { const cid = await onAddSub(x, t.slice(0, 200)); if (cid) { setSel(m => { const nn = new Map(m); nn.delete(K(x.id)); nn.set(K(x.id, cid), {tid: x.id, cid, pct: 0}); return nn; }); setOpen(s0 => new Set(s0).add(x.id)); focusTid.current = x.id; } doneAdd(); } catch {} finally { setSaving(false); } }
+ const sims = addOpen && similarOf && newText.trim().length >= 2 ? similarOf(newText) : [];
  // 위 · 아래 화살표: 찾기 칸 · 업무 줄 · 세부 업무 줄 · 추가 칸 사이를 옮겨 다닌다(% 고르기 안에서는 그대로).
  const nav = e => {
   if ((e.key !== 'ArrowDown' && e.key !== 'ArrowUp') || e.target.tagName === 'SELECT') return;
@@ -1074,7 +1086,7 @@ function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '
   return html`<section key=${x.id} class=${cx('wp-proj', exp && 'open', (st.on || st.mixed) && 'picked', x.status === 'hold' && 'hold', teamDelayed(x) && 'late')} data-tid=${x.id}>
    <div class="wp-proj-head">
     <label class=${cx('check-tick wp-ptick', st.mixed && 'mixed', st.off && 'off')} title=${solo ? (st.off ? '오늘 보고에 이미 넣었어요' : '세부 업무 없이 이 업무로 고르기') : st.off ? '남은 세부 업무가 없어요' : '이 업무의 세부 업무 모두 고르기'}><input type="checkbox" aria-label=${`${x.title} · ${solo ? '업무로 고르기' : '세부 업무 모두 고르기'}`} checked=${st.on || (solo && st.off)} indeterminate=${st.mixed} disabled=${st.off || busyAll} onChange=${() => toggleProj(x)} /><span class="check-box">${I(st.mixed ? 'Minus' : 'Check', 12)}</span></label>
-    <button type="button" class="wp-proj-btn" data-nav aria-expanded=${exp} title=${qq ? x.title : exp ? '접기' : '펼쳐서 세부 업무 보기'} onClick=${() => { if (!qq) flip(x.id); }}>${I('ChevronRight', 15)}<span class="wp-proj-main"><span class="wp-proj-title"><span class="wp-proj-name">${x.title}</span>${teamFresh(x) ? html`<${TeamNewTag} x=${x} />` : ''}${teamDelayed(x) ? html`<${TeamLateTag} x=${x} />` : ''}</span><span class="wp-proj-meta"><span>${meta}</span>${inRep ? html`<span class="wp-in">보고에 있음</span>` : ''}</span></span></button>
+    <button type="button" class="wp-proj-btn" data-nav aria-expanded=${exp} title=${qq ? x.title : exp ? '접기' : '펼쳐서 세부 업무 보기'} onClick=${() => { if (!qq) flip(x.id); }}>${I('ChevronRight', 15)}<span class="wp-proj-main"><span class="wp-proj-title"><span class="wp-proj-name">${x.title}</span>${teamFresh(x) ? html`<${TeamNewTag} x=${x} />` : ''}${teamDelayed(x) ? html`<${TeamLateTag} x=${x} />` : ''}</span><span class="wp-proj-meta"><span>${meta}</span>${hot(x) ? html`<span class="wp-today" title=${`오늘 ${teamClock(x.updated_at)}에 내가 바꾼 업무`}>오늘 손댐</span>` : ''}${inRep ? html`<span class="wp-in">보고에 있음</span>` : ''}</span></span></button>
     <span class=${cx('wp-count', solo && 'none')} title=${solo ? '세부 업무가 없어요' : '끝낸 세부 업무 / 전체'}>${solo ? '세부 없음' : `세부 ${cs.done}/${cs.total}`}</span>
     ${ps ? pctSel(ps.pct, v => setPct(K(x.id), v), `오늘 진행률: ${x.title}`) : pctRO(x.progress || 0)}
    </div>
@@ -1085,18 +1097,29 @@ function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '
   </section>`;
  };
  const m = shown(mine), o = shown(others), allOpen = all.length > 0 && all.every(x => open.has(x.id)), qt = q.trim();
- return html`<${Dialog} class="wp-dlg" title="오늘 한 일 고르기" description="업무를 펼쳐 오늘 한 세부 업무를 체크하고 오늘 %를 맞춘 뒤 넣어요. 여러 개를 한 번에 넣을 수 있어요." onClose=${close}>
+ return html`<${Dialog} class="wp-dlg" title="오늘 한 일 고르기" description="업무를 펼쳐 오늘 한 세부 업무를 체크하고 오늘 %를 맞춘 뒤 넣어요. 목록에 없는 일은 ‘추가하기’로 바로 만들 수 있어요." onClose=${close}>
   <div class="wp-wrap" onKeyDown=${nav}>
-   <div class="wp-tools">
+   <div class="wp-tools"><div class="wp-tools-row">
     <label class="wp-find">${I('Search', 15)}<input ref=${findRef} data-nav type="search" maxLength="300" aria-label="업무 · 세부 업무 찾기" placeholder="업무 · 세부 업무 이름으로 찾기" value=${q} onInput=${e => setQ(e.target.value)} onKeyDown=${e => { if (e.key === 'Escape' && q) { e.preventDefault(); e.stopPropagation(); setQ(''); } else if (e.key === 'Enter' && !e.isComposing && qt) { e.preventDefault(); if (!m.length && !o.length) free(); else { const f = bodyRef.current && bodyRef.current.querySelector('input[type=checkbox][data-nav]:not(:disabled)'); if (f) f.focus(); } } }} /></label>
-    ${!qq && all.length > 0 && html`<button type="button" class="text-button wp-all" onClick=${() => setOpen(allOpen ? new Set() : new Set(all.map(x => x.id)))}>${I(allOpen ? 'ChevronsDownUp' : 'ChevronsUpDown', 14)}${allOpen ? '모두 접기' : '모두 펼치기'}</button>`}
+    <button type="button" class=${cx('text-button wp-addbtn', addOpen && 'on')} aria-expanded=${addOpen} title="새 업무 · 세부 업무 · 한 줄 추가" onClick=${() => { if (addOpen) { setAddOpen(false); setNewText(''); } else { setNewText(qt); setAddOpen(true); } }}>${I(addOpen ? 'X' : 'Plus', 14)}${addOpen ? '추가 닫기' : '추가하기'}</button>
+    ${!qq && all.length > 0 && html`<button type="button" class="text-button wp-all" title=${allOpen ? '모두 접기' : '모두 펼치기'} onClick=${() => setOpen(allOpen ? new Set() : new Set(all.map(x => x.id)))}>${I(allOpen ? 'ChevronsDownUp' : 'ChevronsUpDown', 14)}<span>${allOpen ? '모두 접기' : '모두 펼치기'}</span></button>`}
+   </div>
+   ${addOpen && html`<div class="wp-new" role="group" aria-label="새로 추가">
+    <form class="wp-new-row" onSubmit=${e => { e.preventDefault(); if (onCreate) createNew(newText); else addFree(newText); }}>
+     <span class="wp-new-label">${I('Plus', 14)}새로 추가</span>
+     <input ref=${focusOnMount} data-nav maxLength="200" aria-label="새로 추가할 이름" placeholder=${onCreate ? '새 업무 이름 · Enter면 내 업무(진행 중)로 추가' : '오늘 한 일 · Enter면 업무 없이 한 줄로'} value=${newText} disabled=${busyAll} onInput=${e => setNewText(e.target.value)} onKeyDown=${e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setAddOpen(false); setNewText(''); } }} />
+     ${onCreate ? html`<button class="primary-button small" disabled=${busyAll || !newText.trim()}>새 업무로 추가</button>` : ''}
+     <button type=${onCreate ? 'button' : 'submit'} class=${onCreate ? 'secondary-button small' : 'primary-button small'} disabled=${busyAll || !newText.trim()} onClick=${e => { if (onCreate) { e.preventDefault(); addFree(newText); } }}>한 줄로 넣기</button>
+    </form>
+    ${sims.length > 0 ? html`<div class="wp-new-sim">${I('Sparkles', 12)}<span>비슷한 업무가 있어요 · 누르면 그 업무의 세부 업무로</span>${sims.map(x => html`<button type="button" key=${x.id} class="chip" disabled=${busyAll} title=${`‘${newText.trim()}’을 이 업무의 세부 업무로 추가`} onClick=${() => addToTask(x, newText)}>${x.title}</button>`)}</div>` : html`<p class="wp-new-help">새 업무는 내 업무 · 진행 중으로 만들어지고 바로 골라져요. 이어서 세부 업무를 적을 수 있어요.</p>`}
+   </div>`}
    </div>
    <div class="wp-body" ref=${bodyRef}>
     ${!all.length && html`<p class="wp-none">아직 진행 중인 업무가 없어요. 찾기 칸에 적으면 업무 없이 한 줄로 넣을 수 있어요.</p>`}
     ${m.length > 0 && html`<div class="wp-group"><span>내 업무</span><small>${m.length}</small></div>${m.map(x => block(x, false))}`}
     ${o.length > 0 && html`<div class="wp-group"><span>다른 업무</span><small>${o.length}</small></div>${o.map(x => block(x, true))}`}
     ${qq && !m.length && !o.length && all.length > 0 ? html`<p class="wp-none">‘${qt}’에 맞는 업무 · 세부 업무가 없어요.</p>` : ''}
-    ${qt ? html`<button type="button" class="wp-free" data-nav disabled=${busyAll} onClick=${free}>${I('Plus', 14)}<span>‘<b>${qt.length > 40 ? qt.slice(0, 39) + '…' : qt}</b>’ 업무 없이 한 줄로 넣기</span></button>` : ''}
+    ${qt ? html`<div class="wp-free-row">${onCreate ? html`<button type="button" class="wp-free" data-nav disabled=${busyAll} onClick=${() => createNew(qt)}>${I('Plus', 14)}<span>‘<b>${qt.length > 30 ? qt.slice(0, 29) + '…' : qt}</b>’ 새 업무로 추가</span></button>` : ''}<button type="button" class="wp-free line" data-nav disabled=${busyAll} onClick=${free}>${I('Plus', 14)}<span>${onCreate ? '업무 없이 한 줄로 넣기' : html`‘<b>${qt.length > 30 ? qt.slice(0, 29) + '…' : qt}</b>’ 업무 없이 한 줄로 넣기`}</span></button></div>` : ''}
    </div>
   </div>
   <div class="wp-foot"><span class="wp-sum">${n ? html`<b>${n}</b>개 골랐어요` : '체크한 것이 오늘 한 일에 들어가요'}</span>${n > 0 && html`<button type="button" class="text-button wp-clear" disabled=${busyAll} onClick=${() => setSel(new Map())}>모두 빼기</button>`}<button type="button" class="secondary-button wp-close" onClick=${close}>닫기</button><button type="button" class="primary-button wp-go" disabled=${!n || busyAll} onClick=${insert}>${I('Check', 15)}오늘 보고에 넣기${n ? ` ${n}` : ''}</button></div>
@@ -1155,8 +1178,8 @@ async function reportPng(d) {
  paint(ctx, false);
  return await new Promise((res, rej) => cv.toBlob(b => (b ? res(b) : rej(new Error('이미지를 만들지 못했어요.'))), 'image/png'));
 }
-function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgress, onComment, onMark, onEditComment, onDeleteComment, onOpenTask, onAvatar, seats = SEATS, viewOnly = false, initialDay = '', focus = null}) {
- const [pickOpen, setPickOpen] = useState(false), [calOpen, setCalOpen] = useState(false);
+function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgress, onCreate = null, onComment, onMark, onEditComment, onDeleteComment, onOpenTask, onAvatar, seats = SEATS, viewOnly = false, initialDay = '', focus = null}) {
+ const [calOpen, setCalOpen] = useState(false);
  const [day, setDay] = useState(() => (initialDay && initialDay <= today() ? initialDay : today())), [text, setText] = useState('');
  // 오늘 한 일 고르기 창(11-05): null | {focus: 펼쳐 보일 업무 id, draft: 그 업무 추가 칸에 미리 적어 둘 글}. 다른 날로 가면 닫는다.
  const [wp, setWp] = useState(null);
@@ -1186,7 +1209,8 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
  const mineT = cand.filter(x => teamHas(x, me.name)).sort(teamOrder), otherT = cand.filter(x => !teamHas(x, me.name)).sort(teamOrder);
  const usedIn = id => new Set(my.lines.filter(l => l.task_id === id && l.check_id).map(l => l.check_id));
  const projIn = id => my.lines.some(l => l.task_id === id && !l.check_id);
- const suggest = tasks.filter(x => inSeoul(x.updated_at) === day && x.updated_by === me.id && !my.lines.some(l => l.task_id === x.id)).slice(0, 6);
+ // 오늘 내가 바꾼 업무(11-05: 예전 '오늘 손댄 업무' 줄 대신 고르기 창에서 '오늘 손댐' 표시 · 묶음 맨 위 · 펼침)
+ const touched = x => inSeoul(x.updated_at) === day && x.updated_by === me.id;
  const projOnly = x => ({id: newCheckId(), text: x.title, task_id: x.id, task_title: x.title, check_id: '', pct: x.progress || 0});
  // 비슷한 업무 찾기: 적은 글과 업무 제목 · 세부 업무 이름에서 겹치는 낱말(2자 이상, '진행' 같은 흔한 말 제외) 수로 고른다.
  const similar = text => teamSimilar(text, cand);
@@ -1235,6 +1259,8 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
   toast.success('세부 업무를 고쳤어요.');
  }
  async function removeSubOf(t, c) { if (!confirm(`‘${c.text}’ 세부 업무를 지울까요? 이 업무의 세부 업무 목록에서 빠져요.`)) return false; await onCheck(t, {type: 'remove', cid: c.id}); return true; }
+ // 고르기 창 '추가하기' → 새 업무(내 업무 · 진행 중 · 오늘 시작). 만든 업무 id를 돌려준다.
+ const addTask = title => onCreate({title, assignee: me.name, status: 'doing', start_on: today(), via: '업무보고에서 추가'});
  const addFreeLine = t => onAct(day, cur => ({lines: [...cur.lines, {id: newCheckId(), text: t, task_id: '', task_title: '', check_id: '', pct: null}]}), '업무 없이 한 줄로 넣었어요.');
  // 복사하기(11-05): 내 그날 보고를 이미지로 클립보드에(카톡에 바로 붙여넣기). 메모는 칸에 적힌 그대로(저장 전이어도).
  async function copyReport(card) {
@@ -1289,7 +1315,6 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
   return html`<li key=${l.id} class=${cx(open && 'linking')}><span class="tb-rep-dot"></span><div class="tb-rep-free"><${TeamText} text=${l.text} />${sug ? html`<button type="button" class="tb-rep-sug" disabled=${busy} title="이 업무에 이어서 세부 업무 · %로 남기기" onClick=${() => startLink(l, sug.id)}>${I('Sparkles', 11)}<span>${sug.title}</span><em>에 잇기</em></button>` : ''}</div>${isMe ? html`<span class="tb-rep-free-tools">${can && !open ? html`<button type="button" class="text-button tb-rep-linkbtn" disabled=${busy} onClick=${() => startLink(l, sug ? sug.id : '')}>${I('Link2', 12)}업무에 잇기</button>` : ''}${xBtn('빼기', () => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), ''))}</span>` : ''}${open ? linkPanel(l) : ''}</li>`;
  };
  const workView = (r, isMe) => { const gs = groupsOf(r); return gs.length ? html`<div class="tb-rep-work">${gs.map(g => g.k ? projView(g, isMe) : html`<ul class="tb-rep-lines" key="free">${g.lines.map(l => freeLine(l, isMe))}</ul>`)}</div>` : ''; };
- const optT = x => `${x.title}${x.status === 'done' ? ' · 완료' : ` · ${x.progress || 0}%`}`;
  const projMeta = (x, who) => [statuses[x.status], x.due ? dDay(x.due).label : '', who ? teamWho(x.assignee) : ''].filter(Boolean).join(' · ');
  // 오늘 한 일 적기(11-05): 큰 버튼 = 고르기 창(업무 → 세부 업무를 한눈에, 여러 개 한 번에), 아래 칸 = 업무에 없는 일 한 줄.
  const nSubs = mineT.reduce((a, x) => a + x.checklist.length, 0);
@@ -1308,7 +1333,7 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
    ${workView(r, isMe)}
    ${isMe ? html`<${Fragment}>
     ${form}
-    ${suggest.length > 0 && html`<div class="tb-rep-suggest"><span>${I('Sparkles', 13)}오늘 손댄 업무 ${suggest.length}건</span>${pickOpen ? html`<button type="button" class="text-button" disabled=${busy} onClick=${async () => { try { await onAct(day, cur => ({lines: [...cur.lines, ...suggest.filter(x => !cur.lines.some(l => l.task_id === x.id)).map(projOnly)]}), ''); setPickOpen(false); } catch {} }}>한 번에 넣기</button><button type="button" class="text-button" onClick=${() => setPickOpen(false)}>접기</button>` : html`<button type="button" class="text-button" onClick=${() => setPickOpen(true)}>골라 넣기</button>`}${pickOpen && html`<div class="tb-rep-picks">${suggest.map(x => html`<button type="button" key=${x.id} class="chip" disabled=${busy} title="프로젝트로 넣고 세부 업무를 바로 고를 수 있어요" onClick=${async () => { try { await onAct(day, cur => ({lines: cur.lines.some(l => l.task_id === x.id) ? cur.lines : [...cur.lines, projOnly(x)]}), ''); setWp({focus: x.id, draft: ''}); } catch {} }}>${I('Plus', 11)}${optT(x)}</button>`)}</div>`}</div>`}<//>` : formOff(off)}
+   <//>` : formOff(off)}
    <div class="tb-sub"><span>링크</span></div>
    ${isMe ? html`<${LinkChips} wide=${true} links=${my.links} editable=${true} busy=${busy} max=${20} addLabel="링크 공유" idPrefix=${'rep-' + day} onAdd=${l => onAct(day, cur => ({links: [...cur.links, {id: newCheckId(), label: l.label, url: l.url, shared_by: me.name, shared_at: nowIso()}]}), '')} onRemove=${i => onAct(day, cur => ({links: cur.links.filter((_, k) => k !== i)}), '')} />` : r && r.links.length ? html`<${LinkChips} wide=${true} links=${r.links} editable=${false} />` : html`<div class="link-chips wide tb-link-off"><button type="button" class="link-chip add" disabled title=${off}>${I('Plus', 13)}링크 공유</button></div>`}
    <div class="tb-sub"><span>오늘 업무 메모</span></div>
@@ -1320,7 +1345,7 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
    <div class="tb-rep-comments"><div class="tb-sub"><span>댓글 ${cs.length || ''}</span></div><${TeamCommentList} cs=${cs} me=${me} busy=${busy} onMark=${onMark} onEdit=${onEditComment} onDelete=${onDeleteComment} />${onComment && html`<${ReplyForm} key=${rid} busy=${busy} label=${`${s.name} 업무보고 댓글`} placeholder=${isMe ? '덧붙일 말 · Shift+Enter 줄바꿈' : viewOnly && me.name !== ADMIN_NAME ? '이현성에게 남길 말 · 디자인팀에는 안 보여요' : `${s.name}님에게 댓글 · Shift+Enter 줄바꿈`} onSend=${t => onComment({id: rid}, t)} />`}</div>
   </article>`; })}</div>
   ${!people.some(s => { const r = repOf(s.key), rid = r ? r.id : `C-rep-${s.key}-${day}`; return (!viewOnly && s.key === me.id) || !!r || s.name !== ADMIN_NAME || comments.some(c => c.item_id === rid); }) && html`<p class="tb-none pad tb-rep-none">디자인팀 업무보고는 이현성만 볼 수 있어요.</p>`}
-  ${wp && !viewOnly && onCheck && html`<${WorkPick} mine=${mineT} others=${otherT} usedOf=${usedIn} projIn=${projIn} busy=${busy} focus=${wp.focus} draft=${wp.draft} onClose=${() => setWp(null)} onInsert=${insertPicks} onAddSub=${addSubTo} onSaveSub=${saveSubOf} onRemoveSub=${removeSubOf} onFreeLine=${addFreeLine} />`}
+  ${wp && !viewOnly && onCheck && html`<${WorkPick} mine=${mineT} others=${otherT} usedOf=${usedIn} projIn=${projIn} busy=${busy} focus=${wp.focus} draft=${wp.draft} onClose=${() => setWp(null)} onInsert=${insertPicks} onAddSub=${addSubTo} onSaveSub=${saveSubOf} onRemoveSub=${removeSubOf} onFreeLine=${addFreeLine} onCreate=${onCreate ? addTask : null} similarOf=${similar} isTouched=${touched} />`}
  </section>`;
 }
 
