@@ -1396,7 +1396,6 @@ body.memo-resizing,body.memo-resizing *{cursor:ns-resize!important;user-select:n
 .tb-rep-sel.sub,.tb-rep-form-row>input{flex:1}
 .tb-rep-sel.pct{flex:0 0 84px;width:84px;padding:0 6px!important}
 .tb-rep-form .secondary-button{height:34px!important;min-height:0!important;padding:0 14px!important;font-size:13px;white-space:nowrap;flex-shrink:0}
-.tb-rep-back{width:34px;height:34px;flex-shrink:0;border:1px solid #dfe3ef;border-radius:3px;color:#6b7591;background:#fff}
 .tb-rep-form.is-off select,.tb-rep-form.is-off input{background:#f7f8fa!important;border-color:#eceff5!important;color:#a9b3c4;cursor:not-allowed}
 .tb-rep-form.is-off input::placeholder{color:#c3c9d6}
 .tb-rep-form.is-off .secondary-button{cursor:not-allowed;color:#c3c9d6!important;border-color:#eceff5!important;background:#fff!important}
@@ -1936,32 +1935,110 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 .ck-tag.edit{background:#fff1dc;color:#b45f06;border:1px solid #f3d3a3}
 .pk-val>.ck-tag{align-self:center;margin-left:0}
 .tb-rep-subtext>.ck-tag{margin-left:0;align-self:center}
-/* 업무보고 세부 업무 고르기(11-05): 넓은 목록 · 맨 위 바로 추가 · 줄마다 고치기 */
-.pk-pop.sp-pop{max-width:none;min-width:0;max-height:380px;padding:6px}
-.sp-add{display:flex;align-items:center;gap:8px;padding:4px 4px 8px 8px;margin-bottom:4px;border-bottom:1px solid #eef0f7;color:#315df8}
-.sp-add>input{flex:1;min-width:0;height:34px;padding:0 10px;border:1px solid #dfe3ef;border-radius:3px;font:inherit;font-size:13.5px;color:#1d2a44;background:#fff}
-.sp-add>input:focus{outline:none;border-color:#9fb3f7;box-shadow:0 0 0 3px #e8edff}
-.sp-row{display:flex;align-items:center;gap:2px;border-radius:5px}
-.sp-row.hl,.sp-row:hover{background:#f3f6fd}
-.sp-row.on{background:#eef3ff}
-.sp-pick{flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:40px;padding:7px 4px 7px 8px;border:0;background:transparent;text-align:left;font:inherit;font-size:13.5px;color:#1d2a44;cursor:pointer}
-.sp-pick:disabled{cursor:default}
-.sp-row.used .sp-text{color:#7d8394;font-weight:500}
-.sp-name{flex:1;min-width:0;display:flex;align-items:center}
-.sp-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
-.sp-row.on .sp-text{font-weight:700;color:#13204a}
-.sp-by{flex:none;font-size:12px;color:#8a96ad;white-space:nowrap}
-.sp-pick .pk-pct{margin-left:4px}
-.sp-row.full .pk-bar i{background:#3f8c66}
-.sp-pen{flex:none;width:30px;height:30px;display:inline-grid;place-items:center;margin-right:2px;border:0;border-radius:4px;background:transparent;color:#8f99ad;cursor:pointer}
-.sp-pen:hover:not(:disabled){background:#e3e9ff;color:#315df8}
-.sp-edit{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:2px 0;padding:8px;border:1px solid #c9d4fb;border-radius:6px;background:#f7f9ff}
-.sp-edit-text{flex:1 1 200px;min-width:0;height:32px;padding:0 9px;border:1px solid #c9d4fb;border-radius:3px;font:inherit;font-size:13.5px;background:#fff}
-.sp-edit-text:focus{outline:none;border-color:#7f9bf5;box-shadow:0 0 0 3px #e8edff}
-.sp-edit-pct{height:32px;padding:0 6px;border:1px solid #dfe3ef;border-radius:3px;font:inherit;font-size:13px;background:#fff;color:#1d2a44}
-.sp-edit .primary-button.small{height:32px}
-.sp-del{color:#c0504a!important;margin-left:auto}.sp-del:hover:not(:disabled){background:#fff1ee}
-.sp-none{margin:8px 10px;color:#8f95ab;font-size:13px}
+/* 업무보고 오늘 한 일 고르기(11-05 두 번째): 넓은 창 · 업무 → 세부 업무 위계(세부 업무 목록 모양) · 여러 개 한 번에 · 그 자리에서 오늘 % */
+.tb-wp-open{display:flex;align-items:center;gap:10px;width:100%;min-height:50px;padding:8px 12px 8px 9px;border:1px solid #c9d4fb;border-radius:3px;background:#f6f8ff;text-align:left;cursor:pointer;box-sizing:border-box;transition:background .15s,border-color .15s}
+.tb-wp-open:hover:not(:disabled){background:#eef2ff;border-color:#95a8eb}
+.tb-wp-open:focus-visible{outline:none;border-color:#7f9bf5;box-shadow:0 0 0 3px #e8edff}
+.tb-wp-ico{flex:none;display:grid;place-items:center;width:32px;height:32px;border-radius:6px;background:#fff;border:1px solid #dbe3fb;color:#315df8}
+.tb-wp-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.tb-wp-main strong{font-size:14px;font-weight:700;color:#13204a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb-wp-main small{font-size:12px;font-weight:600;color:#8a9bd6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb-wp-open>svg{flex:none;color:#8a9bd6}
+.tb-wp-open:disabled{cursor:not-allowed;background:#f7f8fa;border-color:#eceff5}
+.tb-wp-open:disabled .tb-wp-ico{background:#fbfbfc;border-color:#eceff5;color:#c3c9d6}
+.tb-wp-open:disabled strong,.tb-wp-open:disabled small,.tb-wp-open:disabled>svg{color:#b8c0cf}
+.tb-rep-proj-more{flex:none;display:inline-grid;place-items:center;width:26px;height:26px;border:0;border-radius:4px;background:transparent;color:#8a96ad;cursor:pointer}
+.tb-rep-proj-more:hover:not(:disabled){background:#e8edff;color:#315df8}
+.dialog.wp-dlg{width:min(940px,calc(100vw - 32px));max-width:none;height:min(800px,calc(100dvh - 40px));padding:0;gap:0;display:flex;flex-direction:column;overflow:hidden}
+.wp-dlg>[data-slot=dialog-header]{flex:none;padding:20px 60px 12px 24px}
+.wp-dlg [data-slot=dialog-description]{font-size:13px;line-height:1.55}
+.wp-wrap{flex:1;min-height:0;display:flex;flex-direction:column}
+.wp-tools{flex:none;display:flex;align-items:center;gap:12px;padding:0 24px 12px;border-bottom:1px solid #eef0f7}
+.wp-find{flex:1;min-width:0;display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;border:1px solid #dfe3ef;border-radius:3px;background:#fff;color:#8a96ad;cursor:text;box-sizing:border-box}
+.wp-find:focus-within{border-color:#9fb3f7;box-shadow:0 0 0 3px #e8edff}
+.wp-find>input{flex:1;min-width:0;height:36px!important;min-height:0!important;padding:0!important;border:0!important;outline:0;box-shadow:none!important;background:transparent!important;font-size:14px;color:#1d2a44}
+.wp-all{flex:none;display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;white-space:nowrap}
+.wp-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:6px 24px 18px;display:flex;flex-direction:column;gap:8px;background:#f8f9fd}
+.wp-group{flex:none;display:flex;align-items:baseline;gap:6px;padding:12px 2px 0;font-size:12.5px;font-weight:700;color:#7d889f}
+.wp-group>small{font-size:12px;font-weight:600;color:#aab3c5}
+.wp-proj{flex:none;border:1px solid #e3e8f3;border-radius:8px;background:#fff;transition:border-color .15s,box-shadow .15s}
+.wp-proj.picked{border-color:#b9c8f8;box-shadow:0 0 0 3px #eef2ff}
+.wp-proj.late{box-shadow:inset 3px 0 0 #f0573a}
+.wp-proj.late.picked{box-shadow:inset 3px 0 0 #f0573a,0 0 0 3px #eef2ff}
+.wp-proj.hold .wp-proj-name{color:#6b7280}
+.wp-proj-head{display:flex;align-items:center;gap:6px;min-height:54px;padding:6px 14px 6px 10px}
+.wp-ptick{flex:none;display:inline-flex;align-items:center;padding:6px;cursor:pointer}
+.wp-ptick.off{cursor:default}
+.wp-ptick.mixed .check-box{background:#3865e8;border-color:#3865e8;color:#fff}
+.wp-ptick.off input:not(:checked)+.check-box{background:#f3f5f9;border-color:#dde3ee}
+.wp-proj-btn{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:6px 8px 6px 4px;border:0;border-radius:6px;background:transparent;text-align:left;cursor:pointer;color:#13204a}
+.wp-proj-btn:hover{background:#f3f6fd}
+.wp-proj-btn:focus-visible{outline:2px solid #9bb2fd;outline-offset:-2px}
+.wp-proj-btn>svg{flex:none;color:#8a96ad;transition:transform .15s ease}
+.wp-proj-btn[aria-expanded=true]>svg{transform:rotate(90deg);color:#315df8}
+.wp-proj-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.wp-proj-title{display:flex;align-items:center;min-width:0;font-size:14.5px;font-weight:700;line-height:1.4}
+.wp-proj-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wp-proj-meta{display:flex;align-items:center;gap:6px;min-width:0;font-size:12px;font-weight:500;color:#8a96ad;white-space:nowrap}
+.wp-proj-meta>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.wp-in{flex:none;display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:3px;background:#eaf6ef;color:#3f8c66;font-size:11px;font-weight:700;white-space:nowrap}
+.wp-count{flex:none;font-size:12px;font-weight:600;color:#5b73a0;background:#f1f4fb;border-radius:10px;padding:2px 8px;white-space:nowrap}
+.wp-count.none{color:#a3a9bb;background:#f5f6f9}
+.wp-dlg .check-pct{flex:none;width:126px;justify-content:flex-end;box-sizing:border-box}
+.wp-pct:not(.on){cursor:default}.wp-pct:not(.on):hover{background:none}
+.wp-pct.on select{appearance:auto;-webkit-appearance:menulist;width:68px;height:28px;padding:0 2px 0 6px;border:1px solid #c9d4fb!important;border-radius:3px;background:#fff;color:#315df8;font-weight:700;text-align:left}
+.wp-subs{list-style:none;margin:0;padding:4px 14px 10px 46px;display:flex;flex-direction:column;gap:1px;border-top:1px solid #f0f2f8}
+.wp-sub{display:flex;align-items:center;gap:6px;min-height:40px;padding:0 4px 0 6px;border-radius:6px}
+.wp-sub:hover{background:#f5f7fd}
+.wp-sub.on{background:#eef3ff}
+.wp-sub-main{flex:1;min-width:0;display:flex;align-items:center;gap:9px;min-height:38px;cursor:pointer}
+.wp-sub.used .wp-sub-main{cursor:default}
+.wp-sub-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;color:#3a4b66}
+.wp-sub.on .wp-sub-text{color:#13204a;font-weight:600}
+.wp-sub.used .wp-sub-text{color:#8a96ad}
+.wp-sub.used .check-box,.wp-ptick.off input:checked+.check-box{background:#b7c6ee;border-color:#b7c6ee;color:#fff}
+.wp-sub-main>.ck-tag{margin-left:0}
+.wp-sub>.check-by{margin:0 2px 0 0}
+.wp-pen{flex:none;width:30px;height:30px;display:inline-grid;place-items:center;border:0;border-radius:4px;background:transparent;color:#8f99ad;cursor:pointer}
+.wp-pen:hover:not(:disabled){background:#e3e9ff;color:#315df8}
+.wp-sub.editing{padding:4px 0}
+.wp-sub.editing:hover{background:none}
+.wp-edit{flex:1;min-width:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px;border:1px solid #c9d4fb;border-radius:6px;background:#f7f9ff}
+.wp-edit-text{flex:1 1 220px;min-width:0;height:32px!important;min-height:0!important;padding:0 9px!important;border:1px solid #c9d4fb!important;font-size:13.5px;background:#fff}
+.wp-edit-text:focus{outline:none;border-color:#7f9bf5!important;box-shadow:0 0 0 3px #e8edff}
+.wp-edit-pct{height:32px;padding:0 6px;border:1px solid #dfe3ef;font-size:13px;background:#fff;color:#1d2a44}
+.wp-edit .primary-button.small{height:32px}
+.wp-del{margin-left:auto;color:#c0504a!important}.wp-del:hover:not(:disabled){background:#fff1ee}
+.wp-addli{list-style:none}
+.wp-add{padding-left:6px}
+.wp-subs>.wp-addli:first-child>.check-add{border-top:0;margin-top:0}
+.wp-free{flex:none;display:flex;align-items:center;gap:8px;width:100%;padding:12px 14px;border:1px dashed #c9d4fb;border-radius:8px;background:#fff;color:#315df8;font-size:13.5px;font-weight:600;text-align:left;cursor:pointer;box-sizing:border-box}
+.wp-free:hover:not(:disabled){background:#f3f6ff}
+.wp-free>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wp-free b{color:#13204a}
+.wp-none{margin:18px 4px 6px;color:#8f95ab;font-size:13.5px}
+.wp-foot{flex:none;display:flex;align-items:center;gap:8px;padding:12px 24px;border-top:1px solid #eef0f7;background:#fff}
+.wp-sum{flex:1;min-width:0;font-size:13px;color:#8a96ad;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wp-sum>b{font-size:15px;color:#315df8;margin-right:1px}
+.wp-foot .primary-button,.wp-foot .secondary-button{height:38px;white-space:nowrap;flex:none}
+.wp-go{display:inline-flex;align-items:center;gap:6px}
+@media(max-width:640px){
+.dialog.wp-dlg{left:0;top:0;transform:none;width:100vw;height:100dvh;max-height:none;border:0;border-radius:0;animation:none}
+.wp-dlg>[data-slot=dialog-header]{padding:calc(14px + env(safe-area-inset-top,0px)) 56px 10px 16px}
+.wp-dlg .dialog-close{top:calc(10px + env(safe-area-inset-top,0px))}
+.wp-dlg [data-slot=dialog-description]{display:none}
+.wp-tools{padding:0 12px 10px;gap:8px}
+.wp-all{font-size:12.5px}
+.wp-body{padding:4px 10px 14px}
+.wp-proj-head{padding:4px 10px 4px 4px;gap:2px;min-height:52px}
+.wp-count{display:none}
+.wp-dlg .check-pct{width:auto}
+.wp-dlg .check-pct-bar{display:none}
+.wp-subs{padding:2px 6px 8px 10px}
+.wp-sub>.check-by{display:none}
+.wp-foot{padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));gap:6px}
+.wp-close{display:none}
+}
 .tb-rep-copy{display:inline-flex;align-items:center;gap:5px}
 @media(max-width:640px){.tb-rep-save{flex-wrap:wrap}}
 </style>
@@ -1973,6 +2050,6 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1793847011"></script>
-<script src="app.js?v=1793847011"></script>
+<script src="platform.js?v=1793849399"></script>
+<script src="app.js?v=1793849399"></script>
 </body></html>
