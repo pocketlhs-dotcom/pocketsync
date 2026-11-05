@@ -59,7 +59,17 @@ function progressFields(item, v) { const p = Math.max(0, Math.min(100, Math.roun
 function dDay(due) { if (!due) return {label: '마감 없음', cls: 'none', n: null}; const n = Math.round((Date.parse(due + 'T00:00:00+09:00') - Date.parse(today() + 'T00:00:00+09:00')) / 864e5); return n < 0 ? {label: `D+${-n}`, cls: 'late', n} : n === 0 ? {label: '오늘', cls: 'today', n} : {label: `D-${n}`, cls: n <= 3 ? 'soon' : '', n}; }
 // 업무 안의 세부 업무 목록. 진행률은 체크한 비율로 자동 계산된다.
 // 세부 업무마다 진행률(pct)을 가진다. 체크 = 100%, 업무 진행률 = 세부 업무 진행률의 평균.
-function normChecklist(v) { return (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const pct = c.done ? 100 : Math.max(0, Math.min(100, Math.round(Number(c.pct) || 0))); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct, done: pct === 100, ...(c.by ? {by: String(c.by).slice(0, 20)} : {}), ...(c.at ? {at: String(c.at).slice(0, 30)} : {})}; }); }
+function normChecklist(v) { return (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const pct = c.done ? 100 : Math.max(0, Math.min(100, Math.round(Number(c.pct) || 0))); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct, done: pct === 100, ...(c.by ? {by: String(c.by).slice(0, 20)} : {}), ...(c.at ? {at: String(c.at).slice(0, 30)} : {}), ...(c.ed ? {ed: String(c.ed).slice(0, 30)} : {})}; }); }
+// 세부 업무 표시(11-05): 새로 넣은 것(at) 'New', 이름 · %를 고친 것(ed) '조정됨' — 7시간 동안(업무 NEW와 같은 기준). 둘 다면 New.
+const CHECK_FRESH_MS = 7 * 36e5;
+const checkTag = c => { const now = Date.now(); if (!c) return ''; if (now - Date.parse(c.at || '') < CHECK_FRESH_MS) return 'new'; if (now - Date.parse(c.ed || '') < CHECK_FRESH_MS) return 'edit'; return ''; };
+const CheckTag = ({c}) => { const k = checkTag(c); return k ? html`<span class=${'ck-tag ' + k} title=${k === 'new' ? `새로 추가 · ${fullTime(c.at)}` : `조정 · ${fullTime(c.ed)}`}>${k === 'new' ? 'New' : '조정됨'}</span>` : null; };
+// 이미지 복사(11-05): PNG를 클립보드에(카톡 대화창에 바로 붙여넣기). 클릭한 그 순간에 써야 해서 이미지는 Promise로 넘긴다. 안 되면 파일로 저장.
+async function copyImage(make, filename) {
+ const blobP = Promise.resolve().then(make);
+ try { if (!navigator.clipboard || !window.ClipboardItem) throw new Error('이미지 복사를 지원하지 않는 브라우저'); await navigator.clipboard.write([new ClipboardItem({'image/png': blobP})]); return 'copied'; }
+ catch (e) { console.warn('copy image', e); const blob = await blobP; const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); return 'saved'; }
+}
 function checkStat(item) { const l = (item && item.checklist) || []; const done = l.filter(c => c.done).length; return {total: l.length, done, pct: l.length ? Math.round(l.reduce((a, c) => a + (c.pct || 0), 0) / l.length) : 0}; }
 const newCheckId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 // 설명의 여러 줄을 세부 업무로: 글머리표·번호·체크 표시를 떼어 낸다.

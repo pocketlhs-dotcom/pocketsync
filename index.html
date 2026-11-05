@@ -1930,6 +1930,40 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 .kpi-month:hover{color:#315df8;text-decoration:underline}
 .kpi-note{margin:0;font-size:12px;color:#a0a6b8}
 @media(max-width:640px){.dv-left{flex-wrap:wrap}.kpi-table th,.kpi-table td{padding:9px 10px}}
+/* 세부 업무 New · 조정됨(11-05) */
+.ck-tag{flex:none;display:inline-flex;align-items:center;height:16px;margin-left:6px;padding:0 5px;border-radius:3px;font-size:10px;font-weight:800;letter-spacing:0;line-height:1;white-space:nowrap;vertical-align:1px;box-sizing:border-box}
+.ck-tag.new{background:#3865e8;color:#fff}
+.ck-tag.edit{background:#fff1dc;color:#b45f06;border:1px solid #f3d3a3}
+.pk-val>.ck-tag{align-self:center;margin-left:0}
+.tb-rep-subtext>.ck-tag{margin-left:0;align-self:center}
+/* 업무보고 세부 업무 고르기(11-05): 넓은 목록 · 맨 위 바로 추가 · 줄마다 고치기 */
+.pk-pop.sp-pop{max-width:none;min-width:0;max-height:380px;padding:6px}
+.sp-add{display:flex;align-items:center;gap:8px;padding:4px 4px 8px 8px;margin-bottom:4px;border-bottom:1px solid #eef0f7;color:#315df8}
+.sp-add>input{flex:1;min-width:0;height:34px;padding:0 10px;border:1px solid #dfe3ef;border-radius:3px;font:inherit;font-size:13.5px;color:#1d2a44;background:#fff}
+.sp-add>input:focus{outline:none;border-color:#9fb3f7;box-shadow:0 0 0 3px #e8edff}
+.sp-row{display:flex;align-items:center;gap:2px;border-radius:5px}
+.sp-row.hl,.sp-row:hover{background:#f3f6fd}
+.sp-row.on{background:#eef3ff}
+.sp-pick{flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:40px;padding:7px 4px 7px 8px;border:0;background:transparent;text-align:left;font:inherit;font-size:13.5px;color:#1d2a44;cursor:pointer}
+.sp-pick:disabled{cursor:default}
+.sp-row.used .sp-text{color:#7d8394;font-weight:500}
+.sp-name{flex:1;min-width:0;display:flex;align-items:center}
+.sp-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.sp-row.on .sp-text{font-weight:700;color:#13204a}
+.sp-by{flex:none;font-size:12px;color:#8a96ad;white-space:nowrap}
+.sp-pick .pk-pct{margin-left:4px}
+.sp-row.full .pk-bar i{background:#3f8c66}
+.sp-pen{flex:none;width:30px;height:30px;display:inline-grid;place-items:center;margin-right:2px;border:0;border-radius:4px;background:transparent;color:#8f99ad;cursor:pointer}
+.sp-pen:hover:not(:disabled){background:#e3e9ff;color:#315df8}
+.sp-edit{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:2px 0;padding:8px;border:1px solid #c9d4fb;border-radius:6px;background:#f7f9ff}
+.sp-edit-text{flex:1 1 200px;min-width:0;height:32px;padding:0 9px;border:1px solid #c9d4fb;border-radius:3px;font:inherit;font-size:13.5px;background:#fff}
+.sp-edit-text:focus{outline:none;border-color:#7f9bf5;box-shadow:0 0 0 3px #e8edff}
+.sp-edit-pct{height:32px;padding:0 6px;border:1px solid #dfe3ef;border-radius:3px;font:inherit;font-size:13px;background:#fff;color:#1d2a44}
+.sp-edit .primary-button.small{height:32px}
+.sp-del{color:#c0504a!important;margin-left:auto}.sp-del:hover:not(:disabled){background:#fff1ee}
+.sp-none{margin:8px 10px;color:#8f95ab;font-size:13px}
+.tb-rep-copy{display:inline-flex;align-items:center;gap:5px}
+@media(max-width:640px){.tb-rep-save{flex-wrap:wrap}}
 </style>
 </head><body>
 <div id="app"></div>
@@ -1939,6 +1973,6 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1793760306"></script>
-<script src="app.js?v=1793760306"></script>
+<script src="platform.js?v=1793847011"></script>
+<script src="app.js?v=1793847011"></script>
 </body></html>

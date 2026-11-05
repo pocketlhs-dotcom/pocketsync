@@ -188,7 +188,7 @@
   const sd = d => d ? `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))}` : '없음';
   const pct = v => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
   // 세부 업무 정리: 앱의 normChecklist와 같은 규칙(그래야 양쪽 비교가 흔들리지 않는다).
-  const nChecks = v => (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const p = c.done ? 100 : pct(c.pct); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct: p, done: p === 100, ...(c.by ? {by: String(c.by).slice(0, 20)} : {}), ...(c.at ? {at: String(c.at).slice(0, 30)} : {})}; });
+  const nChecks = v => (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const p = c.done ? 100 : pct(c.pct); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct: p, done: p === 100, ...(c.by ? {by: String(c.by).slice(0, 20)} : {}), ...(c.at ? {at: String(c.at).slice(0, 30)} : {}), ...(c.ed ? {ed: String(c.ed).slice(0, 30)} : {})}; });
   const stateOf = v => ({status: ST.includes(v.status) ? v.status : 'todo', due: DRE.test(v.due || '') ? v.due : '', start_on: DRE.test(v.start_on || '') ? v.start_on : '', priority: PR.includes(v.priority) ? v.priority : 'share', checklist: nChecks(v.checklist), progress: pct(v.progress)});
   const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
   const fv = (st, f) => f === 'checklist' ? hash(JSON.stringify(st.checklist)) : String(st[f]);

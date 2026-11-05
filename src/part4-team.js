@@ -174,7 +174,9 @@ function TeamBoard() {
   else if (act.type === 'add') list = [...list, ...act.texts.map(t => ({id: newCheckId(), text: t, done: false, by: me.name, at: nowIso()}))];
   else if (act.type === 'addOne') { const p = Math.max(0, Math.min(100, Math.round(Number(act.pct) || 0))); list = [...list, {id: act.id || newCheckId(), text: act.text, pct: p, done: p >= 100, by: me.name, at: nowIso()}]; }
   else if (act.type === 'remove') list = list.filter(c => c.id !== act.cid);
-  else if (act.type === 'edit') list = list.map(c => c.id === act.cid ? {...c, text: act.text} : c);
+  else if (act.type === 'edit') list = list.map(c => c.id === act.cid ? {...c, text: act.text, ed: nowIso()} : c);
+  // 고치기(11-05, 업무보고 세부 업무 목록): 이름 · %를 한 번에, 고친 시각(ed) → '조정됨'.
+  else if (act.type === 'update') list = list.map(c => c.id === act.cid ? {...c, ...(act.text ? {text: act.text} : {}), ...(act.pct !== undefined ? {pct: act.pct, done: act.pct >= 100} : {}), ed: nowIso()} : c);
   else if (act.type === 'by') list = list.map(c => c.id === act.cid ? (act.by ? {...c, by: act.by} : (({by, ...rest}) => rest)(c)) : c);
   else if (act.type === 'reorder') { const byId = new Map(list.map(c => [c.id, c])); list = [...act.ids.map(i => byId.get(i)).filter(Boolean), ...list.filter(c => !act.ids.includes(c.id))]; }
   list = normChecklist(list); const st = checkStat({checklist: list});
@@ -364,7 +366,7 @@ const TEAM_NEW_MS = 7 * 36e5;
 const teamFresh = x => x.status !== 'done' && Date.now() - Date.parse(x.created_at || '') < TEAM_NEW_MS;
 const TeamNewTag = ({x}) => html`<span class="tb-new" title=${`${teamDay(inSeoul(x.created_at))} ${teamClock(x.created_at)} 추가 · 7시간 동안 보여요`}>NEW</span>`;
 // NEW가 있는 동안만 1분마다 다시 그려서 7시간이 지나면 새로고침 없이 지운다(절전에서 깨어나도 1분 안에 맞춰짐).
-function useFreshTick(list) { const [, tick] = useState(0), on = list.some(teamFresh); useEffect(() => { if (!on) return; const h = setInterval(() => tick(n => n + 1), 60000); return () => clearInterval(h); }, [on]); }
+function useFreshTick(list) { const [, tick] = useState(0), on = list.some(x => teamFresh(x) || (x.checklist || []).some(c => checkTag(c))); useEffect(() => { if (!on) return; const h = setInterval(() => tick(n => n + 1), 60000); return () => clearInterval(h); }, [on]); }
 // 업무를 추가하기 전에 비슷한 남은 업무를 먼저 보여 준다. 누르면 적은 글을 그 업무의 세부 업무로 넣고, Enter는 그대로 새 업무.
 function TeamSimilar({text, items, busy, onPick}) {
  const t = String(text || '').trim(); if (t.length < 2) return null;
@@ -986,6 +988,115 @@ function ReportCalendar({reports, seats, day, onPick, onClose}) {
   <div class="rc-sum"><span class="rc-sum-label">${Number(month.slice(5))}월 작성</span>${seats.map((s, k) => { const c = work.filter(d => (wrote.get(d) || new Set()).has(s.key)).length; return html`<span key=${s.key} class="rc-person"><i style=${`background:${colorOf(k)}`}></i>${s.name}<b>${c}</b>일</span>`; })}</div>
  </div>`;
 }
+// 업무보고 세부 업무 고르기(11-05, 사용자 '목록을 넓게 · 직접 추가 · 이미 된 것도 고치게 · 바뀐 건 조정됨 · 새로 넣은 건 New'):
+// 넓은 목록(이름 한 줄, 길면 …), 맨 위 칸에 적고 Enter = 이 업무의 세부 업무로 바로 추가하고 고르기, 줄마다 연필 = 이름 · % 고치기 · 지우기(고치면 '조정됨').
+// 오늘 보고에 이미 넣은 세부 업무는 아래 '오늘 보고에 넣은 것'에(고르기는 막고 고치기만). 위 · 아래 화살표 · Enter · Esc.
+function SubPick({task, value, used, busy, onPick, onAdd, onSave, onRemove}) {
+ const [open, setOpen] = useState(false), [pos, setPos] = useState({up: false, left: 0, width: 440}), [hl, setHl] = useState(-1), [q, setQ] = useState(''), [edit, setEdit] = useState(null), [saving, setSaving] = useState(false);
+ const wrap = useRef(null), btn = useRef(null), addRef = useRef(null), list = useRef(null), editNow = useRef(null);
+ editNow.current = edit;
+ const items = task ? task.checklist : [], avail = items.filter(c => !used.has(c.id)), done = items.filter(c => used.has(c.id));
+ const sel = items.find(c => c.id === value);
+ const close = () => { setOpen(false); setEdit(null); setQ(''); };
+ useEffect(() => { if (!open) return; const off = e => { if (wrap.current && !wrap.current.contains(e.target)) close(); }; const esc = e => { if (e.key !== 'Escape' || e.defaultPrevented) return; e.preventDefault(); if (editNow.current) setEdit(null); else close(); }; document.addEventListener('pointerdown', off); document.addEventListener('keydown', esc); return () => { document.removeEventListener('pointerdown', off); document.removeEventListener('keydown', esc); }; }, [open]);
+ // 열면 맨 위 추가 칸에 바로 적을 수 있게(마우스 화면만 — 모바일은 자판이 목록을 가려서 누를 때만)
+ useEffect(() => { if (open && addRef.current && !(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)) addRef.current.focus(); }, [open]);
+ useEffect(() => { if (!open || hl < 0 || !list.current) return; const el = list.current.querySelector(`[data-i="${hl}"]`); if (el && el.scrollIntoView) el.scrollIntoView({block: 'nearest'}); }, [open, hl]);
+ // 목록 폭: 버튼보다 좁지 않게, 440~560px(화면이 좁으면 화면 폭에 맞춤). 오른쪽 · 왼쪽 끝을 넘으면 안쪽으로 민다.
+ const show = () => {
+  if (busy || !btn.current) return;
+  const r = btn.current.getBoundingClientRect(), vw = document.documentElement.clientWidth, below = window.innerHeight - r.bottom;
+  const width = Math.min(Math.max(r.width, 440), 560, vw - 24); let left = 0;
+  if (r.left + width > vw - 12) left = vw - 12 - (r.left + width);
+  if (r.left + left < 12) left = 12 - r.left;
+  setPos({up: below < 380 && r.top > below, left: Math.round(left), width: Math.round(width)});
+  setHl(Math.max(0, avail.findIndex(c => c.id === value))); setOpen(true);
+ };
+ const pick = c => { close(); onPick(c.id); if (btn.current) btn.current.focus(); };
+ const busyAll = busy || saving;
+ async function add(e) { e.preventDefault(); const t = q.trim(); if (!t || busyAll) return; setSaving(true); try { await onAdd(t.slice(0, 200)); close(); if (btn.current) btn.current.focus(); } catch {} finally { setSaving(false); } }
+ async function save(e, c) { e.preventDefault(); const t = (edit && edit.text || '').trim(); if (!t || busyAll) return; setSaving(true); try { await onSave(c, {text: t.slice(0, 200), pct: edit.pct}); setEdit(null); } catch {} finally { setSaving(false); } }
+ async function remove(c) { if (busyAll) return; setSaving(true); try { if (await onRemove(c)) { setEdit(null); if (addRef.current) addRef.current.focus(); } } catch {} finally { setSaving(false); } }
+ const key = e => {
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (edit) setEdit(null); else { close(); if (btn.current) btn.current.focus(); } return; }
+  if (e.target !== addRef.current) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); setHl(i => Math.min(avail.length - 1, i + 1)); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); setHl(i => Math.max(0, i - 1)); }
+  else if (e.key === 'Enter' && !e.isComposing && !q.trim() && avail[hl]) { e.preventDefault(); pick(avail[hl]); }
+ };
+ const pctOpts = v => [...new Set([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, v])].sort((a, b) => a - b);
+ const editRow = c => html`<form class="sp-edit" key=${'e' + c.id} onSubmit=${e => save(e, c)}>
+   <input class="sp-edit-text" aria-label="세부 업무 이름" maxLength="200" value=${edit.text} ref=${focusOnMount} onInput=${e => { const v = e.target.value; setEdit(x => x && {...x, text: v}); }} />
+   <select class="sp-edit-pct" aria-label="진행률" value=${String(edit.pct)} onChange=${e => { const v = Number(e.target.value); setEdit(x => x && {...x, pct: v}); }}>${pctOpts(edit.pct).map(v => html`<option key=${v} value=${String(v)}>${v}%</option>`)}</select>
+   <button class="primary-button small" disabled=${busyAll || !edit.text.trim()}>저장</button><button type="button" class="text-button" onClick=${() => setEdit(null)}>취소</button>
+   <button type="button" class="icon-button sp-del" aria-label=${`지우기: ${c.text}`} title="이 세부 업무 지우기" disabled=${busyAll} onClick=${() => remove(c)}>${I('Trash2', 14)}</button>
+  </form>`;
+ const row = (c, i, isUsed) => html`<div key=${c.id} class=${cx('sp-row', c.id === value && 'on', !isUsed && hl === i && 'hl', isUsed && 'used', c.pct >= 100 && 'full')} data-i=${isUsed ? undefined : i} onMouseEnter=${() => { if (!isUsed) setHl(i); }}>
+   <button type="button" class="sp-pick" role="option" aria-selected=${c.id === value} disabled=${isUsed} title=${isUsed ? '오늘 보고에 이미 넣었어요 · 연필로 고칠 수 있어요' : c.text} onClick=${() => pick(c)}><span class="pk-check">${c.id === value ? I('Check', 14) : ''}</span><span class="sp-name"><span class="sp-text">${c.text}</span><${CheckTag} c=${c} /></span>${cSeenName(c.by) ? html`<span class="sp-by">${cSeenName(c.by)}</span>` : ''}<span class="pk-pct"><span class="pk-bar"><i style=${`width:${c.pct}%`}></i></span><b>${c.pct}%</b></span></button>
+   <button type="button" class="sp-pen" aria-label=${`고치기: ${c.text}`} title="이름 · % 고치기 · 지우기" disabled=${busyAll} onClick=${() => setEdit({id: c.id, text: c.text, pct: c.pct})}>${I('Pencil', 13)}</button>
+  </div>`;
+ return html`<div class=${cx('pk sp tb-rep-sel sub', open && 'open')} ref=${wrap}>
+  <button type="button" ref=${btn} class="pk-btn" aria-haspopup="listbox" aria-expanded=${open} aria-label="세부 업무" disabled=${busy} onClick=${() => (open ? close() : show())} onKeyDown=${e => { if (!open && ['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); show(); } }}><span class="pk-val">${sel ? html`<span class="pk-label">${sel.text}</span><${CheckTag} c=${sel} />${cSeenName(sel.by) ? html`<span class="pk-meta">${cSeenName(sel.by)}</span>` : ''}` : html`<span class="pk-ph">세부 업무 고르기 · 새로 적기</span>`}</span>${I('ChevronDown', 15)}</button>
+  ${open && html`<div class=${cx('pk-pop sp-pop', pos.up && 'up')} style=${`left:${pos.left}px;width:${pos.width}px`} role="listbox" aria-label="세부 업무" ref=${list} onKeyDown=${key}>
+   <form class="sp-add" onSubmit=${add}>${I('Plus', 14)}<input ref=${addRef} maxLength="200" aria-label="새 세부 업무" placeholder="새 세부 업무 적고 Enter · 이 업무에 바로 추가돼요" value=${q} onInput=${e => setQ(e.target.value)} /><button class="secondary-button small" disabled=${busyAll || !q.trim()}>추가</button></form>
+   ${avail.length ? avail.map((c, i) => edit && edit.id === c.id ? editRow(c) : row(c, i, false)) : html`<p class="sp-none">${items.length ? '남은 세부 업무가 없어요. 위 칸에 새로 적어 주세요.' : '아직 세부 업무가 없어요. 위 칸에 적고 Enter.'}</p>`}
+   ${done.length > 0 && html`<div class="pk-group">오늘 보고에 넣은 것</div>${done.map(c => edit && edit.id === c.id ? editRow(c) : row(c, -1, true))}`}
+  </div>`}
+ </div>`;
+}
+
+// 업무보고 이미지(11-05, 복사하기): 내 그날 보고를 카톡에 붙이기 좋은 카드 한 장으로 다시 그린다(입력 칸 · 버튼 없이, 폭 720 · 2배 선명도).
+async function reportPng(d) {
+ try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch {}
+ const W = 720, P = 32, S = 2, FF = getComputedStyle(document.body).fontFamily || 'sans-serif';
+ const C = {navy: '#0b1c5c', ink: '#1d2a44', gray: '#8a93a8', line: '#e5e8f5', blue: '#315df8', green: '#3f8c66', bar: '#e9edf5', soft: '#f6f8fd'};
+ const font = (px, w = 500) => `${w} ${px}px ${FF}`;
+ const wrapT = (ctx, text, max) => { const out = []; for (const para of String(text || '').split('\n')) { let line = ''; for (const ch of [...para]) { const t = line + ch; if (line && ctx.measureText(t).width > max) { const sp = line.lastIndexOf(' '); if (sp > 0 && line.length - sp < 14) { out.push(line.slice(0, sp)); line = line.slice(sp + 1) + ch; } else { out.push(line); line = ch; } } else line = t; } out.push(line); } return out; };
+ const paint = (ctx, dry) => {
+  let y = 0;
+  const text = (s, x, yy, f, col, align = 'left') => { if (dry) return; ctx.font = f; ctx.fillStyle = col; ctx.textAlign = align; ctx.textBaseline = 'alphabetic'; ctx.fillText(s, x, yy); };
+  const rect = (x, yy, w, h, col, r = 0) => { if (dry) return; ctx.fillStyle = col; ctx.beginPath(); if (r && ctx.roundRect) ctx.roundRect(x, yy, w, h, r); else ctx.rect(x, yy, w, h); ctx.fill(); };
+  const bar = (x, yy, w, pct) => { rect(x, yy, w, 6, C.bar, 3); if (pct > 0) rect(x, yy, Math.max(6, w * Math.min(100, pct) / 100), 6, pct >= 100 ? C.green : C.blue, 3); };
+  const pill = (x, yy, label, bg, col) => { ctx.font = font(11, 800); const w = ctx.measureText(label).width + 12; rect(x, yy - 12, w, 17, bg, 3); text(label, x + 6, yy, font(11, 800), col); return w; };
+  rect(0, 0, W, 84, C.navy);
+  text(`${d.name}${d.role ? ` ${d.role}` : ''}`, P, 40, font(24, 800), '#ffffff');
+  text(d.dayLabel, P, 64, font(14, 500), '#c8d0ea');
+  text('오늘의 업무보고', W - P, 40, font(15, 700), '#ffffff', 'right');
+  if (d.savedAt) text(`${d.savedAt} 저장`, W - P, 64, font(13, 500), '#aab6dc', 'right');
+  y = 84 + 26;
+  const section = label => { y += 6; rect(P, y - 12, 3, 15, C.blue, 1); text(label, P + 10, y, font(14, 800), C.navy); y += 10; };
+  section('오늘 한 일');
+  if (!d.groups.length) { text('적은 내용이 없어요.', P, y + 18, font(15), C.gray); y += 30; }
+  for (const g of d.groups) {
+   y += 8;
+   if (g.title) {
+    ctx.font = font(16, 800); const tl = wrapT(ctx, g.title, W - P * 2 - (g.pct !== null ? 116 : 0));
+    tl.forEach((l, i) => text(l, P, y + 16 + i * 23, font(16, 800), C.navy));
+    if (g.pct !== null) { bar(W - P - 104, y + 7, 60, g.pct); text(`${g.pct}%`, W - P, y + 15, font(14, 800), C.navy, 'right'); }
+    y += 16 + (tl.length - 1) * 23 + 10;
+   }
+   for (const s of g.subs) {
+    const hasP = s.pct !== null && s.pct !== undefined, maxW = W - P * 2 - 22 - (hasP ? 116 : 0);
+    ctx.font = font(15, 500); const sl = wrapT(ctx, s.text, maxW);
+    rect(P + 7, y + 6, 5, 5, g.title ? '#7c9cf9' : C.gray, 2.5);
+    sl.forEach((l, i) => text(l, P + 22, y + 14 + i * 22, font(15, 500), C.ink));
+    if (s.tag) { ctx.font = font(15, 500); const lw = ctx.measureText(sl[sl.length - 1]).width, lab = s.tag === 'new' ? 'New' : '조정됨'; ctx.font = font(11, 800); const pw = ctx.measureText(lab).width + 12, px = P + 22 + lw + 8; if (px + pw <= P + 22 + maxW + 4) pill(px, y + 13 + (sl.length - 1) * 22, lab, s.tag === 'new' ? '#3865e8' : '#fff1dc', s.tag === 'new' ? '#ffffff' : '#b45f06'); }
+    if (hasP) { bar(W - P - 104, y + 6, 60, s.pct); text(`${s.pct}%`, W - P, y + 14, font(14, 700), s.pct >= 100 ? C.green : C.ink, 'right'); }
+    y += 14 + (sl.length - 1) * 22 + 12;
+   }
+  }
+  if (d.links.length) { y += 10; section('링크'); for (const l of d.links) { ctx.font = font(14, 600); const ll = wrapT(ctx, l.label ? `${l.label} · ${l.url}` : l.url, W - P * 2 - 10); ll.forEach((s, i) => text(s, P, y + 16 + i * 20, font(14, 600), C.blue)); y += 16 + (ll.length - 1) * 20 + 8; } }
+  for (const [k, label] of [['note', '오늘 업무 메모'], ['next', '내일 할 일 메모']]) { const v = String(d[k] || '').trim(); if (!v) continue; y += 12; section(label); ctx.font = font(15, 500); const ml = wrapT(ctx, v, W - P * 2 - 28); rect(P, y + 6, W - P * 2, ml.length * 22 + 18, C.soft, 6); ml.forEach((s, i) => text(s, P + 14, y + 28 + i * 22, font(15, 500), C.ink)); y += ml.length * 22 + 18 + 10; }
+  y += 14; rect(P, y, W - P * 2, 1, C.line); y += 22; text('pocket sync · 디자인팀 보드', W - P, y, font(12, 600), C.gray, 'right'); y += 16;
+  return y;
+ };
+ const probe = document.createElement('canvas').getContext('2d');
+ const H = Math.ceil(paint(probe, true));
+ const cv = document.createElement('canvas'); cv.width = W * S; cv.height = H * S;
+ const ctx = cv.getContext('2d'); ctx.scale(S, S); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+ paint(ctx, false);
+ return await new Promise((res, rej) => cv.toBlob(b => (b ? res(b) : rej(new Error('이미지를 만들지 못했어요.'))), 'image/png'));
+}
 function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgress, onComment, onMark, onEditComment, onDeleteComment, onOpenTask, onAvatar, seats = SEATS, viewOnly = false, initialDay = '', focus = null}) {
  const [pickOpen, setPickOpen] = useState(false), [calOpen, setCalOpen] = useState(false);
  const [day, setDay] = useState(() => (initialDay && initialDay <= today() ? initialDay : today())), [text, setText] = useState('');
@@ -1063,6 +1174,18 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
   const used = usedIn(t.id); if (sub !== '__new') used.add(sub);
   const left = t.checklist.some(x => !used.has(x.id)); setSub(left ? '' : '__new'); setSubPct(0); setDirty(false);
  }
+ // 세부 업무 목록에서 바로 추가 · 고치기 · 지우기(11-05). 고치면 오늘 내 보고에 이미 넣은 그 줄의 이름 · %도 같이.
+ async function addSub(text) { const t = projTask; if (!t) return; const cid = newCheckId(); await onCheck(t, {type: 'addOne', id: cid, text, pct: 0}); setSub(cid); setSubPct(0); setDirty(true); }
+ async function saveSub(c, {text, pct}) { const t = projTask; if (!t) return; await onCheck(t, {type: 'update', cid: c.id, text, pct}); if (my.lines.some(l => l.task_id === t.id && l.check_id === c.id)) await onAct(day, cur => ({lines: cur.lines.map(l => l.task_id === t.id && l.check_id === c.id ? {...l, text, pct} : l)}), ''); if (sub === c.id) setSubPct(pct); toast.success('세부 업무를 고쳤어요.'); }
+ async function removeSub(c) { const t = projTask; if (!t || !confirm(`‘${c.text}’ 세부 업무를 지울까요? 이 업무의 세부 업무 목록에서 빠져요.`)) return false; await onCheck(t, {type: 'remove', cid: c.id}); if (sub === c.id) { setSub(''); setSubPct(0); } return true; }
+ // 복사하기(11-05): 내 그날 보고를 이미지로 클립보드에(카톡에 바로 붙여넣기). 메모는 칸에 적힌 그대로(저장 전이어도).
+ async function copyReport(card) {
+  const memo = k => { const el = card && card.querySelector(`[data-memo="${k}"] textarea`); return el ? String(el.value || '') : null; };
+  const groups = groupsOf(my).map(g => { const t = g.k ? taskOf(g.k) : null; if (!g.k) return {title: '', pct: null, subs: g.lines.map(l => ({text: l.text, pct: l.pct, tag: ''}))}; return {title: t ? t.title : (g.lines[0].task_title || '지워진 업무'), pct: t ? (t.progress || 0) : null, subs: g.lines.filter(l => !projLine(l)).map(l => { const c = t && l.check_id ? t.checklist.find(x => x.id === l.check_id) : null; return {text: c ? c.text : l.text, pct: c && isToday ? c.pct : l.pct, tag: c ? checkTag(c) : ''}; })}; });
+  const d = {name: me.name, role: TEAM_ROLES[me.name] || '', dayLabel: `${Number(day.slice(5, 7))}월 ${Number(day.slice(8))}일 (${'일월화수목금토'[new Date(day + 'T12:00:00Z').getUTCDay()]})`, savedAt: my.updated_at ? teamClock(my.updated_at) : '', groups, links: my.links || [], note: memo('note') ?? my.note, next: memo('next') ?? my.next};
+  const how = await copyImage(() => reportPng(d), `업무보고-${me.name}-${day}.png`);
+  if (how === 'copied') toast.success('업무보고를 이미지로 복사했어요. 카톡 대화창에 붙여넣기(Ctrl+V · ⌘V) 하면 돼요.'); else toast.info('이 브라우저는 이미지 복사가 안 돼서 파일로 저장했어요. 카톡에 파일로 보내 주세요.');
+ }
  async function setLinePct(l, t, c, v) { try { if (c && c.pct !== v) await onCheck(t, {type: 'pct', cid: c.id, pct: v}); await onAct(day, cur => ({lines: cur.lines.map(x => x.id === l.id ? {...x, pct: v} : x)}), ''); } catch {} }
  // 저장하기: 지금 칸에 적혀 있는 것(추가 전인 오늘 한 일, 두 메모)을 한 번에 저장한다. 버튼을 눌러도 입력 칸 포커스가 빠지지 않게 해 두 번 저장되며 겹치지 않게 한다.
  async function saveAll(card) {
@@ -1081,7 +1204,7 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
  const pctView = (v, set, label) => set ? html`<span class=${cx('tb-rep-pct', v >= 100 && 'full')}><span class="tb-rep-pct-bar"><i style=${`width:${v}%`}></i></span>${pctPick(v, set, label)}</span>` : html`<span class=${cx('tb-rep-pct ro', v >= 100 && 'full')}><span class="tb-rep-pct-bar"><i style=${`width:${v}%`}></i></span><b>${v}%</b></span>`;
  const subLine = (l, t, isMe) => {
   const c = t && l.check_id ? t.checklist.find(x => x.id === l.check_id) : null, v = c && isToday ? c.pct : l.pct, name = c ? c.text : l.text;
-  return html`<li key=${l.id}><span class="tb-rep-dot"></span><div class="tb-rep-subtext"><${TeamText} text=${name} />${c && cSeenName(c.by) ? html`<small>${cSeenName(c.by)}</small>` : ''}</div>${v !== null && v !== undefined ? pctView(v, isMe && c && onCheck ? n => setLinePct(l, t, c, n) : null, `진행률: ${name}`) : html`<span></span>`}${isMe ? xBtn('빼기', () => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), '')) : ''}</li>`;
+  return html`<li key=${l.id}><span class="tb-rep-dot"></span><div class="tb-rep-subtext"><${TeamText} text=${name} />${c && html`<${CheckTag} c=${c} />`}${c && cSeenName(c.by) ? html`<small>${cSeenName(c.by)}</small>` : ''}</div>${v !== null && v !== undefined ? pctView(v, isMe && c && onCheck ? n => setLinePct(l, t, c, n) : null, `진행률: ${name}`) : html`<span></span>`}${isMe ? xBtn('빼기', () => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), '')) : ''}</li>`;
  };
  const projView = (g, isMe) => {
   const t = taskOf(g.k), title = t ? t.title : (g.lines[0].task_title || '지워진 업무'), subs = g.lines.filter(l => !projLine(l)), prog = t ? (t.progress || 0) : null;
@@ -1113,7 +1236,7 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
  const form = html`<form class="tb-rep-form" onSubmit=${async e => { e.preventDefault(); try { await addEntry(); } catch {} }}>
   <${Pick} class="tb-rep-sel proj" label="프로젝트" placeholder="프로젝트 고르기 (없으면 한 줄로 적기)" value=${proj} disabled=${busy} onChange=${pickProj} options=${[{value: '', label: '프로젝트 없이 한 줄로 적기', meta: '오늘 한 일을 자유롭게 한 줄로', blank: true}, ...mineT.map(x => ({value: x.id, label: x.title, meta: projMeta(x, false), pct: x.progress || 0, group: '내 업무'})), ...otherT.map(x => ({value: x.id, label: x.title, meta: projMeta(x, true), pct: x.progress || 0, group: '다른 업무'}))]} />
   ${proj ? html`<div class="tb-rep-form-row">
-   ${sub === '__new' ? html`<${Fragment}>${subOpts.length > 0 && html`<button type="button" class="icon-button tb-rep-back" aria-label="세부 업무 목록에서 고르기" title="세부 업무 목록에서 고르기" onClick=${() => pickSub(subOpts[0].id)}>${I('List', 15)}</button>`}<input class="tb-rep-newsub" ref=${focusOnMount} maxLength="200" aria-label="새 세부 업무" placeholder="오늘 한 일 (이 업무의 세부 업무로도 추가돼요)" value=${subText} onInput=${e => { setSubText(e.target.value); setDirty(true); }} /><//>` : html`<${Pick} class="tb-rep-sel sub" label="세부 업무" placeholder="세부 업무 고르기" value=${sub} disabled=${busy} onChange=${pickSub} options=${[...subOpts.map(c => ({value: c.id, label: c.text, meta: cSeenName(c.by) || '', pct: c.pct})), {value: '__new', label: '목록에 없으면 직접 적기', meta: '이 업무의 세부 업무로도 추가돼요', action: true}]} />`}
+   ${sub === '__new' ? html`<${Fragment}>${subOpts.length > 0 && html`<button type="button" class="icon-button tb-rep-back" aria-label="세부 업무 목록에서 고르기" title="세부 업무 목록에서 고르기" onClick=${() => pickSub(subOpts[0].id)}>${I('List', 15)}</button>`}<input class="tb-rep-newsub" ref=${focusOnMount} maxLength="200" aria-label="새 세부 업무" placeholder="오늘 한 일 (이 업무의 세부 업무로도 추가돼요)" value=${subText} onInput=${e => { setSubText(e.target.value); setDirty(true); }} /><//>` : html`<${SubPick} task=${projTask} value=${sub} used=${usedIn(projTask.id)} busy=${busy} onPick=${pickSub} onAdd=${addSub} onSave=${saveSub} onRemove=${removeSub} />`}
    ${pctPick(subPct, v => { setSubPct(v); setDirty(true); }, '진행률', 'tb-rep-sel pct')}
    <button class="secondary-button" disabled=${busy || !canAdd}>추가</button>
   </div>` : html`<${Fragment}><div class="tb-rep-form-row"><input maxLength="300" aria-label="오늘 한 일" placeholder="오늘 한 일을 한 줄로 적고 Enter" value=${text} onInput=${e => setText(e.target.value)} /><button class="secondary-button" disabled=${busy || !text.trim()}>추가</button></div>${onCheck && text.trim().length >= 2 && (list => list.length ? html`<div class="tb-rep-hint">${I('Sparkles', 12)}<span>비슷한 업무에 이어 적기</span>${list.map(x => html`<button type="button" key=${x.id} class="chip" title="이 업무의 새 세부 업무로 적어요" onClick=${() => toProj(x)}>${x.title}</button>`)}</div>` : '')(similar(text))}<//>`}
@@ -1135,7 +1258,7 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
    <div class="tb-sub"><span>내일 할 일 메모</span></div>
    ${isMe ? html`<${MemoBox} hKey="rep-next" field="next"><${AutoText} class="tb-d-body tb-rep-memo" value=${my.next} label="내일 할 일 메모" placeholder="내일 이어서 할 일, 미리 준비할 것 (선택)" maxLength="3000" disabled=${busy} onCommit=${v => onAct(day, () => ({next: v}), '')} /><//>` : html`<div class=${cx('tb-d-body tb-rep-memo tb-memo-view', !(r && r.next) && 'empty')} aria-readonly="true" title=${off}>${r && r.next ? html`<${TeamText} text=${r.next} />` : '내일 이어서 할 일, 미리 준비할 것 (선택)'}</div>`}
    ${!isMe && html`<div class="tb-rep-save is-off"><small>${r && r.updated_at ? `${teamClock(r.updated_at)} 저장됨` : '아직 저장 전'}</small><button type="button" class="primary-button tb-rep-save-btn" disabled title=${viewOnly && s.key === me.id ? '디자인팀 보드에서 저장할 수 있어요' : `${s.name}님만 저장할 수 있어요`}>${I('Check', 15)}저장하기</button></div>`}
-   ${isMe && html`<div class="tb-rep-save">${pendingLabel ? html`<small class="tb-rep-pending" title="추가를 누르지 않은 줄이에요. 저장하기를 누르면 함께 들어가요.">추가 전인 ‘${pendingLabel.length > 34 ? pendingLabel.slice(0, 33) + '…' : pendingLabel}’도 함께 저장돼요</small>` : html`<small>${r && r.updated_at ? `${teamClock(r.updated_at)} 저장됨` : '아직 저장 전'}</small>`}<button type="button" class="primary-button tb-rep-save-btn" onMouseDown=${e => e.preventDefault()} onClick=${e => saveAll(e.currentTarget.closest('article'))}>${I('Check', 15)}저장하기</button></div>`}
+   ${isMe && html`<div class="tb-rep-save">${pendingLabel ? html`<small class="tb-rep-pending" title="추가를 누르지 않은 줄이에요. 저장하기를 누르면 함께 들어가요.">추가 전인 ‘${pendingLabel.length > 34 ? pendingLabel.slice(0, 33) + '…' : pendingLabel}’도 함께 저장돼요</small>` : html`<small>${r && r.updated_at ? `${teamClock(r.updated_at)} 저장됨` : '아직 저장 전'}</small>`}<button type="button" class="secondary-button tb-rep-copy" title="내 업무보고를 이미지로 복사해요 · 카톡에 바로 붙여넣기" onMouseDown=${e => e.preventDefault()} onClick=${e => copyReport(e.currentTarget.closest('article'))}>${I('Copy', 15)}복사하기</button><button type="button" class="primary-button tb-rep-save-btn" onMouseDown=${e => e.preventDefault()} onClick=${e => saveAll(e.currentTarget.closest('article'))}>${I('Check', 15)}저장하기</button></div>`}
    <div class="tb-rep-comments"><div class="tb-sub"><span>댓글 ${cs.length || ''}</span></div><${TeamCommentList} cs=${cs} me=${me} busy=${busy} onMark=${onMark} onEdit=${onEditComment} onDelete=${onDeleteComment} />${onComment && html`<${ReplyForm} key=${rid} busy=${busy} label=${`${s.name} 업무보고 댓글`} placeholder=${isMe ? '덧붙일 말 · Shift+Enter 줄바꿈' : viewOnly && me.name !== ADMIN_NAME ? '이현성에게 남길 말 · 디자인팀에는 안 보여요' : `${s.name}님에게 댓글 · Shift+Enter 줄바꿈`} onSend=${t => onComment({id: rid}, t)} />`}</div>
   </article>`; })}</div>
   ${!people.some(s => { const r = repOf(s.key), rid = r ? r.id : `C-rep-${s.key}-${day}`; return (!viewOnly && s.key === me.id) || !!r || s.name !== ADMIN_NAME || comments.some(c => c.item_id === rid); }) && html`<p class="tb-none pad tb-rep-none">디자인팀 업무보고는 이현성만 볼 수 있어요.</p>`}
