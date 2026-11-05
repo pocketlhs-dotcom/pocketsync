@@ -1,6 +1,6 @@
 /* ===== Pocket Sync board — runtime (Preact + htm, Claude artifact db) ===== */
 const {h, render, Fragment} = preact;
-const {useState, useEffect, useRef, useMemo, useCallback} = preactHooks;
+const {useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback} = preactHooks;
 const html = htm.bind(h);
 
 /* ---------- Icons (lucide node data, inlined) ---------- */
@@ -60,8 +60,8 @@ function dDay(due) { if (!due) return {label: '마감 없음', cls: 'none', n: n
 // 업무 안의 세부 업무 목록. 진행률은 체크한 비율로 자동 계산된다.
 // 세부 업무마다 진행률(pct)을 가진다. 체크 = 100%, 업무 진행률 = 세부 업무 진행률의 평균.
 function normChecklist(v) { return (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const pct = c.done ? 100 : Math.max(0, Math.min(100, Math.round(Number(c.pct) || 0))); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct, done: pct === 100, ...(c.by ? {by: String(c.by).slice(0, 20)} : {}), ...(c.at ? {at: String(c.at).slice(0, 30)} : {}), ...(c.ed ? {ed: String(c.ed).slice(0, 30)} : {}), ...((h => h > 0 ? {hours: h} : {})(Math.min(999, Math.round((Number(c.hours) || 0) * 2) / 2))), ...(String(c.note || '').trim() ? {note: String(c.note).trim().slice(0, 300)} : {})}; }); }
-// 세부 업무 시간(11-05, 사용자 '% 옆에 시간 개념 1t, 2t, 3t'): 1t = 1시간, 반 시간 단위.
-const fmtT = n => `${Number(n) % 1 ? Number(n).toFixed(1) : Number(n)}t`;
+// 세부 업무 시간(11-05, 사용자 '% 옆에 시간 개념 1t, 2t, 3t' → 같은 날 'h로 하자'): 1h = 1시간, 반 시간 단위.
+const fmtH = n => `${Number(n) % 1 ? Number(n).toFixed(1) : Number(n)}h`;
 const hoursOf = item => ((item && item.checklist) || []).reduce((a, c) => a + (Number(c.hours) || 0), 0);
 const HOUR_OPTS = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 32, 40];
 // 세부 업무 특이사항(11-05, 사용자 '생각보다 지연되면 아이콘 눌러 지연 사유 · 특이사항'): note = '사유 칩 / 사유 칩 / 직접 쓴 말'.
