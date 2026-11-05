@@ -1929,7 +1929,7 @@ function shrinkImage(file, size = 128) {
 }
 function normTeam(d) {
  const b = normItem(d);
- return {...b, assignee: String(d.assignee || ''), topic_label: String(d.topic_label || ''), src_board: String(d.src_board || ''), src_id: String(d.src_id || ''), src_title: String(d.src_title || ''), issue: TEAM_ISSUES[d.issue] ? d.issue : '', issue_note: String(d.issue_note || ''), issue_at: String(d.issue_at || ''), issue_by: String(d.issue_by || ''), src_body: String(d.src_body || ''), src_checks: normChecklist(d.src_checks), src_links: teamLinks(d.src_links), src_synced_at: String(d.src_synced_at || ''), start_on: DATE_RE.test(d.start_on || '') ? d.start_on : '', spec: normChecklist(d.spec).map(c => ({id: c.id, text: c.text, done: c.done})), issue_log: (Array.isArray(d.issue_log) ? d.issue_log : []).filter(h => h && h.resolved_at).map(h => ({issue: TEAM_ISSUES[h.issue] ? h.issue : 'check', note: String(h.note || ''), by: String(h.by || ''), at: String(h.at || ''), resolved_by: String(h.resolved_by || ''), resolved_at: String(h.resolved_at), how: String(h.how || '')})), history: (Array.isArray(d.history) ? d.history : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), text: String(h.text || ''), kind: String(h.kind || ''), from: h.from === undefined ? null : String(h.from), to: h.to === undefined ? null : String(h.to), note: String(h.note || '')})), handoffs: (Array.isArray(d.handoffs) ? d.handoffs : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), from: String(h.from || ''), to: String(h.to || ''), note: String(h.note || '')})), out_links: (Array.isArray(d.out_links) ? d.out_links : []).filter(o => o && ['A', 'B'].includes(o.board) && o.id).map(o => ({board: o.board, id: String(o.id), at: String(o.at || '')})), link_vis: Array.isArray(d.link_vis) ? d.link_vis.filter(b => b === 'A' || b === 'B') : null, lhs_seen: String(d.lhs_seen || ''), work_days: Number(d.work_days) > 0 ? Math.round(Number(d.work_days) * 2) / 2 : 0, work_note: String(d.work_note || ''), work_at: String(d.work_at || ''), work_by: String(d.work_by || '')};
+ return {...b, assignee: String(d.assignee || ''), topic_label: String(d.topic_label || ''), src_board: String(d.src_board || ''), src_id: String(d.src_id || ''), src_title: String(d.src_title || ''), issue: TEAM_ISSUES[d.issue] ? d.issue : '', issue_note: String(d.issue_note || ''), issue_at: String(d.issue_at || ''), issue_by: String(d.issue_by || ''), src_body: String(d.src_body || ''), src_checks: normChecklist(d.src_checks), src_links: teamLinks(d.src_links), src_synced_at: String(d.src_synced_at || ''), start_on: DATE_RE.test(d.start_on || '') ? d.start_on : '', spec: normChecklist(d.spec).map(c => ({id: c.id, text: c.text, done: c.done})), issue_log: (Array.isArray(d.issue_log) ? d.issue_log : []).filter(h => h && h.resolved_at).map(h => ({issue: TEAM_ISSUES[h.issue] ? h.issue : 'check', note: String(h.note || ''), by: String(h.by || ''), at: String(h.at || ''), resolved_by: String(h.resolved_by || ''), resolved_at: String(h.resolved_at), how: String(h.how || '')})), history: (Array.isArray(d.history) ? d.history : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), text: String(h.text || ''), kind: String(h.kind || ''), from: h.from === undefined ? null : String(h.from), to: h.to === undefined ? null : String(h.to), note: String(h.note || '')})), handoffs: (Array.isArray(d.handoffs) ? d.handoffs : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), from: String(h.from || ''), to: String(h.to || ''), note: String(h.note || '')})), out_links: (Array.isArray(d.out_links) ? d.out_links : []).filter(o => o && ['A', 'B'].includes(o.board) && o.id).map(o => ({board: o.board, id: String(o.id), at: String(o.at || '')})), link_vis: Array.isArray(d.link_vis) ? d.link_vis.filter(b => b === 'A' || b === 'B') : null, lhs_seen: String(d.lhs_seen || ''), work_days: Number(d.work_days) > 0 ? Math.round(Number(d.work_days) * 2) / 2 : 0, work_note: String(d.work_note || ''), work_at: String(d.work_at || ''), work_by: String(d.work_by || ''), work_start: DATE_RE.test(d.work_start || '') ? d.work_start : '', work_end: DATE_RE.test(d.work_end || '') ? d.work_end : '', work_delay: String(d.work_delay || ''), work_delay_tags: Array.isArray(d.work_delay_tags) ? d.work_delay_tags.map(String).slice(0, 10) : []};
 }
 const teamByDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || ({critical: 0, urgent: 1, share: 2}[a.priority] - {critical: 0, urgent: 1, share: 2}[b.priority]) || String(a.created_at || '').localeCompare(String(b.created_at || ''));
 // 팀 현황 순서: 손으로 정한 순서(prio_no) 먼저, 나머지는 미배정 먼저 · 마감순.
@@ -1984,7 +1984,7 @@ function TeamBoard() {
  const [finalAsk, setFinalAsk] = useState(null);
  const askFinal = (x, mode) => new Promise(res => setFinalAsk({x, mode, res}));
  // 완료한 뒤 작업일 · 히스토리 적기 · 고치기(이현성만). 업무 수정 시각 · 기록은 건드리지 않는다(디자이너 화면에 '수정'으로 안 뜨게).
- async function editWork(x) { const f = await askFinal(x, 'edit'); if (f) await run(() => db.doc('items/' + x.id).update({...f, work_at: nowIso(), work_by: me.name}), '작업일을 저장했어요.'); }
+ async function editWork(x) { const f = await askFinal(x, 'edit'); if (!f) return; const moved = f.work_end && f.work_end !== inSeoul(doneAt(x)) ? {done_at: atDay(f.work_end, doneAt(x))} : {}; await run(() => db.doc('items/' + x.id).update({...f, ...moved, work_at: nowIso(), work_by: me.name}), '최종 완료 기록을 저장했어요.'); }
  async function run(fn, ok) { setBusy(true); try { const r = await fn(); if (ok) toast.success(ok); return r; } catch (e) { console.error('team save', e); toast.error(friendlyError(e)); throw e; } finally { setBusy(false); } }
  // A 원본의 C 진행 표시 갱신(이현성일 때만; 디자이너는 A에 쓸 수 없다).
  const linkTargets = x => [...(x.src_id ? [x.src_id] : []), ...(x.out_links || []).map(o => o.id)];
@@ -2011,6 +2011,8 @@ function TeamBoard() {
   }
   const status = next.status || x.status;
   if (status === 'done' && x.status !== 'done') { next.done_at = nowIso(); if (!('progress' in fields)) next.progress = 100; }
+  // 최종 종료일을 오늘이 아닌 날로 적었으면 완료 시각의 날짜도 그날로(완료 탭 날짜 · 달 · 제때 계산이 같은 기준).
+  if (next.work_end && next.done_at && next.work_end !== inSeoul(next.done_at)) next.done_at = atDay(next.work_end, next.done_at);
   if (status !== 'done' && x.status === 'done') next.done_at = '';
   // 팀원이 추가한 업무를 이현성이 고치면 '새로' 표시도 지운다.
   if (isAdmin && teamByMember(x) && !x.lhs_seen) next.lhs_seen = nowIso();
@@ -2567,27 +2569,58 @@ function TeamKpi({items, onMonth, onBack}) {
   <p class="kpi-note">완료 수 = 그 달에 완료한 업무(담당이 여러 명이면 각자 1건씩, 팀 전체는 업무 수) · 제때 = 마감일까지 완료한 비율(마감이 있던 업무만) · 작업 = 최종 완료 때 적은 작업일 합계 · 평균(적은 업무만, n/m건 = 적은 수/완료 수)</p>
  </div>`;
 }
-// 최종 완료 창(11-05, 이현성만): 며칠 걸렸는지(작업일, 꼭 · 반나절 단위) + 히스토리 메모(선택). 시작일(없으면 진행 중이 된 날 → 등록일)부터
-// 완료 날까지 주말을 뺀 날 수를 미리 채워 둔다. mode 'done' = 완료로 바꾸는 중(취소하면 완료 안 함), 'edit' = 완료한 뒤 적기 · 고치기.
+// 최종 완료 창(11-05, 이현성만, 사용자 '시작일 · 실제 작업일 · 최종 종료일 · 딜레이 사유 · 히스토리 메모'): 시작일(업무 시작일 → 진행 중이 된 날 → 등록일)과
+// 최종 종료일(완료하는 날 · 나중에 적으면 완료한 날)을 미리 채우고, 실제 작업일(꼭, 반나절 단위)은 그 사이 주말을 뺀 날 수로 채운다(직접 고치기 전까지는 날짜를 바꾸면 따라감).
+// 마감이 있고 종료일이 마감보다 늦으면 딜레이 사유 칸을 강조(사유 칩 + 한 줄, 선택). mode 'done' = 완료로 바꾸는 중(취소하면 완료 안 함), 'edit' = 완료한 뒤 적기 · 고치기.
+const WORK_DELAYS = ['자료 회신 지연', '피드백 지연', '요청 · 범위 변경', '수정 반복', '다른 업무 우선', '기타'];
+// 기록의 시작일 · 종료일(예전 기록은 업무 시작일 · 완료한 날로).
+const workStartOf = x => x.work_start || teamWorkStart(x) || inSeoul(doneAt(x));
+const workEndOf = x => x.work_end || inSeoul(doneAt(x));
+// 하루(YYYY-MM-DD)에 iso의 서울 시각을 붙인 ISO — 최종 종료일로 완료 시각의 날짜만 바꿀 때.
+const atDay = (day, iso) => { const b = iso ? new Date(iso) : new Date(), hms = isNaN(b) ? '18:00:00' : new Date(b.getTime() + 9 * 36e5).toISOString().slice(11, 19); return new Date(`${day}T${hms}+09:00`).toISOString(); };
 function TeamFinalDone({x, mode = 'done', onCancel, onSave}) {
- const end = mode === 'done' ? today() : (inSeoul(doneAt(x)) || today()), start = teamWorkStart(x), s0 = start && start <= end ? start : end;
- const guess = Math.max(1, teamWorkdays(s0, end)), cal = teamDayNum(end) - teamDayNum(s0) + 1;
- const [days, setDays] = useState(() => String(x.work_days || guess)), [note, setNote] = useState(() => x.work_note || '');
- const n = Number(days), ok = Number.isFinite(n) && n >= 0.5 && n <= 999;
- const step = d => setDays(v => String(Math.min(999, Math.max(0.5, Math.round(((Number(v) || 0) + d) * 2) / 2))));
- const save = e => { e.preventDefault(); if (ok) onSave({work_days: Math.round(n * 2) / 2, work_note: note.trim().slice(0, 2000)}); };
+ const t = today(), end0 = x.work_end || (mode === 'done' ? t : (inSeoul(doneAt(x)) || t)), s0 = x.work_start || teamWorkStart(x) || end0, start0 = s0 <= end0 ? s0 : end0;
+ const guessOf = (a, b) => Math.max(1, teamWorkdays(a, b));
+ const [start, setStart] = useState(start0), [end, setEnd] = useState(end0);
+ const [days, setDays] = useState(() => String(x.work_days || guessOf(start0, end0))), [touched, setTouched] = useState(!!x.work_days);
+ const [tags, setTags] = useState(() => x.work_delay_tags || []), [delay, setDelay] = useState(x.work_delay || ''), [note, setNote] = useState(x.work_note || '');
+ const okDates = DATE_RE.test(start) && DATE_RE.test(end) && start <= end && end <= t;
+ const guess = okDates ? guessOf(start, end) : 0, cal = okDates ? teamDayNum(end) - teamDayNum(start) + 1 : 0;
+ const n = Number(days), ok = okDates && Number.isFinite(n) && n >= 0.5 && n <= 999;
+ const late = x.due && okDates && end > x.due ? teamDayNum(end) - teamDayNum(x.due) : 0;
+ const src = x.work_start ? '' : x.start_on ? '업무 시작일' : (x.history || []).some(h => h.kind === 'status' && h.to === statuses.doing) ? '진행 중이 된 날' : '등록한 날';
+ const setDates = (a, b) => { setStart(a); setEnd(b); if (!touched && DATE_RE.test(a) && DATE_RE.test(b) && a <= b) setDays(String(guessOf(a, b))); };
+ const step = d => { setTouched(true); setDays(v => String(Math.min(999, Math.max(0.5, Math.round(((Number(v) || 0) + d) * 2) / 2)))); };
+ const toggleTag = k => setTags(l => (l.includes(k) ? l.filter(v => v !== k) : [...l, k]));
+ const save = e => { e.preventDefault(); if (ok) onSave({work_start: start, work_end: end, work_days: Math.round(n * 2) / 2, work_delay_tags: WORK_DELAYS.filter(k => tags.includes(k)), work_delay: delay.trim().slice(0, 300), work_note: note.trim().slice(0, 2000)}); };
  return html`<${Dialog} class="tb-final" title=${mode === 'done' ? '최종 완료' : '최종 완료 기록'} description=${x.title} onClose=${onCancel}>
   <form class="tb-final-form" onSubmit=${save}>
-   <div class="tb-final-days"><label for="tb-final-n">며칠 걸렸나요?</label>
-    <div class="tb-final-step"><button type="button" class="icon-button" aria-label="반나절 빼기" onClick=${() => step(-0.5)}>${I('Minus', 16)}</button><input id="tb-final-n" type="number" inputmode="decimal" min="0.5" max="999" step="0.5" value=${days} ref=${focusOnMount} onInput=${e => setDays(e.target.value)} /><b>일</b><button type="button" class="icon-button" aria-label="반나절 더하기" onClick=${() => step(0.5)}>${I('Plus', 16)}</button></div>
+   <div class=${cx('tb-final-sum', late > 0 && 'late')} aria-live="polite">
+    <div class="tb-final-bar" title="시작일 ~ 종료일(주말 빼고) 중 실제 작업한 날"><i style=${`width:${okDates && guess ? Math.min(100, Math.round(n / guess * 100)) || 0 : 0}%`}></i></div>
+    <p><b>실제 작업 ${ok ? fmtDays(Math.round(n * 2) / 2) : '-'}</b><span>/ 기간 ${okDates ? `주말 빼고 ${guess}일 · 달력 ${cal}일` : '-'}</span>${late > 0 ? html`<em>마감 ${shortDate(x.due)}보다 ${late}일 늦음</em>` : x.due && okDates ? html`<em class="ok">마감 ${shortDate(x.due)} 안에 끝남</em>` : ''}</p>
    </div>
-   <p class="tb-final-guess">${start ? `${shortDate(s0)} 시작 → ${mode === 'done' ? '오늘' : shortDate(end)} 완료 · 주말 빼고 ${guess}일(달력 ${cal}일)` : `시작일 기록이 없어 ${mode === 'done' ? '오늘' : '완료한 날'} 하루로 채웠어요`}${n !== guess ? html`<button type="button" class="text-button" onClick=${() => setDays(String(guess))}>${guess}일로 되돌리기</button>` : ''}</p>
-   <label class="tb-final-note"><span>히스토리 메모 <small>선택</small></span><textarea rows="4" maxLength="2000" placeholder="진행하면서 있었던 일, 늦어진 이유, 다음에 참고할 점" value=${note} onInput=${e => setNote(e.target.value)}></textarea></label>
-   <p class="tb-final-lock">${I('Lock', 12)}작업일 · 히스토리 메모는 이현성에게만 보여요</p>
+   <div class="tb-final-grid">
+    <label class="tb-final-k" for="tb-final-s">시작일</label>
+    <div class="tb-final-v row"><input id="tb-final-s" type="date" class="chip-date" value=${start} max=${end || t} onChange=${e => setDates(e.target.value, end)} />${src && start === start0 ? html`<small>${src}로 채웠어요</small>` : ''}</div>
+    <label class="tb-final-k" for="tb-final-n">실제 작업일</label>
+    <div class="tb-final-v"><div class="tb-final-step"><button type="button" class="icon-button" aria-label="반나절 빼기" onClick=${() => step(-0.5)}>${I('Minus', 16)}</button><input id="tb-final-n" type="number" inputmode="decimal" min="0.5" max="999" step="0.5" value=${days} ref=${focusOnMount} onInput=${e => { setTouched(true); setDays(e.target.value); }} /><b>일</b><button type="button" class="icon-button" aria-label="반나절 더하기" onClick=${() => step(0.5)}>${I('Plus', 16)}</button></div>
+     <p class="tb-final-guess">${!okDates ? '시작일 · 종료일을 확인해 주세요' : n !== guess ? html`<span>기간(주말 빼고)은 ${guess}일</span><button type="button" class="text-button" onClick=${() => { setDays(String(guess)); setTouched(false); }}>${guess}일로 맞추기</button>` : '시작일 ~ 종료일에서 주말을 뺀 날로 채웠어요 · 실제로 일한 날로 고쳐 주세요'}</p></div>
+    <label class="tb-final-k" for="tb-final-e">최종 종료일</label>
+    <div class="tb-final-v row"><input id="tb-final-e" type="date" class="chip-date" value=${end} min=${start} max=${t} onChange=${e => setDates(start, e.target.value)} /><small class=${cx('tb-final-due', late > 0 && 'late')}>${x.due ? `마감 ${shortDate(x.due)}` : '마감 없음'}</small></div>
+    <span class="tb-final-k">딜레이 사유</span>
+    <div class=${cx('tb-final-v tb-final-delay', late > 0 && 'late')}><div class="tb-chips">${WORK_DELAYS.map(k => html`<button type="button" key=${k} class="chip" aria-pressed=${tags.includes(k)} onClick=${() => toggleTag(k)}>${k}</button>`)}</div><input type="text" maxLength="300" aria-label="딜레이 사유" placeholder=${late > 0 ? '늦어진 이유를 짧게 (예: 원고 회신이 3일 늦음)' : '늦어진 게 있으면 짧게 (선택)'} value=${delay} onInput=${e => setDelay(e.target.value)} /></div>
+    <label class="tb-final-k" for="tb-final-m">히스토리 메모</label>
+    <div class="tb-final-v"><textarea id="tb-final-m" rows="3" maxLength="2000" placeholder="진행하면서 있었던 일, 다음에 참고할 점 (선택)" value=${note} onInput=${e => setNote(e.target.value)}></textarea></div>
+   </div>
+   <p class="tb-final-lock">${I('Lock', 12)}이 기록은 이현성에게만 보여요</p>
    <div class="tb-final-acts"><button type="button" class="secondary-button" onClick=${onCancel}>취소</button><button class="primary-button" disabled=${!ok}>${I('Check', 15)}${mode === 'done' ? '완료하기' : '저장'}</button></div>
   </form>
  <//>`;
 }
+// 기록 한 줄(완료 탭 · 상세, 사용자 '시작일, 마감일, 실제 작업일 5일'): '시작 10.22 · 종료 11.5 · 실제 작업 5일'.
+const workLine = x => `시작 ${shortDate(workStartOf(x))} · 종료 ${shortDate(workEndOf(x))} · 실제 작업 ${fmtDays(x.work_days)}`;
+const workLate = x => (x.due && workEndOf(x) > x.due ? teamDayNum(workEndOf(x)) - teamDayNum(x.due) : 0);
+const workDelayText = x => [...(x.work_delay_tags || []), x.work_delay].filter(Boolean).join(' · ');
 // 완료(10-30 월별): 이번 달 완료부터, 달 칩(맨 앞 '전체' + 완료가 있는 달 + 이번 달)으로 지난 달. 담당 칩 숫자는 고른 달 기준, 달 칩 숫자는 고른 담당 기준.
 // 이현성은 맨 앞 '월별 KPI' 태그로 KPI 요약을 본다(11-04).
 function TeamDone({items, cmap, onOpen, onPatch, busy, isAdmin = false, onWork = null}) {
@@ -2601,7 +2634,7 @@ function TeamDone({items, cmap, onOpen, onPatch, busy, isAdmin = false, onWork =
  const late = list.filter(x => x.due && inSeoul(doneAt(x)) > x.due).length;
  // 작업일(이현성만): 적은 업무의 합계 · 평균, 아직 안 적은 수. 줄마다 'n일'(누르면 고치기) 또는 '작업일 적기'.
  const wd = list.filter(x => x.work_days > 0), wSum = wd.reduce((a, x) => a + x.work_days, 0), wMiss = list.length - wd.length;
- const workBtn = x => html`<button type="button" class=${cx('tag tb-wd', !x.work_days && 'none')} disabled=${busy} title=${x.work_days ? (x.work_note ? `히스토리: ${x.work_note.slice(0, 160)}` : '작업일 · 히스토리 고치기') : '최종 작업일 · 히스토리 적기'} onClick=${() => onWork(x)}>${I('Clock', 12)}${x.work_days ? fmtDays(x.work_days) : '작업일 적기'}${x.work_note ? I('NotebookPen', 11) : ''}</button>`;
+ const workBtn = x => { const dl = workDelayText(x); return html`<button type="button" class=${cx('tag tb-wd', !x.work_days && 'none')} disabled=${busy} title=${x.work_days ? [dl ? `딜레이: ${dl}` : '', x.work_note ? `히스토리: ${x.work_note.slice(0, 160)}` : '', '누르면 고치기'].filter(Boolean).join('\n') : '최종 완료 기록(시작일 · 실제 작업일 · 종료일 · 딜레이 사유 · 히스토리) 적기'} onClick=${() => onWork(x)}>${I('Clock', 12)}${x.work_days ? workLine(x) : '작업일 적기'}${x.work_days && dl ? html`<em class="tb-wd-delay">딜레이</em>` : ''}${x.work_note ? I('NotebookPen', 11) : ''}</button>`; };
  const groups = []; list.slice(0, limit).forEach(x => { const d = inSeoul(doneAt(x)) || '날짜 없음'; const g = groups[groups.length - 1]; if (g && g.day === d) g.items.push(x); else groups.push({day: d, items: [x]}); });
  return html`<section class="done-view"><div class="dv-head"><div class="dv-left">${kpiTag}<${DoneMonths} counts=${counts} value=${month} onChange=${k => { setMonth(k); setLimit(60); }} /></div><div class="dv-who" role="group" aria-label="담당 필터">${[['all', '전체'], ...names.map(n => [n, n])].map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${who === v} onClick=${() => { setWho(v); setLimit(60); }}>${l}<span>${v === 'all' ? inMonth.length : inMonth.filter(x => teamHas(x, v)).length}</span></button>`)}</div></div>
   <p class="dv-sum"><strong>${mLabel}</strong><span>${who !== 'all' ? `${who} · ` : ''}완료 <b>${list.length}</b>건</span>${late ? html`<small>늦게 완료 ${late}건</small>` : ''}${onWork && wd.length > 0 ? html`<small class="dv-wd" title="최종 완료 때 적은 작업일 · 이현성에게만 보여요">작업 ${fmtDays(wSum)} · 평균 ${fmtDays(Math.round(wSum / wd.length * 10) / 10)}</small>` : ''}${onWork && wMiss > 0 ? html`<small class="dv-wd miss" title="작업일을 아직 적지 않은 완료 업무 · 줄의 '작업일 적기'로">작업일 입력 전 ${wMiss}건</small>` : ''}</p>
@@ -2638,7 +2671,7 @@ function TeamDetail({focus = null, handoffFrom = null, item: x, comments, me, is
     ${x.status === 'todo' && html`<div><span>착수 예정</span><div class="tb-chips">${[['', '미정'], [today(), '오늘'], [offsetDate(today(), 1), '내일'], [offsetDate(today(), 2), '모레'], [mondayOf(offsetDate(today(), 7)), '다음 주']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${x.start_on === v} disabled=${busy} onClick=${() => x.start_on !== v && onPatch(x, {start_on: v}, v ? `착수 예정 ${shortDate(v)}` : '착수 예정 미정')}>${l}${l === '다음 주' ? html`<small class="tb-chip-sub">${shortDate(v)}</small>` : ''}</button>`)}<input type="date" class="chip-date" aria-label="착수 예정일" value=${x.start_on} disabled=${busy} onChange=${e => onPatch(x, {start_on: e.target.value}, e.target.value ? `착수 예정 ${shortDate(e.target.value)}` : '착수 예정 미정')} />${x.start_on && html`<b class=${cx('tb-start-tag', x.start_on < today() && 'late')}>${teamStartLabel(x)}</b>`}</div></div>`}
     ${(x.status === 'doing' || x.status === 'hold') && html`<div><span>시작일</span><div class="tb-chips"><button type="button" class="chip" aria-pressed=${x.start_on === today()} disabled=${busy} onClick=${() => x.start_on !== today() && onPatch(x, {start_on: today()}, `시작일 ${shortDate(today())}`)}>오늘</button><input type="date" class="chip-date" aria-label="시작일" value=${x.start_on} disabled=${busy} onChange=${e => onPatch(x, {start_on: e.target.value}, e.target.value ? `시작일 ${shortDate(e.target.value)}` : '시작일 비움')} />${!x.start_on && teamStartOf(x) && html`<small class="tb-start-auto">${shortDate(teamStartOf(x))}부터로 표시 중</small>`}</div></div>`}
     <div><span>진행률</span><div class="tb-chips">${[0, 25, 50, 75, 100].map(v => html`<button type="button" key=${v} class="chip" aria-pressed=${(x.progress || 0) === v} disabled=${busy || x.checklist.length > 0} title=${x.checklist.length ? '세부 업무 체크로 자동 계산돼요' : ''} onClick=${() => onPatch(x, {progress: v}, `진행률 ${v}%`)}>${v}%</button>`)}${![0, 25, 50, 75, 100].includes(x.progress || 0) && html`<b class="tb-pct">${x.progress}%</b>`}</div></div>
-    ${onWork && x.status === 'done' && html`<div class="tb-work-row"><span>작업일</span><div class="tb-work">${x.work_days ? html`<b class="tb-work-days">${fmtDays(x.work_days)}</b>` : html`<em class="tb-work-miss">입력 전</em>`}${x.work_by && x.work_at ? html`<small>${x.work_by} · ${teamDay(inSeoul(x.work_at))}</small>` : ''}<button type="button" class="text-button" disabled=${busy} onClick=${() => onWork(x)}>${x.work_days ? '고치기' : '작업일 적기'}</button><small class="tb-work-lock">${I('Lock', 11)}이현성에게만 보여요</small>${x.work_note && html`<div class="tb-work-note"><${TeamText} text=${x.work_note} /></div>`}</div></div>`}
+    ${onWork && x.status === 'done' && html`<div class="tb-work-row"><span>최종 완료</span><div class="tb-work">${x.work_days ? html`<span class="tb-work-days"><span>시작 ${shortDate(workStartOf(x))}</span><i>·</i><span>종료 ${shortDate(workEndOf(x))}</span><i>·</i><b>실제 작업 ${fmtDays(x.work_days)}</b>${workLate(x) ? html`<em>마감 ${shortDate(x.due)}보다 ${workLate(x)}일 늦음</em>` : ''}</span>` : html`<em class="tb-work-miss">작업일 입력 전</em>`}<button type="button" class="text-button" disabled=${busy} onClick=${() => onWork(x)}>${x.work_days ? '고치기' : '작업일 적기'}</button><small class="tb-work-lock">${I('Lock', 11)}이현성에게만 보여요</small>${x.work_days && workDelayText(x) ? html`<div class="tb-work-delay"><b>딜레이</b>${(x.work_delay_tags || []).map(k => html`<span key=${k} class="tag">${k}</span>`)}${x.work_delay ? html`<span>${x.work_delay}</span>` : ''}</div>` : ''}${x.work_note && html`<div class="tb-work-note"><b>히스토리</b><${TeamText} text=${x.work_note} /></div>`}${x.work_by && x.work_at ? html`<small class="tb-work-by">${x.work_by} · ${teamDay(inSeoul(x.work_at))} ${teamClock(x.work_at)} 기록</small>` : ''}</div></div>`}
    </div>
    <section class=${cx('tb-issue-box', x.issue && 'on ' + x.issue)}><div class="tb-issue-head"><strong>${I('AlertCircle', 15)}특이사항 보고</strong>${x.issue && html`<small>${x.issue_by}${x.issue_at ? ` · ${teamDay(inSeoul(x.issue_at))} ${teamClock(x.issue_at)}` : ''}</small>`}</div>
     <div class="tb-chips">${[['', '없음'], ...Object.entries(TEAM_ISSUES)].map(([v, l]) => html`<button type="button" key=${l} class=${cx('chip', v && 'issue-' + v)} aria-pressed=${issue === v} onClick=${() => setIssue(v)}>${l}</button>`)}</div>
