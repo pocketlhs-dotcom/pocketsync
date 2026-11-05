@@ -1464,7 +1464,7 @@ body.memo-resizing,body.memo-resizing *{cursor:ns-resize!important;user-select:n
 .pk-pct b{font-size:12px;font-weight:700;color:#0b1c5c;min-width:32px;text-align:right}
 .pk-opt.act .pk-label{color:#315df8;font-weight:600}
 /* % 칩 격자 */
-.pk-pop.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;width:220px;min-width:0;left:auto;right:0;padding:8px}
+.pk-pop.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;width:220px;min-width:0;left:0;right:auto;padding:8px}.pk-pop.grid.right{left:auto;right:0}
 .pk-pop.grid .pk-opt{min-height:32px;justify-content:center;padding:0;border:1px solid #e6eaf3;border-radius:3px;font-size:12.5px;font-weight:600;color:#36435f}
 .pk-pop.grid .pk-opt.hl{border-color:#c9d4fb;background:#f3f6fd}
 .pk-pop.grid .pk-opt.on{background:#315df8;border-color:#315df8;color:#fff}
@@ -2167,4 +2167,102 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 .kpi-wd>em{font-style:normal;font-weight:500;color:#a0a6b8}
 .kpi-wd.none{color:#b4b9c6;font-weight:500}
 @media(max-width:640px){.tb-fd-made>small{margin-left:0;flex-basis:100%}.tb-fd-range{flex-wrap:wrap;row-gap:6px}.tb-fd-pt small{white-space:nowrap}.tb-fd-len{margin-left:0;flex-basis:100%;flex-direction:row;align-items:baseline;gap:6px}.tb-fd-months{grid-template-columns:1fr}.tb-fd-month:first-child{display:none}.tb-fd-row{grid-template-columns:minmax(0,1fr);gap:8px}.tb-fd-row.top>label,.tb-fd-row.top>.tb-fd-label{padding-top:0;flex-direction:row;align-items:baseline;gap:6px}.tb-fd-row>label{flex-direction:row;align-items:baseline;gap:6px}.tb-fd-due{margin-left:0}.tb-work-lock{margin-left:0}.tb-final-lock{display:none}}
+
+/* 세부 업무 시간 · 특이사항(11-05): % 옆 1t = 1시간, 아이콘 → 지연 사유 · 특이사항 */
+.check-time{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto;color:#b6c1d2;border-radius:6px;padding:2px 2px 2px 5px;cursor:pointer}
+.check-time:hover{background:#e9effa}
+.check-time>svg{flex:none}
+.check-time select{appearance:none;-webkit-appearance:none;border:0;background:transparent;font-size:13px;font-weight:600;color:#a6b2c6;width:36px;text-align:left;padding:2px 0;cursor:pointer;box-shadow:none!important}
+.check-time.set{color:#7d8ca6}.check-time.set select{color:#3f4f6b}
+.check-time select:focus-visible{outline:2px solid #9bb2fd;border-radius:4px}
+.check-time.ro{cursor:default}.check-time.ro:hover{background:transparent}
+.check-time.ro b{font-size:13px;font-weight:600;color:#3f4f6b}
+.check-list .check-time{flex:0 0 auto;min-height:0;gap:3px}.check-list .check-time.ro{min-width:44px}
+.check-note-btn{display:inline-grid;place-items:center;flex:0 0 auto;width:26px;height:26px;padding:0;border:0;border-radius:6px;background:transparent;color:#c3cddc;cursor:pointer}
+.check-note-btn:hover:not(:disabled){background:#e9effa;color:#4f78e8}
+.check-note-btn.on{color:#d1603f}
+.check-note-btn.on:hover:not(:disabled){background:#fbefea;color:#c0453a}
+.check-note-btn.open{background:#e9effa;color:#315df8}
+.check-note-btn.ro{cursor:default;width:22px}
+.check-sum-t{display:inline-flex;align-items:center;gap:4px;margin-left:4px;padding-left:10px;border-left:1px solid #e3e9f3;font-size:12.5px;font-weight:700;color:#3f4f6b}
+.check-sum-t>svg{color:#9fb0c8}
+.check-sum-t small{font-size:12px;font-weight:600;color:#a0a9bb}
+.check-list>li.has-note{flex-wrap:wrap}
+.check-note-line{flex:0 0 auto;width:calc(100% - 36px);box-sizing:border-box;display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin:-3px 0 6px 36px;padding:0;border:0;background:none;text-align:left;font-size:12.5px;line-height:1.5;color:#6d6360;cursor:default;min-width:0}
+button.check-note-line{cursor:pointer}
+button.check-note-line:hover>span{text-decoration:underline;text-underline-offset:3px}
+.check-note-line>svg{color:#d1603f;flex:none}
+.check-note-line>em{font-style:normal;font-size:11px;font-weight:600;color:#a4553c;background:#fbefea;border-radius:3px;padding:1px 6px}
+.check-note-line>span{overflow-wrap:anywhere;min-width:0}
+.check-note-edit{flex:0 0 auto;width:calc(100% - 36px);display:flex;flex-direction:column;gap:8px;margin:2px 0 8px 36px;padding:10px 12px;border:1px solid #e4e8f2;border-radius:7px;background:#fff;box-shadow:0 2px 8px rgba(17,34,85,.05);min-width:0;box-sizing:border-box}
+.check-note-top{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px}
+.check-note-top b{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:#3a4b66}
+.check-note-top b>svg{color:#d1603f;align-self:center}
+.check-note-top small{font-size:11.5px;color:#a0a9bb}
+.check-note-chips{display:flex;flex-wrap:wrap;gap:5px}
+.check-note-chips>button{height:26px;padding:0 9px;border:1px solid #e3e7f0;border-radius:3px;background:#fff;color:#5d6b86;font-size:12px;font-weight:600;cursor:pointer}
+.check-note-chips>button:hover{border-color:#c9d4fb;color:#315df8}
+.check-note-chips>button[aria-pressed=true]{border-color:#9fb3f7;background:#eef2ff;color:#315df8}
+.check-note-row{display:flex;align-items:center;gap:6px;min-width:0}
+.check-note-row input{flex:1;min-width:0;height:32px;border:1px solid #dfe3ef;border-radius:6px;padding:0 10px;font-size:13px;color:#1d2a44;background:#fff}
+.check-note-row .primary-button.small,.check-note-row .secondary-button.small{flex:none;min-height:32px;height:32px;padding:0 12px;font-size:12.5px}
+.check-note-row .text-button{flex:none;font-size:12.5px;color:#a0a6b8}
+.check-br{display:none}
+/* 모바일: 1줄 = 체크 · 이름 · 삭제, 2줄 = 실무자 · 날짜 · % · 시간 · 특이사항(오른쪽 정렬), 3줄 = 특이사항 */
+@media(max-width:640px){.check-note-row{flex-wrap:wrap}.check-note-row input{flex-basis:100%}.check-note-top small{flex-basis:100%}
+ .check-list>li{flex-wrap:wrap;justify-content:flex-end}
+ .check-list>li>.check-text,.check-list>li>.check-edit{flex:1 1 0;min-width:0}
+ .check-list>li>.check-remove{order:1}
+ .check-list>li>.check-br{display:block;order:2;flex:0 0 100%;height:0}
+ .check-list>li>.ck-tag,.check-list>li>.check-who,.check-list>li>.check-by,.check-list>li>.check-date,.check-list>li>.check-pct,.check-list>li>.check-time,.check-list>li>.check-note-btn{order:3}
+ .check-list>li>.check-note-line,.check-list>li>.check-note-edit{order:4}
+}
+/* 업무보고 줄 맞춤(11-05, 사용자 '삐뚤빼뚤한 거 맞춰 줘'): 머리 줄 · 세부 업무 줄이 같은 칸 */
+.tb-rep-proj .tb-rep-subs{padding:0}
+.tb-rep-proj .tb-rep-row{display:grid;grid-template-columns:16px minmax(0,1fr) auto;column-gap:8px;align-items:center;min-width:0;min-height:30px}
+.tb-rep-work.me .tb-rep-proj .tb-rep-row{grid-template-columns:16px minmax(0,1fr) auto 48px}
+.tb-rep-proj .tb-rep-lead{display:grid;place-items:center;width:16px;color:#8a96ad}
+.tb-rep-proj .tb-rep-lead .tb-rep-dot{margin:0}
+.tb-rep-proj .tb-rep-ctl{display:inline-flex;align-items:center;gap:8px;justify-self:end}
+.tb-rep-proj .tb-rep-acts{display:inline-flex;align-items:center;justify-content:flex-end}
+.tb-rep-proj .tb-rep-acts .link-chip-x{margin-left:2px}
+.tb-rep-proj .tb-rep-pct{justify-content:flex-end}
+.tb-rep-proj .tb-rep-pct.ro b{width:36px;min-width:0;box-sizing:border-box}
+.tb-rep-work.me .tb-rep-proj .tb-rep-pct .pk-sm{width:76px;min-width:0}
+.tb-rep-work.me .tb-rep-proj .tb-rep-pct.ro b{width:76px;text-align:left;padding-left:10px}
+.tb-rep-proj .tb-rep-pct.none{width:90px}
+.tb-rep-work.me .tb-rep-proj .tb-rep-pct.none{width:130px}
+.tb-rep-tn{display:inline-flex;align-items:center;gap:2px}
+.tb-rep-tn .check-time{width:46px;padding:0;border-radius:0;justify-content:flex-start;box-sizing:border-box}
+.tb-rep-tn .check-time:hover{background:none}
+.tb-rep-work.me .tb-rep-tn .check-time{width:68px}
+.tb-rep-work.me .tb-rep-tn .check-time.ro{padding-left:10px}
+.tb-rep-tn .check-time.pick .pk{width:68px}
+.tb-rep-tn .check-time.pick:not(.set) .pk-label{color:#a6b2c6;font-weight:600}
+.tb-rep-tn .check-time.ro b{font-size:12.5px}
+.tb-rep-tn .check-note-btn{width:22px;height:26px}
+.tb-rep-work.me .tb-rep-tn .check-note-btn{width:26px}
+.tb-rep-proj .tb-rep-row>.check-note-line,.tb-rep-proj .tb-rep-row>.check-note-edit{grid-column:2/-1;width:auto;margin:2px 0 4px}
+@media(max-width:640px){
+ .tb-rep-proj .tb-rep-pct.none{width:36px}
+ .tb-rep-work.me .tb-rep-proj .tb-rep-pct.none{width:76px}
+ .tb-rep-tn .check-time{width:36px}.tb-rep-tn .check-time.ro>svg{display:none}
+ .tb-rep-work.me .tb-rep-proj .tb-rep-row{grid-template-columns:16px minmax(0,1fr) 48px;row-gap:4px}
+ .tb-rep-work.me .tb-rep-proj .tb-rep-row>.tb-rep-ctl{grid-column:2/3;grid-row:2;justify-self:start}
+ .tb-rep-work.me .tb-rep-proj .tb-rep-row>.tb-rep-acts{grid-column:3;grid-row:1}
+ .tb-rep-work.me .tb-rep-proj .tb-rep-row>.check-note-line,.tb-rep-work.me .tb-rep-proj .tb-rep-row>.check-note-edit{grid-row:3}
+}
+/* 최종 완료: 세부 업무 시간 합계 · 특이사항 */
+.tb-fd-hours{flex-basis:100%;display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin:0;font-size:12.5px;color:#5d6b86}
+.tb-fd-hours>svg{color:#9fb0c8}
+.tb-fd-hours b{color:#315df8;font-weight:800}
+.tb-fd-hours small{margin-left:6px;font-size:12px;color:#a0a6b8}
+.tb-fd-subnotes{border:1px solid #eef0f5;border-radius:6px;background:#fbfcfe;padding:8px 10px}
+.tb-fd-subnotes-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tb-fd-subnotes-head small{font-size:12px;font-weight:700;color:#7d8ca6}
+.tb-fd-subnotes ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px}
+.tb-fd-subnotes li{display:flex;flex-wrap:wrap;align-items:center;gap:3px 6px;font-size:12.5px;color:#6d6360;line-height:1.5}
+.tb-fd-subnotes li b{font-weight:700;color:#3a4b66}
+.tb-fd-subnotes li i{font-style:normal;font-weight:600;color:#7d8ca6}
+.tb-fd-subnotes li em{font-style:normal;font-size:11px;font-weight:600;color:#a4553c;background:#fbefea;border-radius:3px;padding:1px 6px}
 </style>

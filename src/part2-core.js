@@ -59,7 +59,16 @@ function progressFields(item, v) { const p = Math.max(0, Math.min(100, Math.roun
 function dDay(due) { if (!due) return {label: '마감 없음', cls: 'none', n: null}; const n = Math.round((Date.parse(due + 'T00:00:00+09:00') - Date.parse(today() + 'T00:00:00+09:00')) / 864e5); return n < 0 ? {label: `D+${-n}`, cls: 'late', n} : n === 0 ? {label: '오늘', cls: 'today', n} : {label: `D-${n}`, cls: n <= 3 ? 'soon' : '', n}; }
 // 업무 안의 세부 업무 목록. 진행률은 체크한 비율로 자동 계산된다.
 // 세부 업무마다 진행률(pct)을 가진다. 체크 = 100%, 업무 진행률 = 세부 업무 진행률의 평균.
-function normChecklist(v) { return (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const pct = c.done ? 100 : Math.max(0, Math.min(100, Math.round(Number(c.pct) || 0))); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct, done: pct === 100, ...(c.by ? {by: String(c.by).slice(0, 20)} : {}), ...(c.at ? {at: String(c.at).slice(0, 30)} : {}), ...(c.ed ? {ed: String(c.ed).slice(0, 30)} : {})}; }); }
+function normChecklist(v) { return (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const pct = c.done ? 100 : Math.max(0, Math.min(100, Math.round(Number(c.pct) || 0))); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct, done: pct === 100, ...(c.by ? {by: String(c.by).slice(0, 20)} : {}), ...(c.at ? {at: String(c.at).slice(0, 30)} : {}), ...(c.ed ? {ed: String(c.ed).slice(0, 30)} : {}), ...((h => h > 0 ? {hours: h} : {})(Math.min(999, Math.round((Number(c.hours) || 0) * 2) / 2))), ...(String(c.note || '').trim() ? {note: String(c.note).trim().slice(0, 300)} : {})}; }); }
+// 세부 업무 시간(11-05, 사용자 '% 옆에 시간 개념 1t, 2t, 3t'): 1t = 1시간, 반 시간 단위.
+const fmtT = n => `${Number(n) % 1 ? Number(n).toFixed(1) : Number(n)}t`;
+const hoursOf = item => ((item && item.checklist) || []).reduce((a, c) => a + (Number(c.hours) || 0), 0);
+const HOUR_OPTS = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 32, 40];
+// 세부 업무 특이사항(11-05, 사용자 '생각보다 지연되면 아이콘 눌러 지연 사유 · 특이사항'): note = '사유 칩 / 사유 칩 / 직접 쓴 말'.
+const NOTE_TAGS = ['자료 회신 지연', '피드백 지연', '요청 · 범위 변경', '수정 반복', '다른 업무 우선'];
+const noteParts = note => { const p = String(note || '').split(' / ').map(s => s.trim()).filter(Boolean); return {tags: p.filter(s => NOTE_TAGS.includes(s)), text: p.filter(s => !NOTE_TAGS.includes(s)).join(' / ')}; };
+// 시간 → 일(하루 8시간, 반나절 단위).
+const tDays = h => Math.max(0.5, Math.round((Number(h) || 0) / 8 * 2) / 2);
 // 세부 업무 표시(11-05): 새로 넣은 것(at) 'New', 이름 · %를 고친 것(ed) '조정됨' — 7시간 동안(업무 NEW와 같은 기준). 둘 다면 New.
 const CHECK_FRESH_MS = 7 * 36e5;
 const checkTag = c => { const now = Date.now(); if (!c) return ''; if (now - Date.parse(c.at || '') < CHECK_FRESH_MS) return 'new'; if (now - Date.parse(c.ed || '') < CHECK_FRESH_MS) return 'edit'; return ''; };
@@ -366,7 +375,7 @@ function Pick({value, options, onChange, label, placeholder = '고르기', disab
  useEffect(() => { if (!open) return; const off = e => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); }; document.addEventListener('pointerdown', off); return () => document.removeEventListener('pointerdown', off); }, [open]);
  useEffect(() => { if (!open || act < 0 || !list.current) return; const el = list.current.querySelector(`[data-i="${act}"]`); if (el && el.scrollIntoView) el.scrollIntoView({block: 'nearest'}); }, [open, act]);
  // 목록은 버튼보다 좁아지지 않고 최소 260px. 오른쪽 자리가 모자라면 오른쪽 끝에 맞춘다.
- const show = () => { if (disabled || !btn.current) return; const r = btn.current.getBoundingClientRect(), below = window.innerHeight - r.bottom; setUp(below < 300 && r.top > below); setRight(r.left + Math.max(r.width, 260) > window.innerWidth - 12); setAct(Math.max(0, options.findIndex(o => !o.action && o.value === value))); setOpen(true); };
+ const show = () => { if (disabled || !btn.current) return; const r = btn.current.getBoundingClientRect(), below = window.innerHeight - r.bottom; setUp(below < 300 && r.top > below); setRight(grid ? r.right - 228 >= 8 : r.left + Math.max(r.width, 260) > window.innerWidth - 12); setAct(Math.max(0, options.findIndex(o => !o.action && o.value === value))); setOpen(true); };
  const choose = o => { setOpen(false); if (btn.current) btn.current.focus(); if (o.action || o.value !== value) onChange(o.value); };
  const key = e => {
   if (!open) { if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); show(); } return; }
