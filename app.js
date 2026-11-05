@@ -1929,7 +1929,7 @@ function shrinkImage(file, size = 128) {
 }
 function normTeam(d) {
  const b = normItem(d);
- return {...b, assignee: String(d.assignee || ''), topic_label: String(d.topic_label || ''), src_board: String(d.src_board || ''), src_id: String(d.src_id || ''), src_title: String(d.src_title || ''), issue: TEAM_ISSUES[d.issue] ? d.issue : '', issue_note: String(d.issue_note || ''), issue_at: String(d.issue_at || ''), issue_by: String(d.issue_by || ''), src_body: String(d.src_body || ''), src_checks: normChecklist(d.src_checks), src_links: teamLinks(d.src_links), src_synced_at: String(d.src_synced_at || ''), start_on: DATE_RE.test(d.start_on || '') ? d.start_on : '', spec: normChecklist(d.spec).map(c => ({id: c.id, text: c.text, done: c.done})), issue_log: (Array.isArray(d.issue_log) ? d.issue_log : []).filter(h => h && h.resolved_at).map(h => ({issue: TEAM_ISSUES[h.issue] ? h.issue : 'check', note: String(h.note || ''), by: String(h.by || ''), at: String(h.at || ''), resolved_by: String(h.resolved_by || ''), resolved_at: String(h.resolved_at), how: String(h.how || '')})), history: (Array.isArray(d.history) ? d.history : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), text: String(h.text || ''), kind: String(h.kind || ''), from: h.from === undefined ? null : String(h.from), to: h.to === undefined ? null : String(h.to), note: String(h.note || '')})), handoffs: (Array.isArray(d.handoffs) ? d.handoffs : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), from: String(h.from || ''), to: String(h.to || ''), note: String(h.note || '')})), out_links: (Array.isArray(d.out_links) ? d.out_links : []).filter(o => o && ['A', 'B'].includes(o.board) && o.id).map(o => ({board: o.board, id: String(o.id), at: String(o.at || '')})), link_vis: Array.isArray(d.link_vis) ? d.link_vis.filter(b => b === 'A' || b === 'B') : null, lhs_seen: String(d.lhs_seen || '')};
+ return {...b, assignee: String(d.assignee || ''), topic_label: String(d.topic_label || ''), src_board: String(d.src_board || ''), src_id: String(d.src_id || ''), src_title: String(d.src_title || ''), issue: TEAM_ISSUES[d.issue] ? d.issue : '', issue_note: String(d.issue_note || ''), issue_at: String(d.issue_at || ''), issue_by: String(d.issue_by || ''), src_body: String(d.src_body || ''), src_checks: normChecklist(d.src_checks), src_links: teamLinks(d.src_links), src_synced_at: String(d.src_synced_at || ''), start_on: DATE_RE.test(d.start_on || '') ? d.start_on : '', spec: normChecklist(d.spec).map(c => ({id: c.id, text: c.text, done: c.done})), issue_log: (Array.isArray(d.issue_log) ? d.issue_log : []).filter(h => h && h.resolved_at).map(h => ({issue: TEAM_ISSUES[h.issue] ? h.issue : 'check', note: String(h.note || ''), by: String(h.by || ''), at: String(h.at || ''), resolved_by: String(h.resolved_by || ''), resolved_at: String(h.resolved_at), how: String(h.how || '')})), history: (Array.isArray(d.history) ? d.history : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), text: String(h.text || ''), kind: String(h.kind || ''), from: h.from === undefined ? null : String(h.from), to: h.to === undefined ? null : String(h.to), note: String(h.note || '')})), handoffs: (Array.isArray(d.handoffs) ? d.handoffs : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), from: String(h.from || ''), to: String(h.to || ''), note: String(h.note || '')})), out_links: (Array.isArray(d.out_links) ? d.out_links : []).filter(o => o && ['A', 'B'].includes(o.board) && o.id).map(o => ({board: o.board, id: String(o.id), at: String(o.at || '')})), link_vis: Array.isArray(d.link_vis) ? d.link_vis.filter(b => b === 'A' || b === 'B') : null, lhs_seen: String(d.lhs_seen || ''), work_days: Number(d.work_days) > 0 ? Math.round(Number(d.work_days) * 2) / 2 : 0, work_note: String(d.work_note || ''), work_at: String(d.work_at || ''), work_by: String(d.work_by || '')};
 }
 const teamByDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || ({critical: 0, urgent: 1, share: 2}[a.priority] - {critical: 0, urgent: 1, share: 2}[b.priority]) || String(a.created_at || '').localeCompare(String(b.created_at || ''));
 // 팀 현황 순서: 손으로 정한 순서(prio_no) 먼저, 나머지는 미배정 먼저 · 마감순.
@@ -1980,6 +1980,11 @@ function TeamBoard() {
   return () => { dead = true; un.forEach(f => { try { f(); } catch {} }); };
  }, []);
  const stamp = () => ({updated_at: nowIso(), updated_by: me.id, updated_by_name: me.name});
+ // 최종 완료 창(11-05): {x, mode('done' | 'edit'), res} — 작업일 · 히스토리를 받아 Promise로 돌려준다(취소 = null).
+ const [finalAsk, setFinalAsk] = useState(null);
+ const askFinal = (x, mode) => new Promise(res => setFinalAsk({x, mode, res}));
+ // 완료한 뒤 작업일 · 히스토리 적기 · 고치기(이현성만). 업무 수정 시각 · 기록은 건드리지 않는다(디자이너 화면에 '수정'으로 안 뜨게).
+ async function editWork(x) { const f = await askFinal(x, 'edit'); if (f) await run(() => db.doc('items/' + x.id).update({...f, work_at: nowIso(), work_by: me.name}), '작업일을 저장했어요.'); }
  async function run(fn, ok) { setBusy(true); try { const r = await fn(); if (ok) toast.success(ok); return r; } catch (e) { console.error('team save', e); toast.error(friendlyError(e)); throw e; } finally { setBusy(false); } }
  // A 원본의 C 진행 표시 갱신(이현성일 때만; 디자이너는 A에 쓸 수 없다).
  const linkTargets = x => [...(x.src_id ? [x.src_id] : []), ...(x.out_links || []).map(o => o.id)];
@@ -1996,6 +2001,14 @@ function TeamBoard() {
  async function patch(x, fields, change) {
   const next = {...fields};
   if ('progress' in next) Object.assign(next, progressFields(x, next.progress));
+  // 최종 완료(11-05, 사용자 '완료 전에 며칠 걸렸는지 적게 · 필요하면 히스토리도 · 최종 완료는 이현성만 봄'): 이현성이 완료로 바꿀 때 작업일(꼭) · 히스토리 메모.
+  // 취소하면 완료하지 않음(세부 업무 체크 · 진행률로 완료가 될 때는 그 변경만 저장). 디자이너가 완료하면 묻지 않고, 이현성이 완료 탭 · 상세에서 나중에 적는다.
+  if (isAdmin && next.status === 'done' && x.status !== 'done' && !('work_days' in fields)) {
+   const f = await askFinal(x, 'done');
+   if (f) Object.assign(next, f, {work_at: nowIso(), work_by: me.name});
+   else if (fields.status === 'done') return false;
+   else delete next.status;
+  }
   const status = next.status || x.status;
   if (status === 'done' && x.status !== 'done') { next.done_at = nowIso(); if (!('progress' in fields)) next.progress = 100; }
   if (status !== 'done' && x.status === 'done') next.done_at = '';
@@ -2169,11 +2182,12 @@ function TeamBoard() {
     ${tab === 'due' && html`<${TeamDue} items=${open} done=${done} ...${common} />`}
     ${tab === 'issues' && html`<${Fragment}><${TeamAsks} focus=${askFocus} asks=${asks} tasks=${open} comments=${comments} me=${me} busy=${busy} onCreate=${createAsk} onUpdate=${updateAsk} onDelete=${deleteAsk} onComment=${comment} onMark=${markComment} onEditComment=${editComment} onDeleteComment=${deleteComment} onOpenTask=${setSel} /><${TeamIssues} items=${issues} comments=${comments} all=${items} onPatch=${patch} ...${common} /><//>`}
     ${tab === 'report' && html`<${TeamReport} key=${'rep-' + (repDay || 'today')} initialDay=${repDay} focus=${repFocus} reports=${shownReports} tasks=${items} comments=${comments} me=${me} busy=${busy} onAct=${reportAct} onCheck=${checklistAct} onProgress=${(x, v) => patch(x, {progress: v}, `진행률 ${v}%`)} onComment=${comment} onMark=${markComment} onEditComment=${editComment} onDeleteComment=${deleteComment} onOpenTask=${setSel} onAvatar=${setAvatar} onCreate=${d => run(() => create(d), '업무를 추가했어요.')} />`}
-    ${tab === 'done' && html`<${TeamDone} items=${done} onPatch=${patch} isAdmin=${isAdmin} ...${common} />`}
+    ${tab === 'done' && html`<${TeamDone} items=${done} onPatch=${patch} isAdmin=${isAdmin} onWork=${isAdmin ? editWork : null} ...${common} />`}
     ${tab === 'links' && html`<${TeamLinks} pool=${linkPool} onOpen=${openLinked} onReport=${openReport} onAsk=${openAsk} />`}
    </div>`}
   </main>
-  ${current && html`<${TeamDetail} key=${current.id} focus=${focus && focus.id === current.id ? focus : null} handoffFrom=${handoff && handoff.id === current.id ? handoff.from : null} item=${current} comments=${comments.filter(c => c.item_id === current.id).sort((a, b) => a.created_at.localeCompare(b.created_at))} me=${me} isAdmin=${isAdmin} busy=${busy} onClose=${() => { setSel(null); setFocus(null); }} onPatch=${patch} onChecklist=${checklistAct} onComment=${comment} onEditComment=${editComment} onDeleteComment=${deleteComment} onMark=${markComment} onRemove=${remove} onAddLink=${addLink} onRemoveLink=${removeLink} onRefreshSource=${refreshSource} onSendTo=${sendTo} onUnlink=${unlink} />`}
+  ${current && html`<${TeamDetail} key=${current.id} focus=${focus && focus.id === current.id ? focus : null} handoffFrom=${handoff && handoff.id === current.id ? handoff.from : null} item=${current} comments=${comments.filter(c => c.item_id === current.id).sort((a, b) => a.created_at.localeCompare(b.created_at))} me=${me} isAdmin=${isAdmin} busy=${busy} onClose=${() => { setSel(null); setFocus(null); }} onPatch=${patch} onChecklist=${checklistAct} onComment=${comment} onEditComment=${editComment} onDeleteComment=${deleteComment} onMark=${markComment} onRemove=${remove} onAddLink=${addLink} onRemoveLink=${removeLink} onRefreshSource=${refreshSource} onSendTo=${sendTo} onUnlink=${unlink} onWork=${isAdmin ? editWork : null} />`}
+  ${finalAsk && html`<${TeamFinalDone} key=${finalAsk.x.id + finalAsk.mode} x=${finalAsk.x} mode=${finalAsk.mode} onCancel=${() => { finalAsk.res(null); setFinalAsk(null); }} onSave=${f => { finalAsk.res(f); setFinalAsk(null); }} />`}
   ${importOpen && html`<${TeamImport} existing=${new Set(items.map(x => x.src_id).filter(Boolean))} busy=${busy} onClose=${() => setImportOpen(false)} onImport=${importRows} onCreate=${d => run(() => create(d), `'${d.title}' 업무를 만들었어요.`)} />`}
   <${Toaster} />
  </div>`;
@@ -2368,6 +2382,10 @@ function teamStartOf(x) {
  const d = at ? seoulDate(new Date(at)) : '';
  return DATE_RE.test(d) ? d : '';
 }
+// 작업일(11-05, 최종 완료): 주말(토 · 일)을 뺀 날 수(시작일 · 끝날 포함). 공휴일은 몰라서 사람이 고쳐서 확정한다.
+const teamWorkdays = (a, b) => { if (!DATE_RE.test(a || '') || !DATE_RE.test(b || '')) return 0; const s0 = teamDayNum(a), e0 = teamDayNum(b); let n = 0; for (let d = s0; d <= e0 && d - s0 < 2000; d++) { const w = new Date(d * 864e5).getUTCDay(); if (w !== 0 && w !== 6) n++; } return n; };
+const teamWorkStart = x => teamStartOf(x) || (x.created_at ? seoulDate(new Date(x.created_at)) : '');
+const fmtDays = n => `${Number(n) % 1 ? Number(n).toFixed(1) : Number(n)}일`;
 // 보드 공용: groups = [{key, label, name(사진용) | icon, match(x), hideEmpty}], coText(x) = 공동 담당 안내(없으면 ''), whoText(x) = 담당 표시.
 function Timeline({items, groups: groupDefs, coText, whoText = x => teamWho(x.assignee), onOpen, onPatch, busy}) {
  const [range, setRangeState] = useState(() => { try { return localStorage.getItem('ps.teamTlRange') === '28' ? 28 : 14; } catch { return 14; } });
@@ -2539,19 +2557,40 @@ function TeamIssues({items, comments, all, cmap, onOpen, onPatch, busy}) {
 function TeamKpi({items, onMonth, onBack}) {
  const names = teamNames(), cur = thisMonth();
  const months = [...new Set([cur, ...items.map(doneMonth).filter(Boolean)])].sort().reverse();
- const stat = list => { const due = list.filter(x => x.due), on = due.filter(x => inSeoul(doneAt(x)) <= x.due).length; return {n: list.length, on, due: due.length}; };
- const cell = (s, k) => html`<td key=${k}><b>${s.n}</b>${s.due ? html`<small class=${cx('kpi-rate', s.on === s.due && 'full')}>제때 ${Math.round(s.on / s.due * 100)}%<em>${s.on}/${s.due}</em></small>` : html`<small class="kpi-rate none">마감 있는 업무 없음</small>`}</td>`;
+ const stat = list => { const due = list.filter(x => x.due), on = due.filter(x => inSeoul(doneAt(x)) <= x.due).length, w = list.filter(x => x.work_days > 0), sum = w.reduce((a, x) => a + x.work_days, 0); return {n: list.length, on, due: due.length, wn: w.length, sum}; };
+ const cell = (s, k) => html`<td key=${k}><b>${s.n}</b>${s.due ? html`<small class=${cx('kpi-rate', s.on === s.due && 'full')}>제때 ${Math.round(s.on / s.due * 100)}%<em>${s.on}/${s.due}</em></small>` : html`<small class="kpi-rate none">마감 있는 업무 없음</small>`}${s.wn ? html`<small class="kpi-wd">작업 ${fmtDays(s.sum)} · 평균 ${fmtDays(Math.round(s.sum / s.wn * 10) / 10)}${s.wn < s.n ? html`<em>${s.wn}/${s.n}건</em>` : ''}</small>` : s.n ? html`<small class="kpi-wd none">작업일 입력 전</small>` : ''}</td>`;
  const row = (k, label, list) => html`<tr key=${k} class=${cx(k === 'all' && 'kpi-all', k === cur && 'kpi-cur')}><th>${k !== 'all' ? html`<button type="button" class="kpi-month" title="이 달 완료 목록 보기" onClick=${() => onMonth(k)}>${label}${I('ChevronRight', 12)}</button>` : label}</th>${[list, ...names.map(n => list.filter(x => teamHas(x, n)))].map((l, i) => cell(stat(l), i))}</tr>`;
  return html`<div class="kpi">
   <div class="kpi-head"><strong>월별 KPI</strong><small>${I('Lock', 12)}이현성에게만 보여요</small><button type="button" class="text-button kpi-back" onClick=${onBack}>완료 목록 보기${I('ChevronRight', 13)}</button></div>
   <div class="kpi-scroll"><table class="kpi-table"><thead><tr><th>달</th><th>팀 전체</th>${names.map(n => html`<th key=${n}>${n}<${RoleTag} name=${n} /></th>`)}</tr></thead>
    <tbody>${row('all', '전체 기간', items)}${months.map(m => row(m, monthLabel(m, true), items.filter(x => doneMonth(x) === m)))}</tbody></table></div>
-  <p class="kpi-note">완료 수 = 그 달에 완료한 업무(담당이 여러 명이면 각자 1건씩, 팀 전체는 업무 수) · 제때 = 마감일까지 완료한 비율(마감이 있던 업무만)</p>
+  <p class="kpi-note">완료 수 = 그 달에 완료한 업무(담당이 여러 명이면 각자 1건씩, 팀 전체는 업무 수) · 제때 = 마감일까지 완료한 비율(마감이 있던 업무만) · 작업 = 최종 완료 때 적은 작업일 합계 · 평균(적은 업무만, n/m건 = 적은 수/완료 수)</p>
  </div>`;
+}
+// 최종 완료 창(11-05, 이현성만): 며칠 걸렸는지(작업일, 꼭 · 반나절 단위) + 히스토리 메모(선택). 시작일(없으면 진행 중이 된 날 → 등록일)부터
+// 완료 날까지 주말을 뺀 날 수를 미리 채워 둔다. mode 'done' = 완료로 바꾸는 중(취소하면 완료 안 함), 'edit' = 완료한 뒤 적기 · 고치기.
+function TeamFinalDone({x, mode = 'done', onCancel, onSave}) {
+ const end = mode === 'done' ? today() : (inSeoul(doneAt(x)) || today()), start = teamWorkStart(x), s0 = start && start <= end ? start : end;
+ const guess = Math.max(1, teamWorkdays(s0, end)), cal = teamDayNum(end) - teamDayNum(s0) + 1;
+ const [days, setDays] = useState(() => String(x.work_days || guess)), [note, setNote] = useState(() => x.work_note || '');
+ const n = Number(days), ok = Number.isFinite(n) && n >= 0.5 && n <= 999;
+ const step = d => setDays(v => String(Math.min(999, Math.max(0.5, Math.round(((Number(v) || 0) + d) * 2) / 2))));
+ const save = e => { e.preventDefault(); if (ok) onSave({work_days: Math.round(n * 2) / 2, work_note: note.trim().slice(0, 2000)}); };
+ return html`<${Dialog} class="tb-final" title=${mode === 'done' ? '최종 완료' : '최종 완료 기록'} description=${x.title} onClose=${onCancel}>
+  <form class="tb-final-form" onSubmit=${save}>
+   <div class="tb-final-days"><label for="tb-final-n">며칠 걸렸나요?</label>
+    <div class="tb-final-step"><button type="button" class="icon-button" aria-label="반나절 빼기" onClick=${() => step(-0.5)}>${I('Minus', 16)}</button><input id="tb-final-n" type="number" inputmode="decimal" min="0.5" max="999" step="0.5" value=${days} ref=${focusOnMount} onInput=${e => setDays(e.target.value)} /><b>일</b><button type="button" class="icon-button" aria-label="반나절 더하기" onClick=${() => step(0.5)}>${I('Plus', 16)}</button></div>
+   </div>
+   <p class="tb-final-guess">${start ? `${shortDate(s0)} 시작 → ${mode === 'done' ? '오늘' : shortDate(end)} 완료 · 주말 빼고 ${guess}일(달력 ${cal}일)` : `시작일 기록이 없어 ${mode === 'done' ? '오늘' : '완료한 날'} 하루로 채웠어요`}${n !== guess ? html`<button type="button" class="text-button" onClick=${() => setDays(String(guess))}>${guess}일로 되돌리기</button>` : ''}</p>
+   <label class="tb-final-note"><span>히스토리 메모 <small>선택</small></span><textarea rows="4" maxLength="2000" placeholder="진행하면서 있었던 일, 늦어진 이유, 다음에 참고할 점" value=${note} onInput=${e => setNote(e.target.value)}></textarea></label>
+   <p class="tb-final-lock">${I('Lock', 12)}작업일 · 히스토리 메모는 이현성에게만 보여요</p>
+   <div class="tb-final-acts"><button type="button" class="secondary-button" onClick=${onCancel}>취소</button><button class="primary-button" disabled=${!ok}>${I('Check', 15)}${mode === 'done' ? '완료하기' : '저장'}</button></div>
+  </form>
+ <//>`;
 }
 // 완료(10-30 월별): 이번 달 완료부터, 달 칩(맨 앞 '전체' + 완료가 있는 달 + 이번 달)으로 지난 달. 담당 칩 숫자는 고른 달 기준, 달 칩 숫자는 고른 담당 기준.
 // 이현성은 맨 앞 '월별 KPI' 태그로 KPI 요약을 본다(11-04).
-function TeamDone({items, cmap, onOpen, onPatch, busy, isAdmin = false}) {
+function TeamDone({items, cmap, onOpen, onPatch, busy, isAdmin = false, onWork = null}) {
  const [limit, setLimit] = useState(60), [month, setMonth] = useState(thisMonth), [who, setWho] = useState('all'), [kpi, setKpi] = useState(false);
  const names = teamNames(), mine = x => who === 'all' || teamHas(x, who);
  const kpiTag = isAdmin && html`<button type="button" class=${cx('dv-kpi-tag', kpi && 'on')} aria-pressed=${kpi} title="월별 KPI 요약 · 이현성에게만 보여요" onClick=${() => setKpi(v => !v)}>${I('TrendingUp', 13)}월별 KPI</button>`;
@@ -2560,13 +2599,16 @@ function TeamDone({items, cmap, onOpen, onPatch, busy, isAdmin = false}) {
  const inMonth = month === 'all' ? items : items.filter(x => doneMonth(x) === month), mLabel = month === 'all' ? '전체 기간' : monthLabel(month, true);
  const list = inMonth.filter(mine).sort((a, b) => doneAt(b).localeCompare(doneAt(a)));
  const late = list.filter(x => x.due && inSeoul(doneAt(x)) > x.due).length;
+ // 작업일(이현성만): 적은 업무의 합계 · 평균, 아직 안 적은 수. 줄마다 'n일'(누르면 고치기) 또는 '작업일 적기'.
+ const wd = list.filter(x => x.work_days > 0), wSum = wd.reduce((a, x) => a + x.work_days, 0), wMiss = list.length - wd.length;
+ const workBtn = x => html`<button type="button" class=${cx('tag tb-wd', !x.work_days && 'none')} disabled=${busy} title=${x.work_days ? (x.work_note ? `히스토리: ${x.work_note.slice(0, 160)}` : '작업일 · 히스토리 고치기') : '최종 작업일 · 히스토리 적기'} onClick=${() => onWork(x)}>${I('Clock', 12)}${x.work_days ? fmtDays(x.work_days) : '작업일 적기'}${x.work_note ? I('NotebookPen', 11) : ''}</button>`;
  const groups = []; list.slice(0, limit).forEach(x => { const d = inSeoul(doneAt(x)) || '날짜 없음'; const g = groups[groups.length - 1]; if (g && g.day === d) g.items.push(x); else groups.push({day: d, items: [x]}); });
  return html`<section class="done-view"><div class="dv-head"><div class="dv-left">${kpiTag}<${DoneMonths} counts=${counts} value=${month} onChange=${k => { setMonth(k); setLimit(60); }} /></div><div class="dv-who" role="group" aria-label="담당 필터">${[['all', '전체'], ...names.map(n => [n, n])].map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${who === v} onClick=${() => { setWho(v); setLimit(60); }}>${l}<span>${v === 'all' ? inMonth.length : inMonth.filter(x => teamHas(x, v)).length}</span></button>`)}</div></div>
-  <p class="dv-sum"><strong>${mLabel}</strong><span>${who !== 'all' ? `${who} · ` : ''}완료 <b>${list.length}</b>건</span>${late ? html`<small>늦게 완료 ${late}건</small>` : ''}</p>
-  ${!list.length && html`<p class="dv-empty">${month === 'all' ? '아직 완료한 업무가 없어요.' : month === thisMonth() ? '이번 달에 완료한 업무가 아직 없어요.' : `${mLabel}에 완료한 업무가 없어요.`}</p>`}${groups.map(g => html`<div class="pl-group dv-group" key=${g.day}><div class="pl-group-head"><span>${teamDay(g.day)}</span><small>${g.items.length}건</small></div>${g.items.map(x => html`<div class="dv-row" key=${x.id}><span class="dv-check">${I('Check', 14)}</span><div class="dv-main"><button type="button" class="dv-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong>${x.due ? html`<span class="pl-date">${shortDate(x.due)} 마감${inSeoul(doneAt(x)) > x.due ? ' · 늦게 완료' : ''}</span>` : ''}</button><span class="pl-tags"><span class="tag">${teamWho(x.assignee)}</span>${x.src_board && !cOnly() && html`<span class="tag tb-src">${x.src_board}${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${cmap[x.id] ? html`<span class="tag">댓글 ${cmap[x.id]}</span>` : ''}</span></div><span class="dv-time">${teamClock(doneAt(x))}</span><button type="button" class="dv-undo" disabled=${busy} onClick=${() => onPatch(x, {status: 'doing'}, '완료 취소')}>되돌리기</button></div>`)}</div>`)}${list.length > limit && html`<button type="button" class="dv-more" onClick=${() => setLimit(l => l + 60)}>이전 완료 더 보기 (${list.length - limit}건)</button>`}</section>`;
+  <p class="dv-sum"><strong>${mLabel}</strong><span>${who !== 'all' ? `${who} · ` : ''}완료 <b>${list.length}</b>건</span>${late ? html`<small>늦게 완료 ${late}건</small>` : ''}${onWork && wd.length > 0 ? html`<small class="dv-wd" title="최종 완료 때 적은 작업일 · 이현성에게만 보여요">작업 ${fmtDays(wSum)} · 평균 ${fmtDays(Math.round(wSum / wd.length * 10) / 10)}</small>` : ''}${onWork && wMiss > 0 ? html`<small class="dv-wd miss" title="작업일을 아직 적지 않은 완료 업무 · 줄의 '작업일 적기'로">작업일 입력 전 ${wMiss}건</small>` : ''}</p>
+  ${!list.length && html`<p class="dv-empty">${month === 'all' ? '아직 완료한 업무가 없어요.' : month === thisMonth() ? '이번 달에 완료한 업무가 아직 없어요.' : `${mLabel}에 완료한 업무가 없어요.`}</p>`}${groups.map(g => html`<div class="pl-group dv-group" key=${g.day}><div class="pl-group-head"><span>${teamDay(g.day)}</span><small>${g.items.length}건</small></div>${g.items.map(x => html`<div class="dv-row" key=${x.id}><span class="dv-check">${I('Check', 14)}</span><div class="dv-main"><button type="button" class="dv-title" onClick=${() => onOpen(x.id)}><strong>${x.title}</strong>${x.due ? html`<span class="pl-date">${shortDate(x.due)} 마감${inSeoul(doneAt(x)) > x.due ? ' · 늦게 완료' : ''}</span>` : ''}</button><span class="pl-tags"><span class="tag">${teamWho(x.assignee)}</span>${x.src_board && !cOnly() && html`<span class="tag tb-src">${x.src_board}${x.topic_label ? ` · ${x.topic_label}` : ''}</span>`}${cmap[x.id] ? html`<span class="tag">댓글 ${cmap[x.id]}</span>` : ''}${onWork ? workBtn(x) : ''}</span></div><span class="dv-time">${teamClock(doneAt(x))}</span><button type="button" class="dv-undo" disabled=${busy} onClick=${() => onPatch(x, {status: 'doing'}, '완료 취소')}>되돌리기</button></div>`)}</div>`)}${list.length > limit && html`<button type="button" class="dv-more" onClick=${() => setLimit(l => l + 60)}>이전 완료 더 보기 (${list.length - limit}건)</button>`}</section>`;
 }
 
-function TeamDetail({focus = null, handoffFrom = null, item: x, comments, me, isAdmin, busy, onClose, onPatch, onChecklist, onComment, onEditComment, onDeleteComment, onMark, onRemove, onAddLink, onRemoveLink, onRefreshSource, onSendTo, onUnlink}) {
+function TeamDetail({focus = null, handoffFrom = null, item: x, comments, me, isAdmin, busy, onClose, onPatch, onChecklist, onComment, onEditComment, onDeleteComment, onMark, onRemove, onAddLink, onRemoveLink, onRefreshSource, onSendTo, onUnlink, onWork = null}) {
  const [linkOpen, setLinkOpen] = useState(() => { try { return localStorage.getItem('ps.teamLinkOpen') === '1'; } catch { return false; } });
  const toggleLink = () => setLinkOpen(v => { try { localStorage.setItem('ps.teamLinkOpen', v ? '0' : '1'); } catch {} return !v; });
  const [full, setFull] = useState(false), [sendBoard, setSendBoard] = useState(''), startWho = useRef(handoffFrom !== null ? handoffFrom : x.assignee), [hoNote, setHoNote] = useState(''), [hoOpen, setHoOpen] = useState(false), [histAll, setHistAll] = useState(false), [hoAll, setHoAll] = useState(false);
@@ -2596,6 +2638,7 @@ function TeamDetail({focus = null, handoffFrom = null, item: x, comments, me, is
     ${x.status === 'todo' && html`<div><span>착수 예정</span><div class="tb-chips">${[['', '미정'], [today(), '오늘'], [offsetDate(today(), 1), '내일'], [offsetDate(today(), 2), '모레'], [mondayOf(offsetDate(today(), 7)), '다음 주']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${x.start_on === v} disabled=${busy} onClick=${() => x.start_on !== v && onPatch(x, {start_on: v}, v ? `착수 예정 ${shortDate(v)}` : '착수 예정 미정')}>${l}${l === '다음 주' ? html`<small class="tb-chip-sub">${shortDate(v)}</small>` : ''}</button>`)}<input type="date" class="chip-date" aria-label="착수 예정일" value=${x.start_on} disabled=${busy} onChange=${e => onPatch(x, {start_on: e.target.value}, e.target.value ? `착수 예정 ${shortDate(e.target.value)}` : '착수 예정 미정')} />${x.start_on && html`<b class=${cx('tb-start-tag', x.start_on < today() && 'late')}>${teamStartLabel(x)}</b>`}</div></div>`}
     ${(x.status === 'doing' || x.status === 'hold') && html`<div><span>시작일</span><div class="tb-chips"><button type="button" class="chip" aria-pressed=${x.start_on === today()} disabled=${busy} onClick=${() => x.start_on !== today() && onPatch(x, {start_on: today()}, `시작일 ${shortDate(today())}`)}>오늘</button><input type="date" class="chip-date" aria-label="시작일" value=${x.start_on} disabled=${busy} onChange=${e => onPatch(x, {start_on: e.target.value}, e.target.value ? `시작일 ${shortDate(e.target.value)}` : '시작일 비움')} />${!x.start_on && teamStartOf(x) && html`<small class="tb-start-auto">${shortDate(teamStartOf(x))}부터로 표시 중</small>`}</div></div>`}
     <div><span>진행률</span><div class="tb-chips">${[0, 25, 50, 75, 100].map(v => html`<button type="button" key=${v} class="chip" aria-pressed=${(x.progress || 0) === v} disabled=${busy || x.checklist.length > 0} title=${x.checklist.length ? '세부 업무 체크로 자동 계산돼요' : ''} onClick=${() => onPatch(x, {progress: v}, `진행률 ${v}%`)}>${v}%</button>`)}${![0, 25, 50, 75, 100].includes(x.progress || 0) && html`<b class="tb-pct">${x.progress}%</b>`}</div></div>
+    ${onWork && x.status === 'done' && html`<div class="tb-work-row"><span>작업일</span><div class="tb-work">${x.work_days ? html`<b class="tb-work-days">${fmtDays(x.work_days)}</b>` : html`<em class="tb-work-miss">입력 전</em>`}${x.work_by && x.work_at ? html`<small>${x.work_by} · ${teamDay(inSeoul(x.work_at))}</small>` : ''}<button type="button" class="text-button" disabled=${busy} onClick=${() => onWork(x)}>${x.work_days ? '고치기' : '작업일 적기'}</button><small class="tb-work-lock">${I('Lock', 11)}이현성에게만 보여요</small>${x.work_note && html`<div class="tb-work-note"><${TeamText} text=${x.work_note} /></div>`}</div></div>`}
    </div>
    <section class=${cx('tb-issue-box', x.issue && 'on ' + x.issue)}><div class="tb-issue-head"><strong>${I('AlertCircle', 15)}특이사항 보고</strong>${x.issue && html`<small>${x.issue_by}${x.issue_at ? ` · ${teamDay(inSeoul(x.issue_at))} ${teamClock(x.issue_at)}` : ''}</small>`}</div>
     <div class="tb-chips">${[['', '없음'], ...Object.entries(TEAM_ISSUES)].map(([v, l]) => html`<button type="button" key=${l} class=${cx('chip', v && 'issue-' + v)} aria-pressed=${issue === v} onClick=${() => setIssue(v)}>${l}</button>`)}</div>

@@ -2067,6 +2067,49 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 }
 .tb-rep-copy{display:inline-flex;align-items:center;gap:5px}
 @media(max-width:640px){.tb-rep-save{flex-wrap:wrap}}
+/* 최종 완료(11-05, 이현성만): 작업일 · 히스토리 메모 */
+.dialog.tb-final{max-width:460px;gap:14px}
+.tb-final [data-slot=dialog-description]{font-size:14px;font-weight:600;color:#13204a;line-height:1.5}
+.tb-final-form{display:flex;flex-direction:column;gap:12px}
+.tb-final-days{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1px solid #c9d4fb;border-radius:8px;background:#f6f8ff}
+.tb-final-days>label{font-size:14.5px;font-weight:700;color:#0b1c5c}
+.tb-final-step{display:inline-flex;align-items:center;gap:6px}
+.tb-final-step .icon-button{width:34px;height:34px;border:1px solid #c9d4fb;border-radius:3px;background:#fff;color:#315df8}
+.tb-final-step .icon-button:hover{background:#eef2ff}
+.tb-final-step input{width:76px;height:38px!important;min-height:0!important;padding:0 8px!important;border:1px solid #9fb3f7!important;text-align:center;font-size:18px!important;font-weight:800;color:#0b1c5c;background:#fff;-moz-appearance:textfield}
+.tb-final-step input::-webkit-outer-spin-button,.tb-final-step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.tb-final-step input:focus{outline:none;box-shadow:0 0 0 3px #e8edff}
+.tb-final-step>b{font-size:14px;font-weight:700;color:#0b1c5c;margin-right:2px}
+.tb-final-guess{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin:-4px 2px 0;font-size:12.5px;color:#7d889f}
+.tb-final-guess .text-button{font-size:12.5px;padding:0}
+.tb-final-note{display:flex;flex-direction:column;gap:6px}
+.tb-final-note>span{font-size:13px;font-weight:700;color:#5d6b86}
+.tb-final-note>span small{font-weight:600;color:#a7afc0;margin-left:2px}
+.tb-final-note textarea{width:100%;min-height:96px;padding:10px 12px;border:1px solid #dfe3ef;font-size:14px;line-height:1.55;color:#1d2a44;resize:vertical;box-sizing:border-box}
+.tb-final-note textarea:focus{outline:none;border-color:#9fb3f7;box-shadow:0 0 0 3px #e8edff}
+.tb-final-lock{display:flex;align-items:center;gap:5px;margin:0;font-size:12px;color:#a0a6b8}
+.tb-final-acts{display:flex;justify-content:flex-end;gap:8px}
+.tb-final-acts .primary-button{display:inline-flex;align-items:center;gap:6px}
+.tb-work-row{align-items:start!important}
+.tb-work-row>span{padding-top:6px}
+.tb-work{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;min-width:0}
+.tb-work-days{display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:3px;background:#e8edff;color:#315df8;font-size:14px;font-weight:800}
+.tb-work-miss{font-style:normal;font-size:13px;font-weight:600;color:#c27a1c;background:#fff3e2;border-radius:3px;padding:3px 8px}
+.tb-work>small{font-size:12px;color:#a0a6b8}
+.tb-work .text-button{font-size:13px;padding:0}
+.tb-work-lock{display:inline-flex;align-items:center;gap:3px;margin-left:auto}
+.tb-work-note{flex-basis:100%;padding:10px 12px;border-radius:6px;background:#f6f8fd;border:1px solid #e6eaf3}
+.tb-work-note .tb-text{font-size:13.5px;color:#33435c;white-space:pre-wrap}
+.tb-wd{display:inline-flex;align-items:center;gap:4px;cursor:pointer;background:#e8edff!important;color:#315df8!important;font-weight:700!important}
+.tb-wd:hover:not(:disabled){background:#dce5ff!important}
+.tb-wd.none{background:#fff!important;color:#c27a1c!important;border:1px dashed #efc98f}
+.tb-wd.none:hover:not(:disabled){background:#fff8ec!important}
+.dv-sum>small.dv-wd{background:#e8edff;color:#315df8}
+.dv-sum>small.dv-wd.miss{background:#fff3e2;color:#c27a1c}
+.kpi-wd{display:flex;align-items:baseline;gap:4px;margin-top:2px;font-size:12px;font-weight:600;color:#315df8}
+.kpi-wd>em{font-style:normal;font-weight:500;color:#a0a6b8}
+.kpi-wd.none{color:#c9a46a;font-weight:500}
+@media(max-width:640px){.tb-final-days{padding:10px 12px}.tb-work-lock{margin-left:0}}
 </style>
 </head><body>
 <div id="app"></div>
@@ -2076,6 +2119,6 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1793850189"></script>
-<script src="app.js?v=1793850189"></script>
+<script src="platform.js?v=1793860993"></script>
+<script src="app.js?v=1793860993"></script>
 </body></html>
