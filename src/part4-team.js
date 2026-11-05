@@ -720,42 +720,71 @@ const workStartOf = x => x.work_start || teamWorkStart(x) || inSeoul(doneAt(x));
 const workEndOf = x => x.work_end || inSeoul(doneAt(x));
 // 하루(YYYY-MM-DD)에 iso의 서울 시각을 붙인 ISO — 최종 종료일로 완료 시각의 날짜만 바꿀 때.
 const atDay = (day, iso) => { const b = iso ? new Date(iso) : new Date(), hms = isNaN(b) ? '18:00:00' : new Date(b.getTime() + 9 * 36e5).toISOString().slice(11, 19); return new Date(`${day}T${hms}+09:00`).toISOString(); };
+// 달 이동(YYYY-MM).
+const fdMonth = (m, n) => { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo - 1 + n, 1)).toISOString().slice(0, 7); };
+const fdDay = d => `${shortDate(d)} (${'일월화수목금토'[teamWeekday(d)]})`;
+// 기간 달력(11-05, 사용자 '캘린더 하나로 시작일 - 마감일을 직관적으로 찍어서'): 두 달(모바일 한 달)을 보여 주고, 시작일 → 종료일 순서로 누른다.
+// 고른 기간은 띠로, 예정 마감 · 오늘은 날짜 아래 작은 글자로. 오늘 뒤는 못 고름.
+function FdCalendar({start, end, pick, due, onPick}) {
+ const t = today(), [hov, setHov] = useState('');
+ const [base, setBase] = useState(() => fdMonth((end || start || t).slice(0, 7), -1));
+ const lo = pick ? (hov && hov < start ? hov : start) : start, hi = pick ? (hov && hov > start ? hov : start) : end;
+ const month = m => {
+  const first = m + '-01', lead = (teamWeekday(first) + 6) % 7, dim = new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7), 0)).getUTCDate(), n = Math.ceil((lead + dim) / 7) * 7, s0 = offsetDate(first, -lead);
+  return html`<div class="tb-fd-month" key=${m}><div class="tb-fd-mh">${Number(m.slice(0, 4))}년 ${Number(m.slice(5))}월</div>
+   <div class="tb-fd-grid tb-fd-wk">${'월화수목금토일'.split('').map((w, i) => html`<span key=${w} class=${cx(i >= 5 && 'we')}>${w}</span>`)}</div>
+   <div class="tb-fd-grid">${Array.from({length: n}, (_, i) => {
+    const d = offsetDate(s0, i); if (d.slice(0, 7) !== m) return html`<span key=${d} class="tb-fd-d out"></span>`;
+    const wd = (teamWeekday(d) + 6) % 7, inR = !!lo && !!hi && d >= lo && d <= hi, isS = !!lo && d === lo, isE = !!hi && d === hi, fut = d > t;
+    return html`<button type="button" key=${d} data-day=${d} class=${cx('tb-fd-d', inR && 'in', isS && 's', isE && 'e', wd >= 5 && 'we', fut && 'fut')} disabled=${fut} aria-label=${`${fdDay(d)}${d === due ? ' · 예정 마감' : ''}${d === t ? ' · 오늘' : ''}`} aria-pressed=${isS || isE} onClick=${() => onPick(d)} onMouseEnter=${() => pick && setHov(d)}><b>${Number(d.slice(8))}</b>${d === due ? html`<small class="due">마감</small>` : d === t ? html`<small>오늘</small>` : ''}</button>`;
+   })}</div></div>`;
+ };
+ return html`<div class="tb-fd-cal" onMouseLeave=${() => setHov('')}>
+  <button type="button" class="tb-fd-nav prev" aria-label="이전 달" onClick=${() => setBase(b => fdMonth(b, -1))}>${I('ChevronLeft', 16)}</button>
+  <button type="button" class="tb-fd-nav next" aria-label="다음 달" disabled=${fdMonth(base, 1) >= t.slice(0, 7)} onClick=${() => setBase(b => fdMonth(b, 1))}>${I('ChevronRight', 16)}</button>
+  <div class="tb-fd-months">${month(base)}${month(fdMonth(base, 1))}</div>
+ </div>`;
+}
 function TeamFinalDone({x, mode = 'done', onCancel, onSave}) {
  const t = today(), end0 = x.work_end || (mode === 'done' ? t : (inSeoul(doneAt(x)) || t)), s0 = x.work_start || teamWorkStart(x) || end0, start0 = s0 <= end0 ? s0 : end0;
  const guessOf = (a, b) => Math.max(1, teamWorkdays(a, b));
- const [start, setStart] = useState(start0), [end, setEnd] = useState(end0);
+ const [start, setStart] = useState(start0), [end, setEnd] = useState(end0), [pick, setPick] = useState(false);
  const [days, setDays] = useState(() => String(x.work_days || guessOf(start0, end0))), [touched, setTouched] = useState(!!x.work_days);
  const [tags, setTags] = useState(() => x.work_delay_tags || []), [delay, setDelay] = useState(x.work_delay || ''), [note, setNote] = useState(x.work_note || '');
- const okDates = DATE_RE.test(start) && DATE_RE.test(end) && start <= end && end <= t;
+ const okDates = !pick && DATE_RE.test(start) && DATE_RE.test(end) && start <= end && end <= t;
  const guess = okDates ? guessOf(start, end) : 0, cal = okDates ? teamDayNum(end) - teamDayNum(start) + 1 : 0;
  const n = Number(days), ok = okDates && Number.isFinite(n) && n >= 0.5 && n <= 999;
  const late = x.due && okDates && end > x.due ? teamDayNum(end) - teamDayNum(x.due) : 0;
- const src = x.work_start ? '' : x.start_on ? '업무 시작일' : (x.history || []).some(h => h.kind === 'status' && h.to === statuses.doing) ? '진행 중이 된 날' : '등록한 날';
- const setDates = (a, b) => { setStart(a); setEnd(b); if (!touched && DATE_RE.test(a) && DATE_RE.test(b) && a <= b) setDays(String(guessOf(a, b))); };
+ // 달력: 처음 누르면 시작일(종료일은 비움), 다음에 누르면 종료일(시작일보다 앞이면 서로 바꿈). 실제 작업일은 직접 고치기 전까지 기간을 따라간다.
+ const onPick = d => {
+  if (!pick) { setStart(d); setEnd(''); setPick(true); return; }
+  const a = d < start ? d : start, b = d < start ? start : d;
+  setStart(a); setEnd(b); setPick(false); if (!touched) setDays(String(guessOf(a, b)));
+ };
  const step = d => { setTouched(true); setDays(v => String(Math.min(999, Math.max(0.5, Math.round(((Number(v) || 0) + d) * 2) / 2)))); };
  const toggleTag = k => setTags(l => (l.includes(k) ? l.filter(v => v !== k) : [...l, k]));
  const save = e => { e.preventDefault(); if (ok) onSave({work_start: start, work_end: end, work_days: Math.round(n * 2) / 2, work_delay_tags: WORK_DELAYS.filter(k => tags.includes(k)), work_delay: delay.trim().slice(0, 300), work_note: note.trim().slice(0, 2000)}); };
  return html`<${Dialog} class="tb-final" title=${mode === 'done' ? '최종 완료' : '최종 완료 기록'} description=${x.title} onClose=${onCancel}>
   <form class="tb-final-form" onSubmit=${save}>
-   <div class=${cx('tb-final-sum', late > 0 && 'late')} aria-live="polite">
-    <div class="tb-final-bar" title="시작일 ~ 종료일(주말 빼고) 중 실제 작업한 날"><i style=${`width:${okDates && guess ? Math.min(100, Math.round(n / guess * 100)) || 0 : 0}%`}></i></div>
-    <p><b>실제 작업 ${ok ? fmtDays(Math.round(n * 2) / 2) : '-'}</b><span>/ 기간 ${okDates ? `주말 빼고 ${guess}일 · 달력 ${cal}일` : '-'}</span>${late > 0 ? html`<em>마감 ${shortDate(x.due)}보다 ${late}일 늦음</em>` : x.due && okDates ? html`<em class="ok">마감 ${shortDate(x.due)} 안에 끝남</em>` : ''}</p>
+   <section class="tb-fd-period" aria-label="기간">
+    <div class="tb-fd-range">
+     <div class="tb-fd-pt"><small>시작일</small><b>${start ? fdDay(start) : '-'}</b></div>
+     ${I('ArrowRight', 15)}
+     <div class=${cx('tb-fd-pt', pick && 'wait')}><small>종료일</small><b>${pick ? '달력에서 눌러 주세요' : fdDay(end)}</b></div>
+     <div class="tb-fd-len">${okDates ? html`<b>${guess}일</b><small>주말 빼고 · 달력 ${cal}일</small>` : ''}</div>
+    </div>
+    <${FdCalendar} start=${start} end=${end} pick=${pick} due=${x.due} onPick=${onPick} />
+    <p class="tb-fd-note"><span>${pick ? '종료일을 눌러 주세요' : '시작일 → 종료일 순서로 누르면 기간이 바뀌어요'}</span>${x.due ? html`<span class=${cx('tb-fd-due', late > 0 && 'late')}>예정 마감 ${fdDay(x.due)}${late > 0 ? ` · ${late}일 늦게 끝남` : okDates ? ' · 안에 끝남' : ''}</span>` : html`<span class="tb-fd-due">예정 마감 없음</span>`}</p>
+   </section>
+   <div class="tb-fd-row"><label for="tb-final-n">실제 작업일</label>
+    <div class="tb-fd-work"><div class="tb-fd-step"><button type="button" aria-label="반나절 빼기" onClick=${() => step(-0.5)}>${I('Minus', 15)}</button><input id="tb-final-n" type="number" inputmode="decimal" min="0.5" max="999" step="0.5" value=${days} ref=${focusOnMount} onInput=${e => { setTouched(true); setDays(e.target.value); }} /><em>일</em><button type="button" aria-label="반나절 더하기" onClick=${() => step(0.5)}>${I('Plus', 15)}</button></div>
+     <span class="tb-fd-sub">${okDates ? `기간 ${guess}일 중` : ''}</span>${okDates && n !== guess ? html`<button type="button" class="text-button tb-fd-fit" onClick=${() => { setDays(String(guess)); setTouched(false); }}>${guess}일로 맞추기</button>` : ''}</div>
    </div>
-   <div class="tb-final-grid">
-    <label class="tb-final-k" for="tb-final-s">시작일</label>
-    <div class="tb-final-v row"><input id="tb-final-s" type="date" class="chip-date" value=${start} max=${end || t} onChange=${e => setDates(e.target.value, end)} />${src && start === start0 ? html`<small>${src}로 채웠어요</small>` : ''}</div>
-    <label class="tb-final-k" for="tb-final-n">실제 작업일</label>
-    <div class="tb-final-v"><div class="tb-final-step"><button type="button" class="icon-button" aria-label="반나절 빼기" onClick=${() => step(-0.5)}>${I('Minus', 16)}</button><input id="tb-final-n" type="number" inputmode="decimal" min="0.5" max="999" step="0.5" value=${days} ref=${focusOnMount} onInput=${e => { setTouched(true); setDays(e.target.value); }} /><b>일</b><button type="button" class="icon-button" aria-label="반나절 더하기" onClick=${() => step(0.5)}>${I('Plus', 16)}</button></div>
-     <p class="tb-final-guess">${!okDates ? '시작일 · 종료일을 확인해 주세요' : n !== guess ? html`<span>기간(주말 빼고)은 ${guess}일</span><button type="button" class="text-button" onClick=${() => { setDays(String(guess)); setTouched(false); }}>${guess}일로 맞추기</button>` : '시작일 ~ 종료일에서 주말을 뺀 날로 채웠어요 · 실제로 일한 날로 고쳐 주세요'}</p></div>
-    <label class="tb-final-k" for="tb-final-e">최종 종료일</label>
-    <div class="tb-final-v row"><input id="tb-final-e" type="date" class="chip-date" value=${end} min=${start} max=${t} onChange=${e => setDates(start, e.target.value)} /><small class=${cx('tb-final-due', late > 0 && 'late')}>${x.due ? `마감 ${shortDate(x.due)}` : '마감 없음'}</small></div>
-    <span class="tb-final-k">딜레이 사유</span>
-    <div class=${cx('tb-final-v tb-final-delay', late > 0 && 'late')}><div class="tb-chips">${WORK_DELAYS.map(k => html`<button type="button" key=${k} class="chip" aria-pressed=${tags.includes(k)} onClick=${() => toggleTag(k)}>${k}</button>`)}</div><input type="text" maxLength="300" aria-label="딜레이 사유" placeholder=${late > 0 ? '늦어진 이유를 짧게 (예: 원고 회신이 3일 늦음)' : '늦어진 게 있으면 짧게 (선택)'} value=${delay} onInput=${e => setDelay(e.target.value)} /></div>
-    <label class="tb-final-k" for="tb-final-m">히스토리 메모</label>
-    <div class="tb-final-v"><textarea id="tb-final-m" rows="3" maxLength="2000" placeholder="진행하면서 있었던 일, 다음에 참고할 점 (선택)" value=${note} onInput=${e => setNote(e.target.value)}></textarea></div>
+   <div class="tb-fd-row top"><span class="tb-fd-label">딜레이 사유${late > 0 ? html`<em>${late}일 늦음</em>` : html`<small>선택</small>`}</span>
+    <div class="tb-fd-delay"><div class="tb-fd-chips">${WORK_DELAYS.map(k => html`<button type="button" key=${k} aria-pressed=${tags.includes(k)} onClick=${() => toggleTag(k)}>${k}</button>`)}</div><input type="text" maxLength="300" aria-label="딜레이 사유" placeholder=${late > 0 ? '늦어진 이유를 짧게 (예: 원고 회신이 3일 늦음)' : '늦어진 게 있으면 짧게'} value=${delay} onInput=${e => setDelay(e.target.value)} /></div>
    </div>
-   <p class="tb-final-lock">${I('Lock', 12)}이 기록은 이현성에게만 보여요</p>
-   <div class="tb-final-acts"><button type="button" class="secondary-button" onClick=${onCancel}>취소</button><button class="primary-button" disabled=${!ok}>${I('Check', 15)}${mode === 'done' ? '완료하기' : '저장'}</button></div>
+   <div class="tb-fd-row top"><label for="tb-final-m">히스토리 메모<small>선택</small></label><textarea id="tb-final-m" rows="3" maxLength="2000" placeholder="진행하면서 있었던 일, 다음에 참고할 점" value=${note} onInput=${e => setNote(e.target.value)}></textarea></div>
+   <div class="tb-final-acts"><p class="tb-final-lock">${I('Lock', 12)}이현성에게만 보여요</p><button type="button" class="secondary-button" onClick=${onCancel}>취소</button><button class="primary-button" disabled=${!ok}>${I('Check', 15)}${mode === 'done' ? '완료하기' : '저장'}</button></div>
   </form>
  <//>`;
 }
