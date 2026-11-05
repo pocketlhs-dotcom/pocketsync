@@ -528,7 +528,11 @@ function teamStartOf(x) {
 }
 // 작업일(11-05, 최종 완료): 주말(토 · 일)을 뺀 날 수(시작일 · 끝날 포함). 공휴일은 몰라서 사람이 고쳐서 확정한다.
 const teamWorkdays = (a, b) => { if (!DATE_RE.test(a || '') || !DATE_RE.test(b || '')) return 0; const s0 = teamDayNum(a), e0 = teamDayNum(b); let n = 0; for (let d = s0; d <= e0 && d - s0 < 2000; d++) { const w = new Date(d * 864e5).getUTCDay(); if (w !== 0 && w !== 6) n++; } return n; };
-const teamWorkStart = x => teamStartOf(x) || (x.created_at ? seoulDate(new Date(x.created_at)) : '');
+// 최종 완료 기록의 기준 날짜(11-05, 사용자 '프로젝트 생성일도 · 시작일은 실제로 진행 중으로 바꾼 날 기준'):
+// 생성일 = 업무를 만든 날(고정), 진행 중으로 바꾼 날 = 업무 기록에서 처음 '진행 중'이 된 날(없으면 업무 시작일 → 생성일).
+const teamMadeDay = x => { const d = x.created_at ? seoulDate(new Date(x.created_at)) : ''; return DATE_RE.test(d) ? d : ''; };
+const teamDoingDay = x => { const h = (x.history || []).filter(e => e.kind === 'status' && e.to === statuses.doing && e.at).sort((a, b) => a.at.localeCompare(b.at))[0], d = h ? seoulDate(new Date(h.at)) : ''; return DATE_RE.test(d) ? d : ''; };
+const teamWorkStart = x => teamDoingDay(x) || x.start_on || teamMadeDay(x);
 const fmtDays = n => `${Number(n) % 1 ? Number(n).toFixed(1) : Number(n)}일`;
 // 보드 공용: groups = [{key, label, name(사진용) | icon, match(x), hideEmpty}], coText(x) = 공동 담당 안내(없으면 ''), whoText(x) = 담당 표시.
 function Timeline({items, groups: groupDefs, coText, whoText = x => teamWho(x.assignee), onOpen, onPatch, busy}) {
@@ -725,7 +729,7 @@ const fdMonth = (m, n) => { const [y, mo] = m.split('-').map(Number); return new
 const fdDay = d => `${shortDate(d)} (${'일월화수목금토'[teamWeekday(d)]})`;
 // 기간 달력(11-05, 사용자 '캘린더 하나로 시작일 - 마감일을 직관적으로 찍어서'): 두 달(모바일 한 달)을 보여 주고, 시작일 → 종료일 순서로 누른다.
 // 고른 기간은 띠로, 예정 마감 · 오늘은 날짜 아래 작은 글자로. 오늘 뒤는 못 고름.
-function FdCalendar({start, end, pick, due, onPick}) {
+function FdCalendar({start, end, pick, due, made = '', onPick}) {
  const t = today(), [hov, setHov] = useState('');
  const [base, setBase] = useState(() => fdMonth((end || start || t).slice(0, 7), -1));
  const lo = pick ? (hov && hov < start ? hov : start) : start, hi = pick ? (hov && hov > start ? hov : start) : end;
@@ -736,7 +740,7 @@ function FdCalendar({start, end, pick, due, onPick}) {
    <div class="tb-fd-grid">${Array.from({length: n}, (_, i) => {
     const d = offsetDate(s0, i); if (d.slice(0, 7) !== m) return html`<span key=${d} class="tb-fd-d out"></span>`;
     const wd = (teamWeekday(d) + 6) % 7, inR = !!lo && !!hi && d >= lo && d <= hi, isS = !!lo && d === lo, isE = !!hi && d === hi, fut = d > t;
-    return html`<button type="button" key=${d} data-day=${d} class=${cx('tb-fd-d', inR && 'in', isS && 's', isE && 'e', wd >= 5 && 'we', fut && 'fut')} disabled=${fut} aria-label=${`${fdDay(d)}${d === due ? ' · 예정 마감' : ''}${d === t ? ' · 오늘' : ''}`} aria-pressed=${isS || isE} onClick=${() => onPick(d)} onMouseEnter=${() => pick && setHov(d)}><b>${Number(d.slice(8))}</b>${d === due ? html`<small class="due">마감</small>` : d === t ? html`<small>오늘</small>` : ''}</button>`;
+    return html`<button type="button" key=${d} data-day=${d} class=${cx('tb-fd-d', inR && 'in', isS && 's', isE && 'e', wd >= 5 && 'we', fut && 'fut')} disabled=${fut} aria-label=${`${fdDay(d)}${d === made ? ' · 프로젝트 생성일' : ''}${d === due ? ' · 예정 마감' : ''}${d === t ? ' · 오늘' : ''}`} aria-pressed=${isS || isE} onClick=${() => onPick(d)} onMouseEnter=${() => pick && setHov(d)}><b>${Number(d.slice(8))}</b>${d === due ? html`<small class="due">마감</small>` : d === t ? html`<small>오늘</small>` : d === made ? html`<small class="made">생성</small>` : ''}</button>`;
    })}</div></div>`;
  };
  return html`<div class="tb-fd-cal" onMouseLeave=${() => setHov('')}>
@@ -747,7 +751,7 @@ function FdCalendar({start, end, pick, due, onPick}) {
 }
 function TeamFinalDone({x, mode = 'done', onCancel, onSave}) {
  const t = today(), end0 = x.work_end || (mode === 'done' ? t : (inSeoul(doneAt(x)) || t)), s0 = x.work_start || teamWorkStart(x) || end0, start0 = s0 <= end0 ? s0 : end0;
- const guessOf = (a, b) => Math.max(1, teamWorkdays(a, b));
+ const guessOf = (a, b) => Math.max(1, teamWorkdays(a, b)), made = teamMadeDay(x), doing = teamDoingDay(x);
  const [start, setStart] = useState(start0), [end, setEnd] = useState(end0), [pick, setPick] = useState(false);
  const [days, setDays] = useState(() => String(x.work_days || guessOf(start0, end0))), [touched, setTouched] = useState(!!x.work_days);
  const [tags, setTags] = useState(() => x.work_delay_tags || []), [delay, setDelay] = useState(x.work_delay || ''), [note, setNote] = useState(x.work_note || '');
@@ -767,13 +771,14 @@ function TeamFinalDone({x, mode = 'done', onCancel, onSave}) {
  return html`<${Dialog} class="tb-final" title=${mode === 'done' ? '최종 완료' : '최종 완료 기록'} description=${x.title} onClose=${onCancel}>
   <form class="tb-final-form" onSubmit=${save}>
    <section class="tb-fd-period" aria-label="기간">
+    <div class="tb-fd-made"><span>프로젝트 생성일</span><b>${made ? fdDay(made) : '-'}</b>${made && okDates && made <= end ? html`<small>생성부터 종료까지 주말 빼고 ${Math.max(1, teamWorkdays(made, end))}일 · 달력 ${teamDayNum(end) - teamDayNum(made) + 1}일</small>` : ''}</div>
     <div class="tb-fd-range">
-     <div class="tb-fd-pt"><small>시작일</small><b>${start ? fdDay(start) : '-'}</b></div>
+     <div class="tb-fd-pt"><small>시작일${doing && start === doing ? ' · 진행 중 전환일' : ''}</small><b>${start ? fdDay(start) : '-'}</b></div>
      ${I('ArrowRight', 15)}
      <div class=${cx('tb-fd-pt', pick && 'wait')}><small>종료일</small><b>${pick ? '달력에서 눌러 주세요' : fdDay(end)}</b></div>
      <div class="tb-fd-len">${okDates ? html`<b>${guess}일</b><small>주말 빼고 · 달력 ${cal}일</small>` : ''}</div>
     </div>
-    <${FdCalendar} start=${start} end=${end} pick=${pick} due=${x.due} onPick=${onPick} />
+    <${FdCalendar} start=${start} end=${end} pick=${pick} due=${x.due} made=${made} onPick=${onPick} />
     <p class="tb-fd-note"><span>${pick ? '종료일을 눌러 주세요' : '시작일 → 종료일 순서로 누르면 기간이 바뀌어요'}</span>${x.due ? html`<span class=${cx('tb-fd-due', late > 0 && 'late')}>예정 마감 ${fdDay(x.due)}${late > 0 ? ` · ${late}일 늦게 끝남` : okDates ? ' · 안에 끝남' : ''}</span>` : html`<span class="tb-fd-due">예정 마감 없음</span>`}</p>
    </section>
    <div class="tb-fd-row"><label for="tb-final-n">실제 작업일</label>
@@ -789,7 +794,8 @@ function TeamFinalDone({x, mode = 'done', onCancel, onSave}) {
  <//>`;
 }
 // 기록 한 줄(완료 탭 · 상세, 사용자 '시작일, 마감일, 실제 작업일 5일'): '시작 10.22 · 종료 11.5 · 실제 작업 5일'.
-const workLine = x => `시작 ${shortDate(workStartOf(x))} · 종료 ${shortDate(workEndOf(x))} · 실제 작업 ${fmtDays(x.work_days)}`;
+const workHead = x => `${teamMadeDay(x) ? `생성 ${shortDate(teamMadeDay(x))} · ` : ''}시작 ${shortDate(workStartOf(x))} · 종료 ${shortDate(workEndOf(x))} · `;
+const workLine = x => `${workHead(x)}실제 작업 ${fmtDays(x.work_days)}`;
 const workLate = x => (x.due && workEndOf(x) > x.due ? teamDayNum(workEndOf(x)) - teamDayNum(x.due) : 0);
 const workDelayText = x => [...(x.work_delay_tags || []), x.work_delay].filter(Boolean).join(' · ');
 // 완료(10-30 월별): 이번 달 완료부터, 달 칩(맨 앞 '전체' + 완료가 있는 달 + 이번 달)으로 지난 달. 담당 칩 숫자는 고른 달 기준, 달 칩 숫자는 고른 담당 기준.
@@ -805,7 +811,7 @@ function TeamDone({items, cmap, onOpen, onPatch, busy, isAdmin = false, onWork =
  const late = list.filter(x => x.due && inSeoul(doneAt(x)) > x.due).length;
  // 작업일(이현성만): 적은 업무의 합계 · 평균, 아직 안 적은 수. 줄마다 'n일'(누르면 고치기) 또는 '작업일 적기'.
  const wd = list.filter(x => x.work_days > 0), wSum = wd.reduce((a, x) => a + x.work_days, 0), wMiss = list.length - wd.length;
- const workBtn = x => { const dl = workDelayText(x); return html`<button type="button" class=${cx('tag tb-wd', !x.work_days && 'none')} disabled=${busy} title=${x.work_days ? [dl ? `딜레이: ${dl}` : '', x.work_note ? `히스토리: ${x.work_note.slice(0, 160)}` : '', '누르면 고치기'].filter(Boolean).join('\n') : '최종 완료 기록(시작일 · 실제 작업일 · 종료일 · 딜레이 사유 · 히스토리) 적기'} onClick=${() => onWork(x)}>${I('Clock', 12)}${x.work_days ? workLine(x) : '작업일 적기'}${x.work_days && dl ? html`<em class="tb-wd-delay">딜레이</em>` : ''}${x.work_note ? I('NotebookPen', 11) : ''}</button>`; };
+ const workBtn = x => { const dl = workDelayText(x); return html`<button type="button" class=${cx('tag tb-wd', !x.work_days && 'none')} disabled=${busy} title=${x.work_days ? [dl ? `딜레이: ${dl}` : '', x.work_note ? `히스토리: ${x.work_note.slice(0, 160)}` : '', '누르면 고치기'].filter(Boolean).join('\n') : '최종 완료 기록(시작일 · 실제 작업일 · 종료일 · 딜레이 사유 · 히스토리) 적기'} onClick=${() => onWork(x)}>${I('Clock', 12)}${x.work_days ? html`<span>${workHead(x)}</span><b class="tb-wd-n">실제 작업 ${fmtDays(x.work_days)}</b>` : '작업일 적기'}${x.work_days && dl ? html`<em class="tb-wd-delay">딜레이</em>` : ''}${x.work_note ? I('NotebookPen', 11) : ''}</button>`; };
  const groups = []; list.slice(0, limit).forEach(x => { const d = inSeoul(doneAt(x)) || '날짜 없음'; const g = groups[groups.length - 1]; if (g && g.day === d) g.items.push(x); else groups.push({day: d, items: [x]}); });
  return html`<section class="done-view"><div class="dv-head"><div class="dv-left">${kpiTag}<${DoneMonths} counts=${counts} value=${month} onChange=${k => { setMonth(k); setLimit(60); }} /></div><div class="dv-who" role="group" aria-label="담당 필터">${[['all', '전체'], ...names.map(n => [n, n])].map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${who === v} onClick=${() => { setWho(v); setLimit(60); }}>${l}<span>${v === 'all' ? inMonth.length : inMonth.filter(x => teamHas(x, v)).length}</span></button>`)}</div></div>
   <p class="dv-sum"><strong>${mLabel}</strong><span>${who !== 'all' ? `${who} · ` : ''}완료 <b>${list.length}</b>건</span>${late ? html`<small>늦게 완료 ${late}건</small>` : ''}${onWork && wd.length > 0 ? html`<small class="dv-wd" title="최종 완료 때 적은 작업일 · 이현성에게만 보여요">작업 ${fmtDays(wSum)} · 평균 ${fmtDays(Math.round(wSum / wd.length * 10) / 10)}</small>` : ''}${onWork && wMiss > 0 ? html`<small class="dv-wd miss" title="작업일을 아직 적지 않은 완료 업무 · 줄의 '작업일 적기'로">작업일 입력 전 ${wMiss}건</small>` : ''}</p>
@@ -842,7 +848,7 @@ function TeamDetail({focus = null, handoffFrom = null, item: x, comments, me, is
     ${x.status === 'todo' && html`<div><span>착수 예정</span><div class="tb-chips">${[['', '미정'], [today(), '오늘'], [offsetDate(today(), 1), '내일'], [offsetDate(today(), 2), '모레'], [mondayOf(offsetDate(today(), 7)), '다음 주']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${x.start_on === v} disabled=${busy} onClick=${() => x.start_on !== v && onPatch(x, {start_on: v}, v ? `착수 예정 ${shortDate(v)}` : '착수 예정 미정')}>${l}${l === '다음 주' ? html`<small class="tb-chip-sub">${shortDate(v)}</small>` : ''}</button>`)}<input type="date" class="chip-date" aria-label="착수 예정일" value=${x.start_on} disabled=${busy} onChange=${e => onPatch(x, {start_on: e.target.value}, e.target.value ? `착수 예정 ${shortDate(e.target.value)}` : '착수 예정 미정')} />${x.start_on && html`<b class=${cx('tb-start-tag', x.start_on < today() && 'late')}>${teamStartLabel(x)}</b>`}</div></div>`}
     ${(x.status === 'doing' || x.status === 'hold') && html`<div><span>시작일</span><div class="tb-chips"><button type="button" class="chip" aria-pressed=${x.start_on === today()} disabled=${busy} onClick=${() => x.start_on !== today() && onPatch(x, {start_on: today()}, `시작일 ${shortDate(today())}`)}>오늘</button><input type="date" class="chip-date" aria-label="시작일" value=${x.start_on} disabled=${busy} onChange=${e => onPatch(x, {start_on: e.target.value}, e.target.value ? `시작일 ${shortDate(e.target.value)}` : '시작일 비움')} />${!x.start_on && teamStartOf(x) && html`<small class="tb-start-auto">${shortDate(teamStartOf(x))}부터로 표시 중</small>`}</div></div>`}
     <div><span>진행률</span><div class="tb-chips">${[0, 25, 50, 75, 100].map(v => html`<button type="button" key=${v} class="chip" aria-pressed=${(x.progress || 0) === v} disabled=${busy || x.checklist.length > 0} title=${x.checklist.length ? '세부 업무 체크로 자동 계산돼요' : ''} onClick=${() => onPatch(x, {progress: v}, `진행률 ${v}%`)}>${v}%</button>`)}${![0, 25, 50, 75, 100].includes(x.progress || 0) && html`<b class="tb-pct">${x.progress}%</b>`}</div></div>
-    ${onWork && x.status === 'done' && html`<div class="tb-work-row"><span>최종 완료</span><div class="tb-work">${x.work_days ? html`<span class="tb-work-days"><span>시작 ${shortDate(workStartOf(x))}</span><i>·</i><span>종료 ${shortDate(workEndOf(x))}</span><i>·</i><b>실제 작업 ${fmtDays(x.work_days)}</b>${workLate(x) ? html`<em>마감 ${shortDate(x.due)}보다 ${workLate(x)}일 늦음</em>` : ''}</span>` : html`<em class="tb-work-miss">작업일 입력 전</em>`}<button type="button" class="text-button" disabled=${busy} onClick=${() => onWork(x)}>${x.work_days ? '고치기' : '작업일 적기'}</button><small class="tb-work-lock">${I('Lock', 11)}이현성에게만 보여요</small>${x.work_days && workDelayText(x) ? html`<div class="tb-work-delay"><b>딜레이</b>${(x.work_delay_tags || []).map(k => html`<span key=${k} class="tag">${k}</span>`)}${x.work_delay ? html`<span>${x.work_delay}</span>` : ''}</div>` : ''}${x.work_note && html`<div class="tb-work-note"><b>히스토리</b><${TeamText} text=${x.work_note} /></div>`}${x.work_by && x.work_at ? html`<small class="tb-work-by">${x.work_by} · ${teamDay(inSeoul(x.work_at))} ${teamClock(x.work_at)} 기록</small>` : ''}</div></div>`}
+    ${onWork && x.status === 'done' && html`<div class="tb-work-row"><span>최종 완료</span><div class="tb-work">${x.work_days ? html`<span class="tb-work-days">${teamMadeDay(x) ? html`<span>생성 ${shortDate(teamMadeDay(x))}</span><i>·</i>` : ''}<span>시작 ${shortDate(workStartOf(x))}</span><i>·</i><span>종료 ${shortDate(workEndOf(x))}</span><i>·</i><b>실제 작업 ${fmtDays(x.work_days)}</b>${workLate(x) ? html`<em>마감 ${shortDate(x.due)}보다 ${workLate(x)}일 늦음</em>` : ''}</span>` : html`<em class="tb-work-miss">작업일 입력 전</em>`}<button type="button" class="text-button" disabled=${busy} onClick=${() => onWork(x)}>${x.work_days ? '고치기' : '작업일 적기'}</button><small class="tb-work-lock">${I('Lock', 11)}이현성에게만 보여요</small>${x.work_days && workDelayText(x) ? html`<div class="tb-work-delay"><b>딜레이</b>${(x.work_delay_tags || []).map(k => html`<span key=${k} class="tag">${k}</span>`)}${x.work_delay ? html`<span>${x.work_delay}</span>` : ''}</div>` : ''}${x.work_note && html`<div class="tb-work-note"><b>히스토리</b><${TeamText} text=${x.work_note} /></div>`}${x.work_by && x.work_at ? html`<small class="tb-work-by">${x.work_by} · ${teamDay(inSeoul(x.work_at))} ${teamClock(x.work_at)} 기록</small>` : ''}</div></div>`}
    </div>
    <section class=${cx('tb-issue-box', x.issue && 'on ' + x.issue)}><div class="tb-issue-head"><strong>${I('AlertCircle', 15)}특이사항 보고</strong>${x.issue && html`<small>${x.issue_by}${x.issue_at ? ` · ${teamDay(inSeoul(x.issue_at))} ${teamClock(x.issue_at)}` : ''}</small>`}</div>
     <div class="tb-chips">${[['', '없음'], ...Object.entries(TEAM_ISSUES)].map(([v, l]) => html`<button type="button" key=${l} class=${cx('chip', v && 'issue-' + v)} aria-pressed=${issue === v} onClick=${() => setIssue(v)}>${l}</button>`)}</div>
