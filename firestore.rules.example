@@ -7,7 +7,8 @@ service cloud.firestore {
     function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
     function me() { return request.auth.token.email.lower(); }
     function boards() {
-      return me() == 'EMAIL_LHS' ? ['A', 'B', 'C', 'all']
+      // 'P' = 이현성 전용(프로젝트 비용 costs 컬렉션, 11-09). 다른 사람 목록에는 넣지 않습니다.
+      return me() == 'EMAIL_LHS' ? ['A', 'B', 'C', 'all', 'P']
         : me() == 'EMAIL_KJS' ? ['A', 'all']
         : me() == 'EMAIL_JGJ' ? ['B', 'all']
         : me() == 'EMAIL_KSY' ? ['C']

@@ -111,6 +111,26 @@ const HOUR_GRID = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 
 // 지금 보드의 업무 · 업무보고(보드가 그릴 때 넣는다) — 그 사람의 그날 합계를 어느 칸에서든 계산하려고.
 let TL_POOL = {tasks: [], reps: []};
 const tlDayTotal = (name, day) => { let s = 0; for (const t of TL_POOL.tasks || []) for (const l of taskLogs(t)) s += Number(l[tlKey(name, day)]) || 0; for (const r of TL_POOL.reps || []) if (r.day === day && (r.name || '') === name) for (const l of r.lines || []) if (!l.task_id) s += Number(l.h) || 0; return Math.round(s * 2) / 2; };
+// 프로젝트 비용(11-09, 이현성만): 원 단위 정수. 입력은 '300만' · '1.5억' · '1억 2000만' · '3,000,000' 모두. 표시는 만 · 억 단위로 짧게.
+const COST_MAX = 1e12;
+const parseWon = v => {
+ const s = String(v == null ? '' : v).replace(/[\s,원₩]/g, '');
+ if (!s) return 0;
+ const m = s.match(/^(?:(\d+(?:\.\d+)?)억)?(?:(\d+(?:\.\d+)?)만)?(\d+(?:\.\d+)?)?$/);
+ if (!m || !(m[1] || m[2] || m[3])) return NaN;
+ const n = Number(m[1] || 0) * 1e8 + Number(m[2] || 0) * 1e4 + Number(m[3] || 0);
+ return Number.isFinite(n) ? Math.min(COST_MAX, Math.round(n)) : NaN;
+};
+const wonNum = n => Math.round(Number(n) || 0).toLocaleString('ko-KR');
+const wonText = n => {
+ const v = Math.round(Number(n) || 0);
+ if (v <= 0) return '0원';
+ if (v >= 1e8) { let e = Math.floor(v / 1e8), m = Math.round((v % 1e8) / 1e4); if (m >= 1e4) { e += 1; m = 0; } return `${e.toLocaleString('ko-KR')}억${m ? ` ${m.toLocaleString('ko-KR')}만` : ''}원`; }
+ if (v >= 1e4) { const m = v / 1e4; return `${m >= 100 || Number.isInteger(m) ? Math.round(m).toLocaleString('ko-KR') : Math.round(m * 10) / 10}만원`; }
+ return `${v.toLocaleString('ko-KR')}원`;
+};
+// 같이 한 사람(11-09, 사용자 '업무 같이하는 형태 반영 확인'): 그 세부 업무(또는 업무) 그날 다른 사람 시간 — 볼 수 있는 사람만(업무보고 권한과 같게).
+const tlPeers = (log, day, who, viewer = tlViewer()) => { const m = {}; Object.entries(log || {}).forEach(([k, h]) => { const p = tlParse(k); if (p.day === day && p.name && p.name !== who && tlCanSee(p.name, viewer)) m[p.name] = (m[p.name] || 0) + (Number(h) || 0); }); return Object.entries(m).filter(([, h]) => h > 0).map(([name, h]) => ({name, h: Math.round(h * 2) / 2})); };
 const hpDay = d => `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))} (${'일월화수목금토'[new Date(`${d}T03:00:00Z`).getUTCDay()]})`;
 const checkPeople = c => [...new Set([...String((c && c.by) || '').split('·').map(s => s.trim()).filter(Boolean), ...Object.keys((c && c.time_log) || {}).map(k => tlParse(k).name)])];
 // 세부 업무 특이사항(11-05, 사용자 '생각보다 지연되면 아이콘 눌러 지연 사유 · 특이사항'): note = '사유 칩 / 사유 칩 / 직접 쓴 말'.

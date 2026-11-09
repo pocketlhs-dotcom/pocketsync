@@ -160,6 +160,20 @@
   return () => us.forEach(u => { try { u(); } catch (e) {} });
  };
  // 이현성: 디자인팀(C) 화면의 'A·B 정리'에 쓸 A·B 업무(공통 'all' 포함)를 구독한다(10-16). 디자이너 화면에서는 부르지 않는다.
+ // 이현성 전용 프로젝트 비용(11-09): costs/{업무 id}, board 'P'. Firestore 규칙 boards()에서 'P'는 이현성만 가진다(디자이너 · 권중선 · 정규진은 읽기 · 쓰기 모두 막힘).
+ // 규칙에 'P'가 아직 없으면 permission-denied → onErr로 화면에 안내만 한다.
+ const nCost = v => ({amount: Math.min(1e12, Math.max(0, Math.round(Number(v && v.amount) || 0))), note: String((v && v.note) || '').slice(0, 200)});
+ window.PS_WATCH_COSTS = (cb, onErr) => {
+  if (session.seat !== 'lhs') return () => {};
+  return fs.collection('costs').where('board', '==', 'P').onSnapshot(s => { const m = {}; s.docs.forEach(d => { m[d.id] = nCost(d.data() || {}); }); cb(m); }, e => { console.warn('costs', e && e.code); if (onErr) onErr(e); });
+ };
+ window.PS_SET_COST = async (id, v) => {
+  if (session.seat !== 'lhs') throw Object.assign(new Error('owner only'), {code: 'permission-denied'});
+  if (!/^[A-Za-z0-9_-]{1,80}$/.test(String(id))) throw Object.assign(new Error('bad id'), {code: 'invalid-argument'});
+  const ref = fs.doc('costs/' + id), c = nCost(v);
+  if (!c.amount && !c.note) return ref.delete();
+  return ref.set({board: 'P', task_id: String(id), ...c, title: String((v && v.title) || '').slice(0, 150), at: new Date().toISOString(), by: SEAT_NAMES.lhs});
+ };
  window.PS_WATCH_AB_TASKS = (cb, onErr) => {
   if (session.seat !== 'lhs') return () => {};
   const base = fs.collection('items').where('board', 'in', ['A', 'B', 'all']);
