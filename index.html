@@ -2178,7 +2178,7 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 .check-time select:focus-visible{outline:2px solid #9bb2fd;border-radius:4px}
 .check-time.ro{cursor:default}.check-time.ro:hover{background:transparent}
 .check-time.ro b{font-size:13px;font-weight:600;color:#3f4f6b}
-.check-list .check-time{flex:0 0 auto;min-height:0;gap:3px}.check-list .check-time.ro{min-width:44px}
+.check-list .check-time{flex:0 0 auto;min-height:0;gap:3px;width:60px;box-sizing:border-box}
 .check-note-btn{display:inline-grid;place-items:center;flex:0 0 auto;width:26px;height:26px;padding:0;border:0;border-radius:6px;background:transparent;color:#c3cddc;cursor:pointer}
 .check-note-btn:hover:not(:disabled){background:#e9effa;color:#4f78e8}
 .check-note-btn.on{color:#d1603f}
@@ -2269,6 +2269,57 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .tb-fd-subnotes li b{font-weight:700;color:#3a4b66}
 .tb-fd-subnotes li i{font-style:normal;font-weight:600;color:#7d8ca6}
 .tb-fd-subnotes li em{font-style:normal;font-size:11px;font-weight:600;color:#a4553c;background:#fbefea;border-radius:3px;padding:1px 6px}
+
+/* 사람별 시간(11-09): 세부 업무 줄 — 1명이면 줄의 칸, 2명 이상이면 합계 + '↳ 이름 · 시간' 줄, 사람 아이콘 = 같이 한 사람 */
+.check-list .check-time.sum b{color:#1d2a44}
+.check-ppl-add{display:inline-grid;place-items:center;flex:0 0 auto;width:26px;height:26px;padding:0;border:0;border-radius:6px;background:transparent;color:#c3cddc;cursor:pointer}
+.check-ppl-add:hover:not(:disabled){background:#e9effa;color:#4f78e8}
+.check-ppl-add.open{background:#e9effa;color:#315df8}
+.check-ppl-add.ph{cursor:default}
+.check-ppl{flex:0 0 auto;width:calc(100% - 36px);margin:-2px 0 4px 36px;padding-right:var(--tr,0px);box-sizing:border-box;display:flex;flex-direction:column;gap:0}
+.check-ppl-row{display:flex;align-items:center;gap:6px;min-height:28px;font-size:12.5px;color:#7d8ca6}
+.check-ppl-row>svg{color:#b6c1d2;flex:none}
+.check-ppl-name{font-weight:600;color:#5d6b86}
+.check-ppl-row>.check-time{margin-left:auto}
+.check-ppl-edit{flex:0 0 auto;width:calc(100% - 36px);box-sizing:border-box;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin:2px 0 8px 36px;padding:10px 12px;border:1px solid #e4e8f2;border-radius:7px;background:#fff;box-shadow:0 2px 8px rgba(17,34,85,.05)}
+.check-ppl-edit>b{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:#3a4b66}
+.check-ppl-edit>b>svg{color:#4f78e8}
+.check-ppl-chips{display:flex;flex-wrap:wrap;gap:5px}
+.check-ppl-chips>button{height:28px;padding:0 10px;border:1px solid #e3e7f0;border-radius:3px;background:#fff;color:#5d6b86;font-size:12.5px;font-weight:600;cursor:pointer}
+.check-ppl-chips>button[aria-checked=true]{border-color:#9fb3f7;background:#eef2ff;color:#315df8}
+.check-ppl-h{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#5d6b86}
+.check-ppl-h select{height:28px;border:1px solid #dfe3ef;border-radius:6px;padding:0 8px;font-size:12.5px;background:#fff;color:#1d2a44}
+.check-ppl-acts{display:inline-flex;gap:6px;margin-left:auto}
+.check-ppl-acts .primary-button.small,.check-ppl-acts .secondary-button.small{min-height:30px;height:30px;padding:0 12px;font-size:12.5px}
+@media(max-width:640px){.check-ppl{padding-right:var(--trm,0px)}.check-list>li>.check-ppl-add{order:3}.check-ppl-edit,.check-ppl{margin-left:4px;width:calc(100% - 4px)}.check-ppl-acts{margin-left:0}}
+/* 업무보고: 이날 쓴 시간 합계 · 업무 없는 줄 시간 */
+.tb-sub{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tb-rep-dayh{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#3f4f6b}
+.tb-rep-dayh>svg{color:#9fb0c8}
+.tb-rep-free-tools .check-time.pick .pk{width:68px}
+.tb-rep-free-tools .check-time.ro{display:inline-flex;align-items:center;gap:3px;padding:0 4px;font-size:12.5px}
+/* 완료 KPI: 작업 시간 → 작업일 */
+.tb-wd-h{color:#5d6b86}
+.tb-wd-n.est{color:#315df8;font-weight:700}
+.tb-wd-fix{font-style:normal;margin-left:4px;padding:1px 6px;border-radius:3px;background:#eef2ff;color:#315df8;font-size:11px;font-weight:700}
+.kpi-h{display:flex;align-items:baseline;gap:4px;margin-top:2px;font-size:12px;font-weight:700;color:#315df8}
+.kpi-h em{font-style:normal;font-weight:600;color:#a0a6b8}
+.kpi-proj{display:flex;flex-direction:column;gap:8px;margin-top:6px;padding:14px 16px;border:1px solid #e8ebf2;border-radius:8px;background:#fff}
+.kpi-proj-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px}
+.kpi-proj-head strong{font-size:14px;font-weight:800;color:#1d2a44}
+.kpi-proj-head small{font-size:12px;color:#a0a6b8}
+.kpi-proj-tot{margin-left:auto;font-size:14px;font-weight:800;color:#315df8}
+.kpi-proj-tot em,.kpi-proj-h em{font-style:normal;font-weight:600;color:#a0a6b8;margin-left:4px;font-size:12px}
+.kpi-proj-months{display:flex;flex-wrap:wrap;gap:6px}
+.kpi-proj-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.kpi-proj-list li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:2px 12px;padding:9px 0;border-top:1px solid #f0f2f6}
+.kpi-proj-list li:first-child{border-top:0}
+.kpi-proj-title{justify-self:start;min-width:0;max-width:100%;padding:0;border:0;background:none;text-align:left;font-size:13.5px;font-weight:700;color:#1d2a44;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpi-proj-title:hover:not(:disabled){color:#315df8}
+.kpi-proj-h b{font-size:13.5px;font-weight:800;color:#315df8}
+.kpi-proj-h em.none{margin:0}
+.kpi-proj-list small{grid-column:1/-1;font-size:12px;color:#7d8ca6}
+.kpi-proj-empty{margin:0;font-size:12.5px;color:#a0a6b8}
 </style>
 </head><body>
 <div id="app"></div>
@@ -2278,6 +2329,6 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1793881809"></script>
-<script src="app.js?v=1793881809"></script>
+<script src="platform.js?v=1794194196"></script>
+<script src="app.js?v=1794194196"></script>
 </body></html>

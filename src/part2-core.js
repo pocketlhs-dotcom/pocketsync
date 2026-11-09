@@ -59,11 +59,53 @@ function progressFields(item, v) { const p = Math.max(0, Math.min(100, Math.roun
 function dDay(due) { if (!due) return {label: '마감 없음', cls: 'none', n: null}; const n = Math.round((Date.parse(due + 'T00:00:00+09:00') - Date.parse(today() + 'T00:00:00+09:00')) / 864e5); return n < 0 ? {label: `D+${-n}`, cls: 'late', n} : n === 0 ? {label: '오늘', cls: 'today', n} : {label: `D-${n}`, cls: n <= 3 ? 'soon' : '', n}; }
 // 업무 안의 세부 업무 목록. 진행률은 체크한 비율로 자동 계산된다.
 // 세부 업무마다 진행률(pct)을 가진다. 체크 = 100%, 업무 진행률 = 세부 업무 진행률의 평균.
-function normChecklist(v) { return (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const pct = c.done ? 100 : Math.max(0, Math.min(100, Math.round(Number(c.pct) || 0))); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct, done: pct === 100, ...(c.by ? {by: String(c.by).slice(0, 20)} : {}), ...(c.at ? {at: String(c.at).slice(0, 30)} : {}), ...(c.ed ? {ed: String(c.ed).slice(0, 30)} : {}), ...((h => h > 0 ? {hours: h} : {})(Math.min(999, Math.round((Number(c.hours) || 0) * 2) / 2))), ...(String(c.note || '').trim() ? {note: String(c.note).trim().slice(0, 300)} : {})}; }); }
+function normChecklist(v) { return (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const pct = c.done ? 100 : Math.max(0, Math.min(100, Math.round(Number(c.pct) || 0))); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct, done: pct === 100, ...(c.by ? {by: String(c.by).slice(0, 20)} : {}), ...(c.at ? {at: String(c.at).slice(0, 30)} : {}), ...(c.ed ? {ed: String(c.ed).slice(0, 30)} : {}), ...((tl => (Object.keys(tl).length ? {time_log: tl} : {}))(normTimeLog(c.time_log, c))), ...(String(c.note || '').trim() ? {note: String(c.note).trim().slice(0, 300)} : {})}; }); }
 // 세부 업무 시간(11-05, 사용자 '% 옆에 시간 개념 1t, 2t, 3t' → 같은 날 'h로 하자'): 1h = 1시간, 반 시간 단위.
 const fmtH = n => `${Number(n) % 1 ? Number(n).toFixed(1) : Number(n)}h`;
-const hoursOf = item => ((item && item.checklist) || []).reduce((a, c) => a + (Number(c.hours) || 0), 0);
+// 시간 기록(11-09, 사용자 '여러 명이 같이 한 세부 업무는 사람마다 시간 · 업무보고에는 그날 쓴 시간 · KPI에서 프로젝트 시간'):
+// time_log = {'이름|YYYY-MM-DD': 시간} — 세부 업무 항목(사람별 · 날짜별)과 업무 문서(세부 업무 없이 업무에 바로 적은 시간).
+// 업무보고에 적은 시간 = 그 사람 · 그날 칸. 세부 업무 줄의 사람별 시간 = 날짜 합계(고치면 차이를 오늘 칸에).
+// 날짜 없는 칸('이름|')은 11-05 hours(세부 업무 하나에 시간 하나)를 옮긴 것 — 실무자 첫 사람, 없으면 '미지정'.
+// 동기화(platform-firebase.js nChecks)도 같은 규칙으로 정리해야 C ⇄ A·B가 같아진다(키 정렬 · 반 시간 · 최대 400칸).
+const TL_SEP = '|';
+const tlKey = (name, day) => `${name}${TL_SEP}${day || ''}`;
+const tlParse = k => { const s = String(k), i = s.lastIndexOf(TL_SEP); return i < 0 ? {name: s, day: ''} : {name: s.slice(0, i), day: s.slice(i + 1)}; };
+function normTimeLog(v, c) {
+ const o = {};
+ const put = (n0, d0, h0) => { const n = String(n0 || '').replace(/\|/g, '').trim().slice(0, 20), d = /^\d{4}-\d{2}-\d{2}$/.test(String(d0 || '')) ? String(d0) : '', h = Math.round((Number(h0) || 0) * 2) / 2; if (!n || !(h > 0)) return; const k = tlKey(n, d); o[k] = Math.min(999, Math.round(((o[k] || 0) + Math.min(99, h)) * 2) / 2); };
+ if (v && typeof v === 'object' && !Array.isArray(v)) for (const [k, h] of Object.entries(v)) { const p = tlParse(k); put(p.name, p.day, h); }
+ if (!Object.keys(o).length && c && Number(c.hours) > 0) put(String(c.by || '').split('·')[0].trim() || '미지정', '', c.hours);
+ let keys = Object.keys(o).sort();
+ if (keys.length > 400) keys = keys.sort((a, b) => tlParse(b).day.localeCompare(tlParse(a).day)).slice(0, 400).sort();
+ const out = {}; keys.forEach(k => { out[k] = o[k]; }); return out;
+}
+// 보기 · 고치기(11-09, 사용자 '업무보고 권한과 같게'): 이현성은 모두, 강승연(팀장)은 자기 + 안은지, 안은지는 자기만, 이현성 시간은 모두,
+// A·B 사람은 자기 + 이현성(디자이너 이름은 안 보임). 고치기는 자기 것만(이현성은 모두). 외부 공유 화면은 아무것도 안 보임.
+const REP_SEES = {'강승연': ['안은지']};
+const tlViewer = () => { const k = window.PS_SEAT || ''; if (!k || window.PS_PLATFORM === 'share') return ''; return (SEATS.find(s => s.key === k) || {}).name || (k === 'lhs' ? ADMIN_NAME : ''); };
+const tlCanSee = (name, viewer = tlViewer()) => !!viewer && (viewer === ADMIN_NAME || name === viewer || name === ADMIN_NAME || (REP_SEES[viewer] || []).includes(name));
+const tlCanEdit = (name, viewer = tlViewer()) => !!viewer && !!name && name !== '미지정' && (viewer === ADMIN_NAME || name === viewer);
+const tlByName = (log, see = tlCanSee) => { const o = {}; for (const [k, h] of Object.entries(log || {})) { const {name} = tlParse(k); if (see && !see(name)) continue; o[name] = Math.round(((o[name] || 0) + (Number(h) || 0)) * 2) / 2; } return o; };
+const tlSum = (log, see = tlCanSee) => Object.values(tlByName(log, see)).reduce((a, b) => a + b, 0);
+const tlDay = (log, name, day) => Number((log || {})[tlKey(name, day)]) || 0;
+const tlSetDay = (log, name, day, h) => { const o = {...(log || {})}, k = tlKey(name, day), v = Math.round((Number(h) || 0) * 2) / 2; if (v > 0) o[k] = v; else delete o[k]; return normTimeLog(o); };
+// 사람 합계를 바꾸면 차이를 오늘 칸에 더한다(줄이면 오늘 → 최근 날 순으로 뺀다).
+const tlSetTotal = (log, name, total, today) => {
+ const o = {...(log || {})}, mine = Object.keys(o).filter(k => tlParse(k).name === name), cur = mine.reduce((a, k) => a + (Number(o[k]) || 0), 0), tk = tlKey(name, today);
+ let d = Math.round(((Number(total) || 0) - cur) * 2) / 2;
+ if (d > 0) o[tk] = (Number(o[tk]) || 0) + d;
+ else if (d < 0) for (const k of [tk, ...mine.filter(k => k !== tk).sort((a, b) => tlParse(b).day.localeCompare(tlParse(a).day))]) { if (d >= 0) break; const v = Number(o[k]) || 0; if (!v) continue; const take = Math.min(v, -d); o[k] = Math.round((v - take) * 2) / 2; d = Math.round((d + take) * 2) / 2; if (!(o[k] > 0)) delete o[k]; }
+ return normTimeLog(o);
+};
+const taskLogs = t => [(t && t.time_log) || {}, ...(((t && t.checklist) || []).map(c => c.time_log || {}))];
+const hoursBy = (t, see = tlCanSee) => { const o = {}; taskLogs(t).forEach(l => Object.entries(tlByName(l, see)).forEach(([n, h]) => { o[n] = Math.round(((o[n] || 0) + h) * 2) / 2; })); return o; };
+const hoursOf = (t, see = tlCanSee) => Object.values(hoursBy(t, see)).reduce((a, b) => a + b, 0);
+const hoursText = by => Object.entries(by).sort((a, b) => b[1] - a[1]).map(([n, h]) => `${n} ${fmtH(h)}`).join(' · ');
+// 이 업무에 그 사람이 그달(YYYY-MM)에 쓴 시간(날짜 있는 칸만).
+const hoursIn = (t, name, month) => taskLogs(t).reduce((a, l) => a + Object.entries(l).reduce((b, [k, h]) => { const p = tlParse(k); return b + (p.name === name && p.day.slice(0, 7) === month ? Number(h) || 0 : 0); }, 0), 0);
 const HOUR_OPTS = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 32, 40];
+const DAY_HOURS = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 9, 10, 11, 12];
+const checkPeople = c => [...new Set([...String((c && c.by) || '').split('·').map(s => s.trim()).filter(Boolean), ...Object.keys((c && c.time_log) || {}).map(k => tlParse(k).name)])];
 // 세부 업무 특이사항(11-05, 사용자 '생각보다 지연되면 아이콘 눌러 지연 사유 · 특이사항'): note = '사유 칩 / 사유 칩 / 직접 쓴 말'.
 const NOTE_TAGS = ['자료 회신 지연', '피드백 지연', '요청 · 범위 변경', '수정 반복', '다른 업무 우선'];
 const noteParts = note => { const p = String(note || '').split(' / ').map(s => s.trim()).filter(Boolean); return {tags: p.filter(s => NOTE_TAGS.includes(s)), text: p.filter(s => !NOTE_TAGS.includes(s)).join(' / ')}; };

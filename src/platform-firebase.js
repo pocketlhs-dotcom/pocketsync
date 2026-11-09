@@ -188,7 +188,17 @@
   const sd = d => d ? `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))}` : '없음';
   const pct = v => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
   // 세부 업무 정리: 앱의 normChecklist와 같은 규칙(그래야 양쪽 비교가 흔들리지 않는다).
-  const nChecks = v => (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const p = c.done ? 100 : pct(c.pct); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct: p, done: p === 100, ...(c.by ? {by: String(c.by).slice(0, 20)} : {}), ...(c.at ? {at: String(c.at).slice(0, 30)} : {}), ...(c.ed ? {ed: String(c.ed).slice(0, 30)} : {}), ...((h => h > 0 ? {hours: h} : {})(Math.min(999, Math.round((Number(c.hours) || 0) * 2) / 2))), ...(String(c.note || '').trim() ? {note: String(c.note).trim().slice(0, 300)} : {})}; });
+  // 시간 기록 정리(11-09): 앱 normTimeLog(part2-core.js)와 같은 규칙이어야 한다 — 키 '이름|YYYY-MM-DD'(날짜 없으면 '이름|'), 반 시간, 칸당 99h, 키 정렬, 최대 400칸, 예전 hours는 실무자 첫 사람 날짜 없는 칸으로.
+ const nTimeLog = (v, c) => {
+  const o = {}, key = (n, d) => `${n}|${d || ''}`, parse = k => { const s = String(k), i = s.lastIndexOf('|'); return i < 0 ? {name: s, day: ''} : {name: s.slice(0, i), day: s.slice(i + 1)}; };
+  const put = (n0, d0, h0) => { const n = String(n0 || '').replace(/\|/g, '').trim().slice(0, 20), d = /^\d{4}-\d{2}-\d{2}$/.test(String(d0 || '')) ? String(d0) : '', h = Math.round((Number(h0) || 0) * 2) / 2; if (!n || !(h > 0)) return; const k = key(n, d); o[k] = Math.min(999, Math.round(((o[k] || 0) + Math.min(99, h)) * 2) / 2); };
+  if (v && typeof v === 'object' && !Array.isArray(v)) for (const [k, h] of Object.entries(v)) { const p = parse(k); put(p.name, p.day, h); }
+  if (!Object.keys(o).length && c && Number(c.hours) > 0) put(String(c.by || '').split('·')[0].trim() || '미지정', '', c.hours);
+  let keys = Object.keys(o).sort();
+  if (keys.length > 400) keys = keys.sort((a, b) => parse(b).day.localeCompare(parse(a).day)).slice(0, 400).sort();
+  const out = {}; keys.forEach(k => { out[k] = o[k]; }); return out;
+ };
+ const nChecks = v => (Array.isArray(v) ? v : []).filter(c => c && String(c.text || '').trim()).slice(0, 60).map((c, i) => { const p = c.done ? 100 : pct(c.pct); return {id: String(c.id || 'c' + i).slice(0, 40), text: String(c.text).trim().slice(0, 200), pct: p, done: p === 100, ...(c.by ? {by: String(c.by).slice(0, 20)} : {}), ...(c.at ? {at: String(c.at).slice(0, 30)} : {}), ...(c.ed ? {ed: String(c.ed).slice(0, 30)} : {}), ...((tl => (Object.keys(tl).length ? {time_log: tl} : {}))(nTimeLog(c.time_log, c))), ...(String(c.note || '').trim() ? {note: String(c.note).trim().slice(0, 300)} : {})}; });
   const stateOf = v => ({status: ST.includes(v.status) ? v.status : 'todo', due: DRE.test(v.due || '') ? v.due : '', start_on: DRE.test(v.start_on || '') ? v.start_on : '', priority: PR.includes(v.priority) ? v.priority : 'share', checklist: nChecks(v.checklist), progress: pct(v.progress)});
   const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
   const fv = (st, f) => f === 'checklist' ? hash(JSON.stringify(st.checklist)) : String(st[f]);
