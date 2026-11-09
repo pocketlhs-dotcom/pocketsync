@@ -105,6 +105,13 @@ const hoursText = by => Object.entries(by).sort((a, b) => b[1] - a[1]).map(([n, 
 const hoursIn = (t, name, month) => taskLogs(t).reduce((a, l) => a + Object.entries(l).reduce((b, [k, h]) => { const p = tlParse(k); return b + (p.name === name && p.day.slice(0, 7) === month ? Number(h) || 0 : 0); }, 0), 0);
 const HOUR_OPTS = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 32, 40];
 const DAY_HOURS = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 9, 10, 11, 12];
+// 하루 시간(11-09, 사용자 '10시~7시 기준(식사 빼고 8h) · 하루 최대 12시간'): 8h = 하루(작업일 계산), 12h = 한 사람이 하루에 적을 수 있는 최대(모든 업무 합).
+const DAY_STD = 8, DAY_MAX = 12;
+const HOUR_GRID = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 9, 10, 11, 12];
+// 지금 보드의 업무 · 업무보고(보드가 그릴 때 넣는다) — 그 사람의 그날 합계를 어느 칸에서든 계산하려고.
+let TL_POOL = {tasks: [], reps: []};
+const tlDayTotal = (name, day) => { let s = 0; for (const t of TL_POOL.tasks || []) for (const l of taskLogs(t)) s += Number(l[tlKey(name, day)]) || 0; for (const r of TL_POOL.reps || []) if (r.day === day && (r.name || '') === name) for (const l of r.lines || []) if (!l.task_id) s += Number(l.h) || 0; return Math.round(s * 2) / 2; };
+const hpDay = d => `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))} (${'일월화수목금토'[new Date(`${d}T03:00:00Z`).getUTCDay()]})`;
 const checkPeople = c => [...new Set([...String((c && c.by) || '').split('·').map(s => s.trim()).filter(Boolean), ...Object.keys((c && c.time_log) || {}).map(k => tlParse(k).name)])];
 // 세부 업무 특이사항(11-05, 사용자 '생각보다 지연되면 아이콘 눌러 지연 사유 · 특이사항'): note = '사유 칩 / 사유 칩 / 직접 쓴 말'.
 const NOTE_TAGS = ['자료 회신 지연', '피드백 지연', '요청 · 범위 변경', '수정 반복', '다른 업무 우선'];

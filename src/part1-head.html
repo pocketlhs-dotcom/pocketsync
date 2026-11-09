@@ -2379,4 +2379,48 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 
 /* 모바일 세부 업무 둘째 줄(11-09 점검): 실무자 여러 명 · 시간 칸까지 한 줄에 들어가게 만든 날짜와 % 막대는 숨김(% 숫자는 그대로) */
 @media(max-width:640px){.check-list>li>.check-date{display:none}.check-list>li>.check-pct .check-pct-bar{display:none}}
+
+/* 시간 고르기 창(11-09, 사용자 '이쁘게' · '하루 최대 12h'): 날짜 · 0.5~12h 격자(8h 넘으면 점선 = 초과) · 지우기 · 그날 합계 */
+.hp{position:relative;display:inline-flex;flex:none}
+.hp-pop{position:absolute;z-index:80;top:calc(100% + 6px);left:0;width:236px;box-sizing:border-box;padding:10px;border:1px solid #dde3ef;border-radius:10px;background:#fff;box-shadow:0 14px 34px rgba(17,34,85,.16),0 2px 6px rgba(17,34,85,.06);display:flex;flex-direction:column;gap:8px;text-align:left;cursor:default;animation:hpIn .12s ease-out}
+.hp-pop.up{top:auto;bottom:calc(100% + 6px);animation-name:hpUp}
+.hp-pop.right{left:auto;right:0}
+@keyframes hpIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@keyframes hpUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.hp-head{font-size:11.5px;font-weight:600;color:#8a97ad;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hp-day{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:26px}
+.hp-day>span{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:13px;color:#1d2a44}
+.hp-day b{font-weight:800}
+.hp-day em{font-style:normal;font-size:11px;font-weight:700;color:#315df8;background:#eef3ff;border-radius:3px;padding:1px 6px}
+.hp-nav{display:inline-grid;place-items:center;width:26px;height:26px;padding:0;border:1px solid #e3e7f0;border-radius:5px;background:#fff;color:#5d6b86;cursor:pointer}
+.hp-nav:hover:not(:disabled){border-color:#a9bcf6;color:#315df8}
+.hp-nav:disabled{opacity:.35;cursor:default}
+.hp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.hp-grid button{height:32px;padding:0;border:1px solid #e6eaf2;border-radius:5px;background:#fff;font-size:12.5px;font-weight:700;color:#3f4f6b;cursor:pointer;font-variant-numeric:tabular-nums;transition:background .1s,border-color .1s,color .1s}
+.hp-grid button:hover:not(:disabled),.hp-grid button:focus-visible{border-color:#9fb3f7;background:#f5f8ff;color:#315df8;outline:none}
+.hp-grid button.ot{border-style:dashed;color:#9a6a2f}
+.hp-grid button.on{border:1px solid #315df8;background:#315df8;color:#fff;box-shadow:0 2px 6px rgba(49,93,248,.28)}
+.hp-grid button:disabled{opacity:.3;cursor:not-allowed}
+.hp-meter{display:flex;flex-direction:column;gap:5px;padding:8px 2px 0;border-top:1px solid #f0f2f6}
+.hp-meter-t{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:11.5px;color:#8a97ad}
+.hp-meter-t b{font-size:13px;font-weight:800;color:#1d2a44;font-variant-numeric:tabular-nums}
+.hp-meter.ot .hp-meter-t b{color:#b0661b}
+.hp-bar{position:relative;height:6px;border-radius:3px;overflow:hidden;background:linear-gradient(90deg,#edf0f6 0 66.66%,#f8ecdc 66.66% 100%)}
+.hp-bar i{position:absolute;top:0;bottom:0;left:0;transition:width .12s,left .12s}
+.hp-bar i.u{background:#b8c2d6}
+.hp-bar i.v{background:#315df8}
+.hp-meter.ot .hp-bar i.v{background:#e08a2b}
+.hp-bar s{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:#fff}
+.hp-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hp-clear{padding:2px 0;border:0;background:none;font-size:12px;font-weight:700;color:#8a97ad;cursor:pointer}
+.hp-clear:hover:not(:disabled){color:#c0453a}
+.hp-clear:disabled{opacity:.4;cursor:default}
+.hp-foot small{font-size:11.5px;font-weight:600;color:#8a97ad;text-align:right}
+.hp-foot small.ot{color:#b0661b}
+.hp-foot small.max{color:#c0453a}
+.check-ppl-h{gap:8px}
+.tb-rep-tn .hp .check-time.btn,.tb-rep-free-tools .hp .check-time.btn{min-width:86px}
+.tb-rep-work.me .tb-rep-tn .hp{width:86px}
+.tb-rep-tn .hp,.tb-rep-free-tools .hp{flex:none}
+@media(max-width:640px){.hp-pop{width:224px}}
 </style>

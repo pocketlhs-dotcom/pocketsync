@@ -387,6 +387,7 @@ function Board() {
  useEffect(() => { if (conn !== 'ready') return; const t = setTimeout(() => setTimedOut(true), 8000); return () => clearTimeout(t); }, [conn]);
 
  const topics = useMemo(() => [...data.topics].sort((a, b) => (a.sort_order - b.sort_order) || a.created_at.localeCompare(b.created_at)), [data.topics]);
+ TL_POOL = {tasks: data.items.filter(i => i.kind === 'task'), reps: []};
  const items = useMemo(() => { const byName = new Map(data.topics.map(t => [t.name, t.id])); return data.items.map(i => !i.topic_id && !i.topic_explicit && i.topic_label && byName.has(i.topic_label) ? {...i, topic_id: byName.get(i.topic_label)} : i).sort((a, b) => b.updated_at.localeCompare(a.updated_at)); }, [data.items, data.topics]);
  const comments = useMemo(() => [...data.comments].sort((a, b) => a.created_at.localeCompare(b.created_at)), [data.comments]);
  const {acks, profiles, members, checkins, reactions, presence, seen, daynotes} = data;
@@ -1312,6 +1313,43 @@ function HourSelect({value, label = '', tip = '', disabled = false, ro = false, 
  const opts = [...new Set([...base, value])].sort((a, b) => a - b);
  return html`<label class=${cx('check-time btn', value > 0 && 'set', disabled && 'off')} title=${tip}>${I('Clock', 12)}${value > 0 ? html`<b>${fmtH(value)}</b>` : html`<span class="ph">시간</span>`}${I('ChevronDown', 12)}<select aria-label=${label} value=${String(value)} disabled=${disabled} onChange=${e => onChange(Number(e.target.value))}>${opts.map(o => html`<option value=${String(o)}>${o ? fmtH(o) : '없음'}</option>`)}</select></label>`;
 }
+// 시간 고르기 창(11-09, 사용자 '이거 좀 이쁘게' · '하루 10시~7시 기준, 식사 빼고 최대 12시간'):
+// 버튼을 누르면 작은 창 — 날짜(세부 업무 줄은 ‹ ›로 지난날도) · 0.5h~12h 칸(4열, 8h 넘는 칸은 점선 = 초과) · 지우기 · 그날 그 사람 합계 n / 12h.
+// 하루 최대 12h: 그 사람이 그날 다른 일에 적은 시간을 빼고 남은 만큼만 고를 수 있다(usedAt = 이 칸 말고 그날 쓴 시간).
+function HourPop({label, who = '', head = '', day: day0 = today(), nav = false, show = 0, valueAt, usedAt = () => 0, ro = false, disabled = false, tip = '', onChange}) {
+ const [open, setOpen] = useState(false), [d, setD] = useState(day0), [pos, setPos] = useState({up: false, right: false}), wrap = useRef(null), btn = useRef(null), grid = useRef(null);
+ useEffect(() => { if (!open) return; const off = e => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); }; document.addEventListener('pointerdown', off, true); return () => document.removeEventListener('pointerdown', off, true); }, [open]);
+ useEffect(() => { if (!open || !grid.current) return; const b = grid.current.querySelector('button.on:not(:disabled)') || grid.current.querySelector('button:not(:disabled)'); if (b) b.focus({preventScroll: true}); }, [open, d]);
+ if (ro) return html`<span class=${cx('check-time ro', show > 0 && 'set')} title=${tip}>${show > 0 ? html`${I('Clock', 12)}<b>${fmtH(show)}</b>` : ''}</span>`;
+ const toggle = () => {
+  if (open) { setOpen(false); return; }
+  const r = btn.current.getBoundingClientRect(), sp = btn.current.closest('.tb-full, .sheet, .wp-body, .dialog'), box = sp ? sp.getBoundingClientRect() : {top: 0, bottom: window.innerHeight};
+  const below = Math.min(window.innerHeight, box.bottom) - r.bottom, above = r.top - Math.max(0, box.top);
+  setPos({up: below < 280 && above > below, right: r.left + 244 > window.innerWidth - 8}); setD(day0); setOpen(true);
+ };
+ const v = valueAt(d), used = Math.max(0, usedAt(d)), left = Math.max(0, DAY_MAX - used), tot = used + v, mine = who && who === tlViewer();
+ const pick = h => { setOpen(false); if (btn.current) btn.current.focus({preventScroll: true}); if (h !== v) onChange(h, d); };
+ const shift = n => { const x = new Date(`${d}T03:00:00Z`); x.setUTCDate(x.getUTCDate() + n); const nd = x.toISOString().slice(0, 10); if (nd <= day0) setD(nd); };
+ const keys = e => {
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); if (btn.current) btn.current.focus({preventScroll: true}); return; }
+  const bs = grid.current ? [...grid.current.querySelectorAll('button')] : [], i = bs.indexOf(document.activeElement), step = {ArrowRight: 1, ArrowLeft: -1, ArrowDown: 4, ArrowUp: -4}[e.key];
+  if (step && i >= 0) { e.preventDefault(); for (let j = i + step; j >= 0 && j < bs.length; j += step) if (!bs[j].disabled) { bs[j].focus(); break; } }
+ };
+ return html`<span class=${cx('hp', open && 'open')} ref=${wrap}>
+  <button type="button" ref=${btn} class=${cx('check-time btn', show > 0 && 'set')} aria-label=${label} aria-haspopup="dialog" aria-expanded=${open} title=${tip} disabled=${disabled} onClick=${toggle}>${I('Clock', 12)}${show > 0 ? html`<b>${fmtH(show)}</b>` : html`<span class="ph">시간</span>`}${I('ChevronDown', 12)}</button>
+  ${open && html`<div class=${cx('hp-pop', pos.up && 'up', pos.right && 'right')} role="dialog" aria-label=${label} onKeyDown=${keys}>
+   ${head ? html`<div class="hp-head" title=${head}>${head}</div>` : ''}
+   <div class="hp-day">${nav ? html`<button type="button" class="hp-nav" aria-label="전날" onClick=${() => shift(-1)}>${I('ChevronLeft', 14)}</button>` : ''}<span><b>${hpDay(d)}</b>${d === today() ? html`<em>오늘</em>` : ''}</span>${nav ? html`<button type="button" class="hp-nav" aria-label="다음 날" disabled=${d >= day0} onClick=${() => shift(1)}>${I('ChevronRight', 14)}</button>` : ''}</div>
+   <div class="hp-grid" ref=${grid} role="group" aria-label="시간">${HOUR_GRID.map(h => html`<button type="button" key=${h} class=${cx(h === v && 'on', h > DAY_STD && 'ot')} disabled=${h > left && h !== v} aria-pressed=${h === v} title=${h > left && h !== v ? `하루 최대 ${DAY_MAX}h를 넘어요(이날 다른 일 ${fmtH(used)})` : h > DAY_STD ? `${DAY_STD}h 넘는 시간(초과)` : ''} onClick=${() => pick(h)}>${fmtH(h)}</button>`)}</div>
+   <div class=${cx('hp-meter', tot > DAY_STD && 'ot')}>
+    <div class="hp-meter-t"><span>${mine || !who ? '이날 내 시간' : `이날 ${who} 시간`}</span><span><b>${fmtH(tot)}</b> / ${DAY_MAX}h</span></div>
+    <div class="hp-bar" aria-hidden="true"><i class="u" style=${{width: hpPct(used)}}></i><i class="v" style=${{left: hpPct(used), width: hpPct(Math.min(v, DAY_MAX - used))}}></i><s style=${{left: hpPct(DAY_STD)}}></s></div>
+   </div>
+   <div class="hp-foot"><button type="button" class="hp-clear" disabled=${!v} onClick=${() => pick(0)}>지우기</button><small class=${cx(tot > DAY_STD && 'ot', tot >= DAY_MAX && 'max')}>${tot >= DAY_MAX ? `하루 최대 ${DAY_MAX}h` : tot > DAY_STD ? `기준 ${DAY_STD}h +${fmtH(tot - DAY_STD)}` : `기준 ${DAY_STD}h까지 ${fmtH(DAY_STD - tot)}`}</small></div>
+  </div>`}
+ </span>`;
+}
+const hpPct = x => `${Math.max(0, Math.min(100, (x / DAY_MAX) * 100))}%`;
 const checkTimeView = (c, viewer = tlViewer()) => {
  const all = checkPeople(c), ppl = all.filter(n => tlCanSee(n, viewer)), by = tlByName(c.time_log, n => tlCanSee(n, viewer));
  const solo = ppl.length <= 1 ? (ppl[0] || viewer) : '', total = ppl.reduce((a, n) => a + (by[n] || 0), 0);
@@ -1319,10 +1357,8 @@ const checkTimeView = (c, viewer = tlViewer()) => {
  return {ppl, by, solo, total, cand};
 };
 // 업무보고 한 줄 시간(11-09): 그 사람 · 그날 칸. 고르기는 Pick(보고의 % 칸과 같은 모양).
-function RepHours({value, edit, busy, label, onChange}) {
- if (!edit) return html`<span class=${cx('check-time ro', value > 0 && 'set')} title=${value ? `이날 ${value}시간` : ''}>${value > 0 ? html`${I('Clock', 12)}<b>${fmtH(value)}</b>` : ''}</span>`;
- const opts = [...new Set([...DAY_HOURS, value])].sort((a, b) => a - b);
- return html`<span class=${cx('check-time pick', value > 0 && 'set')} title="이날 이 일에 쓴 시간"><${Pick} size="sm" grid=${true} icon="Clock" label=${label} value=${value} disabled=${busy} options=${opts.map(o => ({value: o, label: o ? fmtH(o) : '시간'}))} onChange=${v => onChange(Number(v))} /></span>`;
+function RepHours({value, edit, busy, label, onChange, who = '', day = today()}) {
+ return html`<${HourPop} ro=${!edit} show=${value} who=${who} day=${day} label=${label} tip=${edit ? '이날 이 일에 쓴 시간' : value ? `이날 ${value}시간` : ''} disabled=${busy} valueAt=${() => value} usedAt=${d => tlDayTotal(who, d) - value} onChange=${h => onChange(h)} />`;
 }
 function CheckNoteBtn({c, editable, busy, open = false, onNote}) {
  return editable
@@ -1336,7 +1372,7 @@ function CheckPplAdd({c, cand, busy, onAdd, onClose}) {
  return html`<div ref=${ref} class="check-ppl-edit" role="group" aria-label=${`같이 한 사람: ${c.text}`} onKeyDown=${e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose(); } }}>
   <b>${I('UserPlus', 13)}같이 한 사람</b>
   <div class="check-ppl-chips" role="radiogroup" aria-label="사람">${cand.map(n => html`<button type="button" key=${n} role="radio" aria-checked=${who === n} onClick=${() => setWho(n)}>${n}</button>`)}</div>
-  <label class="check-ppl-h">시간<select aria-label="같이 한 사람 시간" value=${String(h)} onChange=${e => setH(Number(e.target.value))}>${HOUR_OPTS.map(o => html`<option value=${String(o)}>${o ? fmtH(o) : '나중에'}</option>`)}</select></label>
+  <span class="check-ppl-h">오늘<${HourPop} who=${who} label="같이 한 사람 오늘 시간" head=${`${who} · ${c.text}`} show=${h} valueAt=${() => h} usedAt=${d => tlDayTotal(who, d)} onChange=${v => setH(v)} /></span>
   <span class="check-ppl-acts"><button type="button" class="secondary-button small" onClick=${onClose}>취소</button><button type="button" class="primary-button small" disabled=${busy || !who} onClick=${() => onAdd(who, h)}>추가</button></span>
  </div>`;
 }
@@ -1376,11 +1412,12 @@ function Checklist({item, editable, busy, onAct, compact = false}) {
  // 사람별 시간 줄(11-09 고침, 사용자 '이름과 시간이 너무 떨어져 있다'): '↳ 이름 [시간]'으로 붙여 둔다.
  const timeOf = c => {
   if (!showT) return {cell: '', add: '', extra: ''};
-  const tv = checkTimeView(c), setTotal = (n, h) => onAct(item, {type: 'ttotal', cid: c.id, name: n, total: h, today: today()});
-  const cell = tv.solo ? html`<${HourSelect} value=${tv.by[tv.solo] || 0} ro=${!(editable && tlCanEdit(tv.solo))} disabled=${busy} label=${`작업 시간: ${c.text} · ${tv.solo}`} tip=${`${tv.solo} · 이 세부 업무에 쓴 시간 합계(업무보고에 날마다 적은 시간이 더해져요)`} onChange=${h => setTotal(tv.solo, h)} />` : html`<${HourSelect} ro=${true} sum=${true} value=${tv.total} tip=${`사람별 합계 · ${hoursText(tv.by)}`} />`;
+  const tv = checkTimeView(c);
+  const hpFor = n => html`<${HourPop} who=${n} nav=${true} show=${tv.by[n] || 0} ro=${!(editable && tlCanEdit(n))} disabled=${busy} label=${`작업 시간: ${c.text} · ${n}`} head=${`${n} · ${c.text}`} tip=${`${n} · 이 세부 업무 합계 ${fmtH(tv.by[n] || 0)} · 눌러서 날짜별로 적기`} valueAt=${d => tlDay(c.time_log, n, d)} usedAt=${d => tlDayTotal(n, d) - tlDay(c.time_log, n, d)} onChange=${(h, d) => onAct(item, {type: 'tlog', cid: c.id, name: n, day: d, h})} />`;
+  const cell = tv.solo ? hpFor(tv.solo) : html`<${HourSelect} ro=${true} sum=${true} value=${tv.total} tip=${`사람별 합계 · ${hoursText(tv.by)}`} />`;
   const add = !editable ? '' : tv.cand.length ? html`<button type="button" class=${cx('check-ppl-add', addFor === c.id && 'open')} aria-label=${`같이 한 사람 추가: ${c.text}`} aria-expanded=${addFor === c.id} title="같이 한 사람 추가 · 사람마다 시간" disabled=${busy} onClick=${() => setAddFor(v => (v === c.id ? null : c.id))}>${I('UserPlus', 14)}</button>` : html`<span class="check-ppl-add ph" aria-hidden="true"></span>`;
-  const rows = tv.ppl.length >= 2 ? html`<div class="check-ppl">${tv.ppl.map(n => html`<div class="check-ppl-row" key=${n}>${I('CornerDownRight', 12)}<span class="check-ppl-name">${n}</span><${HourSelect} value=${tv.by[n] || 0} ro=${!(editable && tlCanEdit(n))} disabled=${busy} label=${`작업 시간: ${c.text} · ${n}`} tip=${`${n} · 이 세부 업무에 쓴 시간 합계`} onChange=${h => setTotal(n, h)} />${editable && tlCanEdit(n) ? html`<button type="button" class="check-ppl-del" aria-label=${`빼기: ${n} · ${c.text}`} title="잘못 넣었으면 빼기(실무자 · 시간 같이)" disabled=${busy} onClick=${() => { const h = tv.by[n] || 0; if (h > 0 && !window.confirm(`${n}님을 이 세부 업무에서 뺄까요? 적힌 시간 ${fmtH(h)}도 같이 지워져요.`)) return; onAct(item, {type: 'tdel', cid: c.id, name: n}); }}>${I('X', 12)}</button>` : ''}</div>`)}</div>` : '';
-  const ed = editable && addFor === c.id && tv.cand.length ? html`<${CheckPplAdd} c=${c} cand=${tv.cand} busy=${busy} onClose=${() => setAddFor(null)} onAdd=${(n, h) => { setAddFor(null); if (h > 0) setTotal(n, h); else onAct(item, {type: 'by', cid: c.id, by: [...String(c.by || '').split('·').map(s => s.trim()).filter(Boolean), n].join('·')}); }} />` : '';
+  const rows = tv.ppl.length >= 2 ? html`<div class="check-ppl">${tv.ppl.map(n => html`<div class="check-ppl-row" key=${n}>${I('CornerDownRight', 12)}<span class="check-ppl-name">${n}</span>${hpFor(n)}${editable && tlCanEdit(n) ? html`<button type="button" class="check-ppl-del" aria-label=${`빼기: ${n} · ${c.text}`} title="잘못 넣었으면 빼기(실무자 · 시간 같이)" disabled=${busy} onClick=${() => { const h = tv.by[n] || 0; if (h > 0 && !window.confirm(`${n}님을 이 세부 업무에서 뺄까요? 적힌 시간 ${fmtH(h)}도 같이 지워져요.`)) return; onAct(item, {type: 'tdel', cid: c.id, name: n}); }}>${I('X', 12)}</button>` : ''}</div>`)}</div>` : '';
+  const ed = editable && addFor === c.id && tv.cand.length ? html`<${CheckPplAdd} c=${c} cand=${tv.cand} busy=${busy} onClose=${() => setAddFor(null)} onAdd=${(n, h) => { setAddFor(null); if (h > 0) onAct(item, {type: 'tlog', cid: c.id, name: n, day: today(), h}); else onAct(item, {type: 'by', cid: c.id, by: [...String(c.by || '').split('·').map(s => s.trim()).filter(Boolean), n].join('·')}); }} />` : '';
   return {cell, add, extra: html`${rows}${ed}`, has: !!(rows || ed)};
  };
  const [text, setText] = useState(''), [editing, setEditing] = useState(null), st = checkStat(item), editRef = useRef(null);

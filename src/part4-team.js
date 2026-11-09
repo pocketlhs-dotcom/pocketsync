@@ -99,6 +99,8 @@ function TeamBoard() {
  const [asks, setAsks] = useState([]), [reports, setReports] = useState([]), [avatars, setAvatars] = useState({}), [meet, setMeet] = useState(null);
  teamAvatars.map = avatars;
  const [db, setDb] = useState(null), [items, setItems] = useState([]), [allComments, setComments] = useState([]), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
+ // 하루 합계(11-09, 최대 12h)를 어느 칸에서든 계산하려고 지금 업무 · 업무보고를 넣어 둔다.
+ TL_POOL = {tasks: items, reps: reports};
  // A·B 사람(권중선 · 정규진)이 디자인팀 탭에서 남긴 댓글은 이현성과 쓴 사람만 본다(10-16). 디자이너 화면에서는 빠진다.
  const comments = useMemo(() => allComments.filter(c => teamSeesComment(c, me) && repSeesComment(c, me)), [allComments, me.id, me.name]);
  const shownReports = useMemo(() => reports.filter(r => repCanSee(r.seat, me)), [reports, me.id, me.name]);
@@ -1229,7 +1231,12 @@ function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '
  const pctOpts = v => [...new Set([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, v])].sort((a, b) => a - b);
  const tone = v => cx(v > 0 && v < 100 && 'mid', v >= 100 && 'full');
  const pctRO = v => html`<span class=${cx('check-pct wp-pct', tone(v))}><span class="check-pct-bar"><i style=${`width:${v}%`}></i></span><b>${v}%</b></span>`;
- const timeSel = (v, set, label) => html`<${HourSelect} value=${v || 0} opts=${DAY_HOURS} label=${label} tip="오늘 이 일에 쓴 시간 · 넣을 때 내 오늘 시간으로 적혀요" disabled=${busyAll} onChange=${set} />`;
+ // 하루 최대 12h(11-09): 이 줄 말고 그날 쓴 시간 = 저장된 그날 합계 − 고른 줄들의 저장된 값 + 다른 고른 줄 값.
+ const savedOf = (x, cid) => (!x ? 0 : cid ? tlDay((x.checklist.find(c => c.id === cid) || {}).time_log, who, day) : tlDay(x.time_log, who, day));
+ const usedFor = (k, self = 0) => { let b = tlDayTotal(who, day); sel.forEach((o, kk) => { b -= savedOf(all.find(t => t.id === o.tid), o.cid); if (kk !== k) b += o.h || 0; }); if (!sel.has(k)) b -= self; return Math.max(0, b); };
+ // 줄마다 오늘 시간(11-09, 사용자 '고르기 창도 세부 업무 줄처럼'): 안 고른 줄에서 시간을 고르면 그 줄도 같이 골라진다.
+ const timeSel = (v, set, label, k) => html`<${HourPop} who=${who} day=${day} show=${v || 0} label=${label} head=${label.replace('오늘 시간: ', '')} tip="오늘 이 일에 쓴 시간 · 고르면 오늘 한 일로도 골라져요" disabled=${busyAll} valueAt=${() => v || 0} usedAt=${() => usedFor(k, v || 0)} onChange=${set} />`;
+ const pickWithH = (x, c, h) => setSel(m => { const n = new Map(m), k = c ? K(x.id, c.id) : K(x.id); n.set(k, {tid: x.id, cid: c ? c.id : '', pct: c ? c.pct : (x.progress || 0), h}); return n; });
  const timeRO = v => (v > 0 ? html`<span class="check-time ro set wp-time" title="오늘 적은 내 시간">${I('Clock', 12)}<b>${fmtH(v)}</b></span>` : html`<span class="check-time ro wp-time"></span>`);
  const pctSel = (v, set, label) => html`<label class=${cx('check-pct wp-pct on', tone(v))} title="오늘 진행률 · 넣을 때 업무에도 반영돼요"><span class="check-pct-bar"><i style=${`width:${v}%`}></i></span><select aria-label=${label} value=${String(v)} disabled=${busyAll} onChange=${e => set(Number(e.target.value))}>${pctOpts(v).map(o => html`<option key=${o} value=${String(o)}>${o}%</option>`)}</select></label>`;
  const editRow = (x, c) => html`<li key=${'e' + c.id} class="wp-sub editing"><form class="wp-edit" onSubmit=${e => save(e, x, c)}>
@@ -1243,7 +1250,7 @@ function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '
   return html`<li key=${c.id} class=${cx('wp-sub', on && 'on', used && 'used')}>
    <label class="check-tick wp-sub-main" title=${used ? '오늘 보고에 이미 넣었어요 · 빼려면 보고에서 ×' : on ? '눌러서 빼기' : '오늘 한 일로 고르기'}><input type="checkbox" data-nav aria-label=${c.text} checked=${used || on} disabled=${used || busyAll} onChange=${() => toggleSub(x, c)} /><span class="check-box">${I('Check', 12)}</span><span class="wp-sub-text">${c.text}</span><${CheckTag} c=${c} />${used ? html`<span class="wp-in">보고에 있음</span>` : ''}</label>
    ${cSeenName(c.by) ? html`<small class="check-by">${cSeenName(c.by)}</small>` : ''}
-   ${on ? timeSel(s.h, v => setH(k, v), `오늘 시간: ${c.text}`) : timeRO(tlDay(c.time_log, who, day))}
+   ${used ? timeRO(tlDay(c.time_log, who, day)) : on ? timeSel(s.h, v => setH(k, v), `오늘 시간: ${c.text}`, k) : timeSel(tlDay(c.time_log, who, day), v => pickWithH(x, c, v), `오늘 시간: ${c.text}`, k)}
    ${on ? pctSel(s.pct, v => setPct(k, v), `오늘 진행률: ${c.text}`) : pctRO(c.pct)}
    <button type="button" class="wp-pen" aria-label=${`고치기: ${c.text}`} title="이름 · % 고치기 · 지우기" disabled=${busyAll} onClick=${() => setEdit({tid: x.id, id: c.id, text: c.text, pct: c.pct})}>${I('Pencil', 13)}</button>
   </li>`;
@@ -1256,7 +1263,7 @@ function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '
     <label class=${cx('check-tick wp-ptick', st.mixed && 'mixed', st.off && 'off')} title=${solo ? (st.off ? '오늘 보고에 이미 넣었어요' : '세부 업무 없이 이 업무로 고르기') : st.off ? '남은 세부 업무가 없어요' : '이 업무의 세부 업무 모두 고르기'}><input type="checkbox" aria-label=${`${x.title} · ${solo ? '업무로 고르기' : '세부 업무 모두 고르기'}`} checked=${st.on || (solo && st.off)} indeterminate=${st.mixed} disabled=${st.off || busyAll} onChange=${() => toggleProj(x)} /><span class="check-box">${I(st.mixed ? 'Minus' : 'Check', 12)}</span></label>
     <button type="button" class="wp-proj-btn" data-nav aria-expanded=${exp} title=${qq ? x.title : exp ? '접기' : '펼쳐서 세부 업무 보기'} onClick=${() => { if (!qq) flip(x.id); }}>${I('ChevronRight', 15)}<span class="wp-proj-main"><span class="wp-proj-title"><span class="wp-proj-name">${x.title}</span>${teamFresh(x) ? html`<${TeamNewTag} x=${x} />` : ''}${teamDelayed(x) ? html`<${TeamLateTag} x=${x} />` : ''}</span><span class="wp-proj-meta"><span>${meta}</span>${hot(x) ? html`<span class="wp-today" title=${`오늘 ${teamClock(x.updated_at)}에 내가 바꾼 업무`}>오늘 손댐</span>` : ''}${inRep ? html`<span class="wp-in">보고에 있음</span>` : ''}</span></span></button>
     <span class=${cx('wp-count', solo && 'none')} title=${solo ? '세부 업무가 없어요' : '끝낸 세부 업무 / 전체'}>${solo ? '세부 없음' : `세부 ${cs.done}/${cs.total}`}</span>
-    ${ps ? timeSel(ps.h, v => setH(K(x.id), v), `오늘 시간: ${x.title}`) : solo ? timeRO(tlDay(x.time_log, who, day)) : html`<span class="check-time ro wp-time"></span>`}
+    ${ps ? timeSel(ps.h, v => setH(K(x.id), v), `오늘 시간: ${x.title}`, K(x.id)) : solo && !projIn(x.id) ? timeSel(tlDay(x.time_log, who, day), v => pickWithH(x, null, v), `오늘 시간: ${x.title}`, K(x.id)) : solo ? timeRO(tlDay(x.time_log, who, day)) : html`<span class="check-time ro wp-time"></span>`}
     ${ps ? pctSel(ps.pct, v => setPct(K(x.id), v), `오늘 진행률: ${x.title}`) : pctRO(x.progress || 0)}
    </div>
    ${exp && html`<ul class="wp-subs">
@@ -1307,6 +1314,10 @@ async function reportPng(d) {
   const text = (s, x, yy, f, col, align = 'left') => { if (dry) return; ctx.font = f; ctx.fillStyle = col; ctx.textAlign = align; ctx.textBaseline = 'alphabetic'; ctx.fillText(s, x, yy); };
   const rect = (x, yy, w, h, col, r = 0) => { if (dry) return; ctx.fillStyle = col; ctx.beginPath(); if (r && ctx.roundRect) ctx.roundRect(x, yy, w, h, r); else ctx.rect(x, yy, w, h); ctx.fill(); };
   const bar = (x, yy, w, pct) => { rect(x, yy, w, 6, C.bar, 3); if (pct > 0) rect(x, yy, Math.max(6, w * Math.min(100, pct) / 100), 6, pct >= 100 ? C.green : C.blue, 3); };
+  // 시간(11-09, 사용자 '복사하면 시간 표기가 안 된다'): 시계 + 'nh'를 오른쪽 맞춤으로.
+  const clock = (x0, y0, col) => { if (dry) return; ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 1.4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(x0, y0, 5.5, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x0, y0 - 3); ctx.lineTo(x0, y0); ctx.lineTo(x0 + 2.4, y0 + 1.6); ctx.stroke(); ctx.restore(); };
+  const hrs = (h, xr, yy, col, w = 700) => { const s = fmtH(h); ctx.font = font(14, w); const tw = ctx.measureText(s).width; text(s, xr, yy, font(14, w), col, 'right'); clock(xr - tw - 10, yy - 5, col); };
+  const HW = 64;
   const pill = (x, yy, label, bg, col) => { ctx.font = font(11, 800); const w = ctx.measureText(label).width + 12; rect(x, yy - 12, w, 17, bg, 3); text(label, x + 6, yy, font(11, 800), col); return w; };
   rect(0, 0, W, 84, C.navy);
   text(`${d.name}${d.role ? ` ${d.role}` : ''}`, P, 40, font(24, 800), '#ffffff');
@@ -1314,24 +1325,26 @@ async function reportPng(d) {
   text('오늘의 업무보고', W - P, 40, font(15, 700), '#ffffff', 'right');
   if (d.savedAt) text(`${d.savedAt} 저장`, W - P, 64, font(13, 500), '#aab6dc', 'right');
   y = 84 + 26;
-  const section = label => { y += 6; rect(P, y - 12, 3, 15, C.blue, 1); text(label, P + 10, y, font(14, 800), C.navy); y += 10; };
-  section('오늘 한 일');
+  const section = (label, total = 0) => { y += 6; rect(P, y - 12, 3, 15, C.blue, 1); text(label, P + 10, y, font(14, 800), C.navy); if (total > 0) { ctx.font = font(13, 800); const s = `합계 ${fmtH(total)}`, tw = ctx.measureText(s).width; text(s, W - P, y, font(13, 800), C.navy, 'right'); clock(W - P - tw - 10, y - 5, C.gray); } y += 10; };
+  section('오늘 한 일', d.total || 0);
   if (!d.groups.length) { text('적은 내용이 없어요.', P, y + 18, font(15), C.gray); y += 30; }
   for (const g of d.groups) {
    y += 8;
    if (g.title) {
-    ctx.font = font(16, 800); const tl = wrapT(ctx, g.title, W - P * 2 - (g.pct !== null ? 116 : 0));
+    ctx.font = font(16, 800); const tl = wrapT(ctx, g.title, W - P * 2 - (g.pct !== null ? 116 : 0) - (g.h > 0 ? HW : 0));
     tl.forEach((l, i) => text(l, P, y + 16 + i * 23, font(16, 800), C.navy));
     if (g.pct !== null) { bar(W - P - 104, y + 7, 60, g.pct); text(`${g.pct}%`, W - P, y + 15, font(14, 800), C.navy, 'right'); }
+    if (g.h > 0) hrs(g.h, W - P - (g.pct !== null ? 116 : 0) - 6, y + 15, C.navy, 800);
     y += 16 + (tl.length - 1) * 23 + 10;
    }
    for (const s of g.subs) {
-    const hasP = s.pct !== null && s.pct !== undefined, maxW = W - P * 2 - 22 - (hasP ? 116 : 0);
+    const hasP = s.pct !== null && s.pct !== undefined, maxW = W - P * 2 - 22 - (hasP ? 116 : 0) - (s.h > 0 ? HW : 0);
     ctx.font = font(15, 500); const sl = wrapT(ctx, s.text, maxW);
     rect(P + 7, y + 6, 5, 5, g.title ? '#7c9cf9' : C.gray, 2.5);
     sl.forEach((l, i) => text(l, P + 22, y + 14 + i * 22, font(15, 500), C.ink));
     if (s.tag) { ctx.font = font(15, 500); const lw = ctx.measureText(sl[sl.length - 1]).width, lab = s.tag === 'new' ? 'New' : '조정됨'; ctx.font = font(11, 800); const pw = ctx.measureText(lab).width + 12, px = P + 22 + lw + 8; if (px + pw <= P + 22 + maxW + 4) pill(px, y + 13 + (sl.length - 1) * 22, lab, s.tag === 'new' ? '#3865e8' : '#fff1dc', s.tag === 'new' ? '#ffffff' : '#b45f06'); }
     if (hasP) { bar(W - P - 104, y + 6, 60, s.pct); text(`${s.pct}%`, W - P, y + 14, font(14, 700), s.pct >= 100 ? C.green : C.ink, 'right'); }
+    if (s.h > 0) hrs(s.h, W - P - (hasP ? 116 : 0) - 6, y + 14, '#3f4f6b');
     y += 14 + (sl.length - 1) * 22 + 12;
    }
   }
@@ -1438,8 +1451,9 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
  // 복사하기(11-05): 내 그날 보고를 이미지로 클립보드에(카톡에 바로 붙여넣기). 메모는 칸에 적힌 그대로(저장 전이어도).
  async function copyReport(card) {
   const memo = k => { const el = card && card.querySelector(`[data-memo="${k}"] textarea`); return el ? String(el.value || '') : null; };
-  const groups = groupsOf(my).map(g => { const t = g.k ? taskOf(g.k) : null; if (!g.k) return {title: '', pct: null, subs: g.lines.map(l => ({text: l.text, pct: l.pct, tag: ''}))}; return {title: t ? t.title : (g.lines[0].task_title || '지워진 업무'), pct: t ? (t.progress || 0) : null, subs: g.lines.filter(l => !projLine(l)).map(l => { const c = t && l.check_id ? t.checklist.find(x => x.id === l.check_id) : null; return {text: c ? c.text : l.text, pct: c && isToday ? c.pct : l.pct, tag: c ? checkTag(c) : ''}; })}; });
-  const d = {name: me.name, role: TEAM_ROLES[me.name] || '', dayLabel: `${Number(day.slice(5, 7))}월 ${Number(day.slice(8))}일 (${'일월화수목금토'[new Date(day + 'T12:00:00Z').getUTCDay()]})`, savedAt: my.updated_at ? teamClock(my.updated_at) : '', groups, links: my.links || [], note: memo('note') ?? my.note, next: memo('next') ?? my.next};
+  // 시간(11-09): 줄마다 이날 내 시간, 업무 머리 = 이날 그 업무 합계, 맨 위 = 이날 합계.
+  const groups = groupsOf(my).map(g => { const t = g.k ? taskOf(g.k) : null; if (!g.k) return {title: '', pct: null, h: 0, subs: g.lines.map(l => ({text: l.text, pct: l.pct, tag: '', h: Number(l.h) || 0}))}; const subs = g.lines.filter(l => !projLine(l)).map(l => { const c = t && l.check_id ? t.checklist.find(x => x.id === l.check_id) : null; return {text: c ? c.text : l.text, pct: c && isToday ? c.pct : l.pct, tag: c ? checkTag(c) : '', h: c ? tlDay(c.time_log, me.name, day) : 0}; }); return {title: t ? t.title : (g.lines[0].task_title || '지워진 업무'), pct: t ? (t.progress || 0) : null, h: subs.reduce((a, x) => a + x.h, t && g.lines.some(projLine) ? tlDay(t.time_log, me.name, day) : 0), subs}; });
+  const d = {total: dayTotal(my, me.name), name: me.name, role: TEAM_ROLES[me.name] || '', dayLabel: `${Number(day.slice(5, 7))}월 ${Number(day.slice(8))}일 (${'일월화수목금토'[new Date(day + 'T12:00:00Z').getUTCDay()]})`, savedAt: my.updated_at ? teamClock(my.updated_at) : '', groups, links: my.links || [], note: memo('note') ?? my.note, next: memo('next') ?? my.next};
   const how = await copyImage(() => reportPng(d), `업무보고-${me.name}-${day}.png`);
   if (how === 'copied') toast.success('업무보고를 이미지로 복사했어요. 카톡 대화창에 붙여넣기(Ctrl+V · ⌘V) 하면 돼요.'); else toast.info('이 브라우저는 이미지 복사가 안 돼서 파일로 저장했어요. 카톡에 파일로 보내 주세요.');
  }
@@ -1473,7 +1487,7 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
  const subLine = (l, t, isMe, show, who) => {
   const c = t && l.check_id ? t.checklist.find(x => x.id === l.check_id) : null, v = c && isToday ? c.pct : l.pct, name = c ? c.text : l.text, edit = isMe && !!c && !!onCheck, nk = c ? `${t.id}:${c.id}` : '';
   // 시간(11-09) = 이 사람 · 이날 칸(세부 업무 time_log). 특이사항은 세부 업무에 하나.
-  const tn = show.t || show.n ? html`<span class="tb-rep-tn">${show.t ? html`<${RepHours} value=${c ? tlDay(c.time_log, who, day) : 0} edit=${edit} busy=${busy} label=${`이날 시간: ${name}`} onChange=${h => setDayHours(t, c, who, h)} />` : ''}${show.n ? (c ? html`<${CheckNoteBtn} c=${c} editable=${edit} busy=${busy} open=${noteFor === nk} onNote=${() => setNoteFor(k => (k === nk ? null : nk))} />` : html`<span class="check-note-btn ro"></span>`) : ''}</span>` : '';
+  const tn = show.t || show.n ? html`<span class="tb-rep-tn">${show.t ? html`<${RepHours} value=${c ? tlDay(c.time_log, who, day) : 0} edit=${edit} busy=${busy} who=${who} day=${day} label=${`이날 시간: ${name}`} onChange=${h => setDayHours(t, c, who, h)} />` : ''}${show.n ? (c ? html`<${CheckNoteBtn} c=${c} editable=${edit} busy=${busy} open=${noteFor === nk} onNote=${() => setNoteFor(k => (k === nk ? null : nk))} />` : html`<span class="check-note-btn ro"></span>`) : ''}</span>` : '';
   return html`<li key=${l.id} class="tb-rep-row"><span class="tb-rep-lead"><span class="tb-rep-dot"></span></span><div class="tb-rep-subtext"><${TeamText} text=${name} />${c && html`<${CheckTag} c=${c} />`}${c && cSeenName(c.by) ? html`<small>${cSeenName(c.by)}</small>` : ''}</div><span class="tb-rep-ctl">${tn}${v !== null && v !== undefined ? pctView(v, edit ? n => setLinePct(l, t, c, n) : null, `진행률: ${name}`) : html`<span class="tb-rep-pct none"></span>`}</span>${isMe ? html`<span class="tb-rep-acts">${xBtn('빼기', () => removeLines([l], t, who))}</span>` : ''}${edit && noteFor === nk ? html`<${CheckNote} c=${c} busy=${busy} onClose=${() => setNoteFor(null)} onSave=${note => saveNote(t, c, note)} />` : c && c.note ? html`<${CheckNoteLine} note=${c.note} onClick=${edit ? () => setNoteFor(nk) : null} />` : ''}</li>`;
  };
  const projView = (g, isMe, show, who) => {
@@ -1482,7 +1496,7 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
   // 머리 줄 시간(11-09): 세부 업무 줄이 없고 업무만 고른 줄이면 그 업무에 바로 적는 칸(고르기), 아니면 이 사람이 이날 이 업무에 쓴 시간 합계.
   const own = !subs.length && !!projL && !!t, dayT = t ? subs.reduce((a, l) => { const c = l.check_id ? t.checklist.find(x => x.id === l.check_id) : null; return a + (c ? tlDay(c.time_log, who, day) : 0); }, projL ? tlDay(t.time_log, who, day) : 0) : 0;
   return html`<section class="tb-rep-proj" key=${g.k}>
-   <div class="tb-rep-proj-head tb-rep-row"><span class="tb-rep-lead tb-rep-proj-ico">${I('Layers3', 13)}</span><button type="button" class="tb-rep-proj-title" disabled=${!t} title=${t ? '업무 열기' : '지워진 업무예요'} onClick=${() => t && onOpenTask(t.id)}>${title}</button><span class="tb-rep-ctl">${show.t || show.n ? html`<span class="tb-rep-tn">${show.t ? (own ? html`<${RepHours} value=${dayT} edit=${isMe && !!onCheck} busy=${busy} label=${`이날 시간: ${title}`} onChange=${h => setTaskDayHours(t, who, h)} />` : html`<span class=${cx('check-time ro sum', dayT > 0 && 'set')} title=${dayT ? `이날 이 업무에 쓴 시간 합계 ${dayT}시간` : ''}>${dayT ? html`${I('Clock', 12)}<b>${fmtH(dayT)}</b>` : ''}</span>`) : ''}${show.n ? html`<span class="check-note-btn ro"></span>` : ''}</span>` : ''}${prog !== null ? pctView(prog, canProg ? v => onProgress(t, v) : null, `업무 진행률: ${title}`) : html`<span class="tb-rep-pct none"></span>`}</span>${isMe ? html`<span class="tb-rep-acts">${t && onCheck ? html`<button type="button" class="tb-rep-proj-more" aria-label=${`세부 업무 더 고르기: ${title}`} title="이 업무에서 세부 업무 더 고르기 · 새로 적기" disabled=${busy} onClick=${() => setWp({focus: t.id, draft: ''})}>${I('ListTree', 14)}</button>` : ''}${xBtn('이 프로젝트 줄 모두 빼기', () => removeLines(g.lines, t, who))}</span>` : ''}</div>
+   <div class="tb-rep-proj-head tb-rep-row"><span class="tb-rep-lead tb-rep-proj-ico">${I('Layers3', 13)}</span><button type="button" class="tb-rep-proj-title" disabled=${!t} title=${t ? '업무 열기' : '지워진 업무예요'} onClick=${() => t && onOpenTask(t.id)}>${title}</button><span class="tb-rep-ctl">${show.t || show.n ? html`<span class="tb-rep-tn">${show.t ? (own ? html`<${RepHours} value=${dayT} edit=${isMe && !!onCheck} busy=${busy} who=${who} day=${day} label=${`이날 시간: ${title}`} onChange=${h => setTaskDayHours(t, who, h)} />` : html`<span class=${cx('check-time ro sum', dayT > 0 && 'set')} title=${dayT ? `이날 이 업무에 쓴 시간 합계 ${dayT}시간` : ''}>${dayT ? html`${I('Clock', 12)}<b>${fmtH(dayT)}</b>` : ''}</span>`) : ''}${show.n ? html`<span class="check-note-btn ro"></span>` : ''}</span>` : ''}${prog !== null ? pctView(prog, canProg ? v => onProgress(t, v) : null, `업무 진행률: ${title}`) : html`<span class="tb-rep-pct none"></span>`}</span>${isMe ? html`<span class="tb-rep-acts">${t && onCheck ? html`<button type="button" class="tb-rep-proj-more" aria-label=${`세부 업무 더 고르기: ${title}`} title="이 업무에서 세부 업무 더 고르기 · 새로 적기" disabled=${busy} onClick=${() => setWp({focus: t.id, draft: ''})}>${I('ListTree', 14)}</button>` : ''}${xBtn('이 프로젝트 줄 모두 빼기', () => removeLines(g.lines, t, who))}</span>` : ''}</div>
    ${subs.length > 0 && html`<ul class="tb-rep-subs">${subs.map(l => subLine(l, t, isMe, show, who))}</ul>`}
   </section>`;
  };
@@ -1506,11 +1520,11 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
    <div class="tb-rep-link-actions"><button type="button" class="text-button" onClick=${() => setLinking(null)}>취소</button><button type="button" class="primary-button" disabled=${busy || !t} onClick=${() => doLink(l)}>${I('Link2', 14)}잇기</button></div>
   </div>`;
  };
- const freeLine = (l, isMe) => {
+ const freeLine = (l, isMe, who = '') => {
   const can = isMe && !!onCheck, open = can && linking && linking.lineId === l.id, sug = can && !open ? similar(l.text)[0] : null;
-  return html`<li key=${l.id} class=${cx(open && 'linking')}><span class="tb-rep-dot"></span><div class="tb-rep-free"><${TeamText} text=${l.text} />${sug ? html`<button type="button" class="tb-rep-sug" disabled=${busy} title="이 업무에 이어서 세부 업무 · %로 남기기" onClick=${() => startLink(l, sug.id)}>${I('Sparkles', 11)}<span>${sug.title}</span><em>에 잇기</em></button>` : ''}</div>${isMe ? html`<span class="tb-rep-free-tools">${can && !open ? html`<button type="button" class="text-button tb-rep-linkbtn" disabled=${busy} onClick=${() => startLink(l, sug ? sug.id : '')}>${I('Link2', 12)}업무에 잇기</button>` : ''}<${RepHours} value=${Number(l.h) || 0} edit=${true} busy=${busy} label=${`이날 시간: ${l.text}`} onChange=${h => onAct(day, cur => ({lines: cur.lines.map(x => (x.id === l.id ? {...x, h} : x))}), '')} />${xBtn('빼기', () => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), ''))}</span>` : Number(l.h) > 0 ? html`<span class="tb-rep-free-tools"><${RepHours} value=${Number(l.h)} edit=${false} /></span>` : ''}${open ? linkPanel(l) : ''}</li>`;
+  return html`<li key=${l.id} class=${cx(open && 'linking')}><span class="tb-rep-dot"></span><div class="tb-rep-free"><${TeamText} text=${l.text} />${sug ? html`<button type="button" class="tb-rep-sug" disabled=${busy} title="이 업무에 이어서 세부 업무 · %로 남기기" onClick=${() => startLink(l, sug.id)}>${I('Sparkles', 11)}<span>${sug.title}</span><em>에 잇기</em></button>` : ''}</div>${isMe ? html`<span class="tb-rep-free-tools">${can && !open ? html`<button type="button" class="text-button tb-rep-linkbtn" disabled=${busy} onClick=${() => startLink(l, sug ? sug.id : '')}>${I('Link2', 12)}업무에 잇기</button>` : ''}<${RepHours} value=${Number(l.h) || 0} edit=${true} busy=${busy} who=${who} day=${day} label=${`이날 시간: ${l.text}`} onChange=${h => onAct(day, cur => ({lines: cur.lines.map(x => (x.id === l.id ? {...x, h} : x))}), '')} />${xBtn('빼기', () => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), ''))}</span>` : Number(l.h) > 0 ? html`<span class="tb-rep-free-tools"><${RepHours} value=${Number(l.h)} edit=${false} who=${who} day=${day} /></span>` : ''}${open ? linkPanel(l) : ''}</li>`;
  };
- const workView = (r, isMe, who) => { const gs = groupsOf(r), show = showOf(gs, isMe, who); return gs.length ? html`<${RepWork} cls=${cx('tb-rep-work', isMe && 'me', (show.t || show.n) && 'tn')}>${gs.map(g => g.k ? projView(g, isMe, show, who) : html`<ul class="tb-rep-lines" key="free">${g.lines.map(l => freeLine(l, isMe))}</ul>`)}<//>` : ''; };
+ const workView = (r, isMe, who) => { const gs = groupsOf(r), show = showOf(gs, isMe, who); return gs.length ? html`<${RepWork} cls=${cx('tb-rep-work', isMe && 'me', (show.t || show.n) && 'tn')}>${gs.map(g => g.k ? projView(g, isMe, show, who) : html`<ul class="tb-rep-lines" key="free">${g.lines.map(l => freeLine(l, isMe, who))}</ul>`)}<//>` : ''; };
  const projMeta = (x, who) => [statuses[x.status], x.due ? dDay(x.due).label : '', who ? teamWho(x.assignee) : ''].filter(Boolean).join(' · ');
  // 오늘 한 일 적기(11-05): 큰 버튼 = 고르기 창(업무 → 세부 업무를 한눈에, 여러 개 한 번에), 아래 칸 = 업무에 없는 일 한 줄.
  const nSubs = mineT.reduce((a, x) => a + x.checklist.length, 0);
