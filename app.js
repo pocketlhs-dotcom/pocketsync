@@ -411,7 +411,7 @@ function ToggleGroup({class: cls = '', value, onChange, items, label}) {
 // 앱 모양 드롭다운(기본 select 대신): 버튼을 누르면 아래(자리가 없으면 위)로 목록이 열리고, 위 · 아래 화살표 · Enter · Esc로도 고른다.
 // options: [{value, label, meta?, pct?, group?, action?, blank?}] — group이 바뀌는 곳에 묶음 이름, action은 맨 아래에 줄을 나눠 따로(예: 직접 적기), blank는 골라도 버튼에 안내 문구를 둔다.
 // grid: % 고르기처럼 칩 격자. size 'sm': 작은 버튼.
-function Pick({value, options, onChange, label, placeholder = '고르기', disabled = false, class: cls = '', grid = false, size = ''}) {
+function Pick({value, options, onChange, label, placeholder = '고르기', disabled = false, class: cls = '', grid = false, size = '', icon = ''}) {
  const [open, setOpen] = useState(false), [up, setUp] = useState(false), [right, setRight] = useState(false), [act, setAct] = useState(-1);
  const wrap = useRef(null), btn = useRef(null), list = useRef(null);
  const sel = options.find(o => !o.action && !o.blank && o.value === value);
@@ -437,7 +437,7 @@ function Pick({value, options, onChange, label, placeholder = '고르기', disab
   body.push(html`<button type="button" role="option" key=${'o' + i} data-i=${i} tabIndex="-1" aria-selected=${on} class=${cx('pk-opt', o.action && 'act', on && 'on', act === i && 'hl', has(o.pct) && o.pct >= 100 && 'full')} onMouseEnter=${() => setAct(i)} onClick=${() => choose(o)}>${grid ? o.label : html`<span class="pk-check">${on ? I('Check', 14) : o.icon ? I(o.icon, 14) : o.action ? I('Plus', 14) : ''}</span><span class="pk-main"><span class="pk-label">${o.label}</span>${o.meta ? html`<span class="pk-meta">${o.meta}</span>` : ''}</span>${has(o.pct) ? html`<span class="pk-pct"><span class="pk-bar"><i style=${`width:${o.pct}%`}></i></span><b>${o.pct}%</b></span>` : ''}`}</button>`);
  });
  return html`<div class=${cx('pk', cls, size && 'pk-' + size, open && 'open')} ref=${wrap}>
-  <button type="button" ref=${btn} class="pk-btn" aria-haspopup="listbox" aria-expanded=${open} aria-label=${label} disabled=${disabled} onClick=${() => (open ? setOpen(false) : show())} onKeyDown=${key}><span class="pk-val">${sel ? html`<span class="pk-label">${sel.label}</span>${sel.meta && !grid ? html`<span class="pk-meta">${sel.meta}</span>` : ''}` : html`<span class="pk-ph">${placeholder}</span>`}</span>${I('ChevronDown', 15)}</button>
+  <button type="button" ref=${btn} class="pk-btn" aria-haspopup="listbox" aria-expanded=${open} aria-label=${label} disabled=${disabled} onClick=${() => (open ? setOpen(false) : show())} onKeyDown=${key}>${icon ? I(icon, 12) : ''}<span class="pk-val">${sel ? html`<span class="pk-label">${sel.label}</span>${sel.meta && !grid ? html`<span class="pk-meta">${sel.meta}</span>` : ''}` : html`<span class="pk-ph">${placeholder}</span>`}</span>${I('ChevronDown', 15)}</button>
   ${open && html`<div class=${cx('pk-pop', up && 'up', right && 'right', grid && 'grid')} role="listbox" aria-label=${label} ref=${list}>${body}</div>`}
  </div>`;
 }
@@ -558,6 +558,7 @@ const ops = {
   if (act.type === 'toggle') list = list.map(c => c.id === act.cid ? {...c, done: !!act.done, pct: act.done ? 100 : 0} : c);
   else if (act.type === 'pct') list = list.map(c => c.id === act.cid ? {...c, pct: act.pct, done: act.pct >= 100} : c);
   else if (act.type === 'tlog' || act.type === 'ttotal') list = list.map(c => c.id === act.cid ? checkTimeAct(c, act) : c);
+  else if (act.type === 'tdel') list = list.map(c => c.id === act.cid ? checkPplDel(c, act.name) : c);
   else if (act.type === 'note') list = list.map(c => c.id === act.cid ? (String(act.note || '').trim() ? {...c, note: String(act.note).trim().slice(0, 300)} : (({note, ...rest}) => rest)(c)) : c);
   else if (act.type === 'add') list = [...list, ...act.texts.map(t => ({id: newCheckId(), text: t, done: false, by: ctx.actor.name, at: nowIso()}))];
   else if (act.type === 'remove') list = list.filter(c => c.id !== act.cid);
@@ -1784,15 +1785,22 @@ function checkTimeAct(c, act) {
  const by = String(c.by || '').split('·').map(s => s.trim()).filter(Boolean), add = (act.type === 'ttotal' ? act.total : act.h) > 0 && act.name && !by.includes(act.name);
  const {time_log, hours, ...rest} = c; return {...rest, ...(add ? {by: [...by, act.name].join('·').slice(0, 20)} : {}), ...(Object.keys(log).length ? {time_log: log} : {})};
 }
+// 사람 빼기(11-09, 사용자 '잘못 추가했을 수 있으니 삭제도'): 실무자에서 빼고 그 사람 시간도 지운다.
+function checkPplDel(c, name) {
+ const by = String(c.by || '').split('·').map(s => s.trim()).filter(n => n && n !== name), log = {};
+ Object.entries(c.time_log || {}).forEach(([k, h]) => { if (tlParse(k).name !== name) log[k] = h; });
+ const {time_log, hours, by: b0, ...rest} = c; return {...rest, ...(by.length ? {by: by.join('·')} : {}), ...(Object.keys(log).length ? {time_log: log} : {})};
+}
 // 세부 업무 시간 · 특이사항(11-05, 사용자 '% 옆에 시간(h)' · '생각보다 지연되면 아이콘 눌러 지연 사유 · 특이사항').
 // 1h = 1시간(반 시간 단위, 그 세부 업무에 든 시간 누적). pick = 업무보고처럼 % 고르기가 Pick인 곳.
 // 세부 업무 시간(11-09, 사용자 '같이 한 세부 업무는 사람마다 시간' · '업무보고 권한과 같게'):
 // 보이는 사람이 1명(없으면 나)이면 줄의 시간 칸 = 그 사람 합계(고치면 차이를 오늘 칸에), 2명 이상이면 줄의 칸 = 합계(보기만) + 아래 '↳ 이름 · 시간' 줄.
 // '같이 한 사람'(사람 아이콘) = 사람 고르고 시간 → 실무자에도 들어감. 고치기는 자기 것만(이현성은 모두).
-function HourSelect({value, label = '', tip = '', disabled = false, ro = false, sum = false, onChange}) {
+// 시간 버튼(11-09, 사용자 '[time] 버튼화 · 가시성 · 엣지 있게'): 테두리 버튼(시계 · 값 · ▾), 적힌 값이 있으면 파랑. 위에 투명 select를 덮어 고른다(키보드 · 모바일 그대로).
+function HourSelect({value, label = '', tip = '', disabled = false, ro = false, sum = false, opts: base = HOUR_OPTS, onChange}) {
  if (ro) return html`<span class=${cx('check-time ro', value > 0 && 'set', sum && 'sum')} title=${tip}>${value > 0 ? html`${I('Clock', 12)}<b>${fmtH(value)}</b>` : ''}</span>`;
- const opts = [...new Set([...HOUR_OPTS, value])].sort((a, b) => a - b);
- return html`<label class=${cx('check-time', value > 0 && 'set')} title=${tip}>${I('Clock', 12)}<select aria-label=${label} value=${String(value)} disabled=${disabled} onChange=${e => onChange(Number(e.target.value))}>${opts.map(o => html`<option value=${String(o)}>${o ? fmtH(o) : '–'}</option>`)}</select></label>`;
+ const opts = [...new Set([...base, value])].sort((a, b) => a - b);
+ return html`<label class=${cx('check-time btn', value > 0 && 'set', disabled && 'off')} title=${tip}>${I('Clock', 12)}${value > 0 ? html`<b>${fmtH(value)}</b>` : html`<span class="ph">시간</span>`}${I('ChevronDown', 12)}<select aria-label=${label} value=${String(value)} disabled=${disabled} onChange=${e => onChange(Number(e.target.value))}>${opts.map(o => html`<option value=${String(o)}>${o ? fmtH(o) : '없음'}</option>`)}</select></label>`;
 }
 const checkTimeView = (c, viewer = tlViewer()) => {
  const all = checkPeople(c), ppl = all.filter(n => tlCanSee(n, viewer)), by = tlByName(c.time_log, n => tlCanSee(n, viewer));
@@ -1804,7 +1812,7 @@ const checkTimeView = (c, viewer = tlViewer()) => {
 function RepHours({value, edit, busy, label, onChange}) {
  if (!edit) return html`<span class=${cx('check-time ro', value > 0 && 'set')} title=${value ? `이날 ${value}시간` : ''}>${value > 0 ? html`${I('Clock', 12)}<b>${fmtH(value)}</b>` : ''}</span>`;
  const opts = [...new Set([...DAY_HOURS, value])].sort((a, b) => a - b);
- return html`<span class=${cx('check-time pick', value > 0 && 'set')} title="이날 이 일에 쓴 시간"><${Pick} size="sm" grid=${true} label=${label} value=${value} disabled=${busy} options=${opts.map(o => ({value: o, label: o ? fmtH(o) : '시간'}))} onChange=${v => onChange(Number(v))} /></span>`;
+ return html`<span class=${cx('check-time pick', value > 0 && 'set')} title="이날 이 일에 쓴 시간"><${Pick} size="sm" grid=${true} icon="Clock" label=${label} value=${value} disabled=${busy} options=${opts.map(o => ({value: o, label: o ? fmtH(o) : '시간'}))} onChange=${v => onChange(Number(v))} /></span>`;
 }
 function CheckNoteBtn({c, editable, busy, open = false, onNote}) {
  return editable
@@ -1812,8 +1820,10 @@ function CheckNoteBtn({c, editable, busy, open = false, onNote}) {
   : html`<span class=${cx('check-note-btn ro', c.note && 'on')} title=${c.note ? `특이사항: ${c.note}` : ''}>${c.note ? I('MessageSquareWarning', 14) : ''}</span>`;
 }
 function CheckPplAdd({c, cand, busy, onAdd, onClose}) {
- const [who, setWho] = useState(cand[0] || ''), [h, setH] = useState(0);
- return html`<div class="check-ppl-edit" role="group" aria-label=${`같이 한 사람: ${c.text}`} onKeyDown=${e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose(); } }}>
+ const [who, setWho] = useState(cand[0] || ''), [h, setH] = useState(0), ref = useRef(null);
+ // 열리면 첫 사람 칩에 포커스(Esc가 이 칸부터 닫히게).
+ useEffect(() => { const b = ref.current && ref.current.querySelector('button[role=radio]'); if (b) b.focus({preventScroll: true}); }, []);
+ return html`<div ref=${ref} class="check-ppl-edit" role="group" aria-label=${`같이 한 사람: ${c.text}`} onKeyDown=${e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose(); } }}>
   <b>${I('UserPlus', 13)}같이 한 사람</b>
   <div class="check-ppl-chips" role="radiogroup" aria-label="사람">${cand.map(n => html`<button type="button" key=${n} role="radio" aria-checked=${who === n} onClick=${() => setWho(n)}>${n}</button>`)}</div>
   <label class="check-ppl-h">시간<select aria-label="같이 한 사람 시간" value=${String(h)} onChange=${e => setH(Number(e.target.value))}>${HOUR_OPTS.map(o => html`<option value=${String(o)}>${o ? fmtH(o) : '나중에'}</option>`)}</select></label>
@@ -1836,15 +1846,30 @@ function CheckNoteLine({note, onClick}) {
  return onClick ? html`<button type="button" class="check-note-line" title="특이사항 · 눌러서 고치기" onClick=${onClick}>${body}</button>` : html`<p class="check-note-line" title="특이사항">${body}</p>`;
 }
 function Checklist({item, editable, busy, onAct, compact = false}) {
+ // 좁은 목록(11-09): 이름 칸이 180px보다 좁아질 줄이 하나라도 있으면 2줄 배치. 칸들(실무자 · 날짜 · % · 시간 · 버튼)은 두 배치에서 폭이 같아 오가지 않는다.
+ const boxRef = useRef(null), [narrow, setNarrow] = useState(false);
+ const fitRows = () => {
+  const el = boxRef.current; if (!el) return;
+  const skip = ['check-text', 'check-edit', 'check-br', 'check-note-line', 'check-note-edit', 'check-ppl', 'check-ppl-edit'];
+  let need = 0, w = 0;
+  el.querySelectorAll('.check-list > li').forEach(li => { w = li.clientWidth; let m = 0, n = 0; [...li.children].forEach(ch => { if (skip.some(k => ch.classList.contains(k))) return; const cs = getComputedStyle(ch); if (cs.display === 'none' || cs.position === 'absolute') return; m += ch.getBoundingClientRect().width; n++; }); need = Math.max(need, m + (n + 1) * 6 + 180); });
+  setNarrow(w > 0 && w < need);
+ };
+ useLayoutEffect(fitRows);
+ useEffect(() => {
+  const el = boxRef.current; if (!el || typeof ResizeObserver === 'undefined') return;
+  let lastW = el.clientWidth, raf = 0;
+  const ro = new ResizeObserver(() => { const w = el.clientWidth; if (w === lastW) return; lastW = w; cancelAnimationFrame(raf); raf = requestAnimationFrame(fitRows); });
+  ro.observe(el); return () => { ro.disconnect(); cancelAnimationFrame(raf); };
+ }, []);
  const [noteFor, setNoteFor] = useState(null), [addFor, setAddFor] = useState(null), tSum = hoursOf(item), showT = (editable && !!tlViewer()) || tSum > 0, showN = editable || (item.checklist || []).some(c => c.note);
- // 사람별 시간 줄의 오른쪽 여백 = 줄에서 시간 칸 뒤에 오는 칸들(같이 한 사람 · 특이사항 · 삭제) 폭 → 시간이 위 칸과 한 줄로.
- const trail = (editable ? 32 : 0) + (showN ? (editable ? 32 : 28) : 0), trailD = trail + (editable ? 32 : 0);
+ // 사람별 시간 줄(11-09 고침, 사용자 '이름과 시간이 너무 떨어져 있다'): '↳ 이름 [시간]'으로 붙여 둔다.
  const timeOf = c => {
   if (!showT) return {cell: '', add: '', extra: ''};
   const tv = checkTimeView(c), setTotal = (n, h) => onAct(item, {type: 'ttotal', cid: c.id, name: n, total: h, today: today()});
   const cell = tv.solo ? html`<${HourSelect} value=${tv.by[tv.solo] || 0} ro=${!(editable && tlCanEdit(tv.solo))} disabled=${busy} label=${`작업 시간: ${c.text} · ${tv.solo}`} tip=${`${tv.solo} · 이 세부 업무에 쓴 시간 합계(업무보고에 날마다 적은 시간이 더해져요)`} onChange=${h => setTotal(tv.solo, h)} />` : html`<${HourSelect} ro=${true} sum=${true} value=${tv.total} tip=${`사람별 합계 · ${hoursText(tv.by)}`} />`;
   const add = !editable ? '' : tv.cand.length ? html`<button type="button" class=${cx('check-ppl-add', addFor === c.id && 'open')} aria-label=${`같이 한 사람 추가: ${c.text}`} aria-expanded=${addFor === c.id} title="같이 한 사람 추가 · 사람마다 시간" disabled=${busy} onClick=${() => setAddFor(v => (v === c.id ? null : c.id))}>${I('UserPlus', 14)}</button>` : html`<span class="check-ppl-add ph" aria-hidden="true"></span>`;
-  const rows = tv.ppl.length >= 2 ? html`<div class="check-ppl" style=${`--tr:${trailD}px;--trm:${trail}px`}>${tv.ppl.map(n => html`<div class="check-ppl-row" key=${n}>${I('CornerDownRight', 12)}<span class="check-ppl-name">${n}</span><${HourSelect} value=${tv.by[n] || 0} ro=${!(editable && tlCanEdit(n))} disabled=${busy} label=${`작업 시간: ${c.text} · ${n}`} tip=${`${n} · 이 세부 업무에 쓴 시간 합계`} onChange=${h => setTotal(n, h)} /></div>`)}</div>` : '';
+  const rows = tv.ppl.length >= 2 ? html`<div class="check-ppl">${tv.ppl.map(n => html`<div class="check-ppl-row" key=${n}>${I('CornerDownRight', 12)}<span class="check-ppl-name">${n}</span><${HourSelect} value=${tv.by[n] || 0} ro=${!(editable && tlCanEdit(n))} disabled=${busy} label=${`작업 시간: ${c.text} · ${n}`} tip=${`${n} · 이 세부 업무에 쓴 시간 합계`} onChange=${h => setTotal(n, h)} />${editable && tlCanEdit(n) ? html`<button type="button" class="check-ppl-del" aria-label=${`빼기: ${n} · ${c.text}`} title="잘못 넣었으면 빼기(실무자 · 시간 같이)" disabled=${busy} onClick=${() => { const h = tv.by[n] || 0; if (h > 0 && !window.confirm(`${n}님을 이 세부 업무에서 뺄까요? 적힌 시간 ${fmtH(h)}도 같이 지워져요.`)) return; onAct(item, {type: 'tdel', cid: c.id, name: n}); }}>${I('X', 12)}</button>` : ''}</div>`)}</div>` : '';
   const ed = editable && addFor === c.id && tv.cand.length ? html`<${CheckPplAdd} c=${c} cand=${tv.cand} busy=${busy} onClose=${() => setAddFor(null)} onAdd=${(n, h) => { setAddFor(null); if (h > 0) setTotal(n, h); else onAct(item, {type: 'by', cid: c.id, by: [...String(c.by || '').split('·').map(s => s.trim()).filter(Boolean), n].join('·')}); }} />` : '';
   return {cell, add, extra: html`${rows}${ed}`, has: !!(rows || ed)};
  };
@@ -1855,7 +1880,7 @@ function Checklist({item, editable, busy, onAct, compact = false}) {
  const onPaste = async e => { const raw = (e.clipboardData && e.clipboardData.getData('text')) || ''; if (!/\n/.test(raw.trim())) return; e.preventDefault(); const t = bodyToChecks(raw); if (t.length && !busy) { await onAct(item, {type: 'add', texts: t}); setText(''); } };
  const lines = !compact && editable && !st.total ? bodyToChecks(item.body) : [];
  async function add(e) { e.preventDefault(); const t = text.split('\n').map(x => x.trim()).filter(Boolean); if (!t.length || busy) return; await onAct(item, {type: 'add', texts: t}); setText(''); }
- return html`<section class=${cx('checklist', compact && 'compact')}>
+ return html`<section class=${cx('checklist', compact && 'compact', narrow && 'narrow')} ref=${boxRef}>
   ${!compact && html`<div class="checklist-head"><strong>${I('ListChecks', 15)}세부 업무</strong>${st.total ? html`<span class="check-count">${st.done}/${st.total}</span><span class="check-bar"><i style=${`width:${st.pct}%`}></i></span><b>${st.pct}%</b>${tSum > 0 ? html`<span class="check-sum-t" title=${`작업 시간 합계 · ${hoursText(hoursBy(item))} · 하루 8시간 기준`}>${I('Clock', 12)}${fmtH(tSum)}${tSum >= 8 ? html`<small>≈ ${tDays(tSum)}일</small>` : ''}</span>` : ''}` : html`<span class="check-hint">세부 업무를 적어 두면 체크한 만큼 진행률이 자동으로 올라가요</span>`}</div>`}
   ${lines.length >= 2 && html`<button type="button" class="check-convert" disabled=${busy} onClick=${() => onAct(item, {type: 'add', texts: lines, body: ''})}>${I('ListChecks', 14)}설명 ${lines.length}줄을 세부 업무로 옮기기</button>`}
   ${st.total > 0 && html`<ul class="check-list" data-sort-list>${item.checklist.map(c => html`<li key=${c.id} data-sort-id=${c.id} class=${cx(c.done && 'done', editing && editing.id === c.id && 'editing', (c.note || (editable && noteFor === c.id) || timeOf(c).has) && 'has-note', editable && st.total > 1 && 'grip')}>${editable && st.total > 1 && html`<${SortGrip} id=${c.id} label="끌어서 순서 바꾸기" onDrop=${order => onAct(item, {type: 'reorder', ids: order})} />`}<label class="check-tick"><input type="checkbox" checked=${c.done} disabled=${!editable || busy} onChange=${e => onAct(item, {type: 'toggle', cid: c.id, done: e.target.checked})} /><span class="check-box">${I('Check', 12)}</span></label>${editing && editing.id === c.id ? html`<input class="check-edit" maxLength="200" aria-label="세부 업무 이름 고치기" ref=${editRef} onKeyDown=${e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); commitEdit(); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setEditing(null); } }} onBlur=${commitEdit} />` : editable ? html`<button type="button" class="check-text editable" title="눌러서 이름 고치기" disabled=${busy} onClick=${() => setEditing({id: c.id})}>${c.text}</button>` : html`<span class="check-text">${c.text}</span>`}<i class="check-br" aria-hidden="true"></i>${!(editing && editing.id === c.id) && html`<${CheckTag} c=${c} />`}${editable ? html`<${CheckWho} c=${c} busy=${busy} onSet=${by => onAct(item, {type: 'by', cid: c.id, by})} />` : cSeenName(c.by) ? html`<small class="check-by">${cSeenName(c.by)}</small>` : ''}${c.at ? html`<small class="check-date" title=${fullTime(c.at)}>${shortDate(inSeoul(c.at))}</small>` : ''}${editable ? html`<label class=${cx('check-pct', c.pct > 0 && !c.done && 'mid', c.done && 'full')} title="이 세부 업무의 진행률"><span class="check-pct-bar"><i style=${`width:${c.pct}%`}></i></span><select aria-label=${`진행률: ${c.text}`} value=${String(c.pct)} disabled=${busy} onChange=${e => onAct(item, {type: 'pct', cid: c.id, pct: Number(e.target.value)})}>${[...new Set([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, c.pct])].sort((a, b) => a - b).map(v => html`<option value=${String(v)}>${v}%</option>`)}</select></label>` : html`<span class=${cx('check-pct', c.pct > 0 && !c.done && 'mid', c.done && 'full')}><span class="check-pct-bar"><i style=${`width:${c.pct}%`}></i></span><b>${c.pct}%</b></span>`}${timeOf(c).cell}${timeOf(c).add}${showN ? html`<${CheckNoteBtn} c=${c} editable=${editable} busy=${busy} open=${noteFor === c.id} onNote=${() => setNoteFor(v => (v === c.id ? null : c.id))} />` : ''}${editable && html`<button type="button" class="check-remove" title="세부 업무 삭제" aria-label=${`세부 업무 삭제: ${c.text}`} disabled=${busy} onClick=${() => onAct(item, {type: 'remove', cid: c.id})}>${I('X', 13)}</button>`}${timeOf(c).extra}${editable && noteFor === c.id ? html`<${CheckNote} c=${c} busy=${busy} onClose=${() => setNoteFor(null)} onSave=${v => { setNoteFor(null); onAct(item, {type: 'note', cid: c.id, note: v}); }} />` : c.note ? html`<${CheckNoteLine} note=${c.note} onClick=${editable ? () => setNoteFor(c.id) : null} />` : ''}</li>`)}</ul>`}
@@ -2172,6 +2197,9 @@ function TeamBoard() {
   else if (act.type === 'pct') list = list.map(c => c.id === act.cid ? {...c, pct: act.pct, done: act.pct >= 100} : c);
   // 세부 업무 시간(11-09): 사람 · 날짜별(checkTimeAct).
   else if ((act.type === 'tlog' || act.type === 'ttotal') && act.cid) list = list.map(c => c.id === act.cid ? checkTimeAct(c, act) : c);
+  else if (act.type === 'tdel' && act.cid) list = list.map(c => c.id === act.cid ? checkPplDel(c, act.name) : c);
+  // 고르기 창에서 한 번에(11-09): {name, day, map: {cid: h}}.
+  else if (act.type === 'tlogs') list = list.map(c => (act.map[c.id] !== undefined ? checkTimeAct(c, {type: 'tlog', name: act.name, day: act.day, h: act.map[c.id]}) : c));
   else if (act.type === 'note') list = list.map(c => c.id === act.cid ? (String(act.note || '').trim() ? {...c, note: String(act.note).trim().slice(0, 300)} : (({note, ...rest}) => rest)(c)) : c);
   // 여러 세부 업무 %를 한 번에(11-05, 업무보고 고르기 창에서 넣을 때 업무마다 한 번만 저장).
   else if (act.type === 'pcts') list = list.map(c => act.map[c.id] !== undefined ? {...c, pct: act.map[c.id], done: act.map[c.id] >= 100} : c);
@@ -2187,7 +2215,7 @@ function TeamBoard() {
   const fields = {checklist: list, ...(act.body !== undefined ? {body: act.body} : {})};
   if (list.length) fields.progress = st.pct;
   const one = act.cid ? list.find(c => c.id === act.cid) : null;
-  await patch(x, fields, one && (act.type === 'tlog' || act.type === 'ttotal') ? `세부 업무 시간 · ${one.text} · ${act.name} ${fmtH(act.type === 'ttotal' ? act.total : act.h)}${act.type === 'tlog' && act.day ? ` (${shortDate(act.day)})` : ''}` : one && act.type === 'note' ? `세부 업무 특이사항 · ${one.text}` : list.length ? `세부 업무 ${st.done}/${st.total}` : '세부 업무 정리');
+  await patch(x, fields, act.type === 'tdel' && one ? `세부 업무 사람 빼기 · ${one.text} · ${act.name}` : act.type === 'tlogs' ? `세부 업무 시간 · ${act.name} ${Object.keys(act.map).length}개` : one && (act.type === 'tlog' || act.type === 'ttotal') ? `세부 업무 시간 · ${one.text} · ${act.name} ${fmtH(act.type === 'ttotal' ? act.total : act.h)}${act.type === 'tlog' && act.day ? ` (${shortDate(act.day)})` : ''}` : one && act.type === 'note' ? `세부 업무 특이사항 · ${one.text}` : list.length ? `세부 업무 ${st.done}/${st.total}` : '세부 업무 정리');
  }
  // 끌어서 바꾼 순서: 걸러 본 목록이면 그 업무들의 자리만 새 순서로 바꾸고, 전체를 1..n으로 저장(바뀐 것만).
  async function reorder(visibleIds) {
@@ -3119,9 +3147,13 @@ const wpRank = x => ({doing: 0, todo: 1, hold: 2}[x.status] ?? 3);
 function RepWork({cls, children}) {
  const ref = useRef(null), [narrow, setNarrow] = useState(false);
  const fit = () => {
-  const el = ref.current, row = el && el.querySelector('.tb-rep-row'); if (!row) return;
-  const ctl = row.querySelector('.tb-rep-ctl'), acts = row.querySelector('.tb-rep-acts');
-  setNarrow(row.clientWidth > 0 && row.clientWidth < 16 + 8 + 200 + 8 + (ctl ? ctl.offsetWidth : 0) + (acts ? 8 + acts.offsetWidth : 0));
+  const el = ref.current; if (!el) return;
+  let nr = false;
+  const row = el.querySelector('.tb-rep-row');
+  if (row) { const ctl = row.querySelector('.tb-rep-ctl'), acts = row.querySelector('.tb-rep-acts'); nr = row.clientWidth > 0 && row.clientWidth < 16 + 8 + 200 + 8 + (ctl ? ctl.offsetWidth : 0) + (acts ? 8 + acts.offsetWidth : 0); }
+  // 업무 없는 줄(11-09): 도구(업무에 잇기 · 시간 · ×) 때문에 글 칸이 160px보다 좁아지면 도구를 둘째 줄로.
+  el.querySelectorAll('.tb-rep-lines > li').forEach(li => { const tools = li.querySelector(':scope > .tb-rep-free-tools'); if (tools && li.clientWidth > 0 && li.clientWidth < 8 + 8 + 160 + 8 + tools.offsetWidth) nr = true; });
+  setNarrow(nr);
  };
  useLayoutEffect(fit);
  useEffect(() => {
@@ -3133,7 +3165,7 @@ function RepWork({cls, children}) {
  }, []);
  return html`<div class=${cx(cls, narrow && 'narrow')} ref=${ref}>${children}</div>`;
 }
-function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '', draft = '', onClose, onInsert, onAddSub, onSaveSub, onRemoveSub, onFreeLine, onCreate = null, similarOf = null, isTouched = null}) {
+function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '', draft = '', who = '', day = '', onClose, onInsert, onAddSub, onSaveSub, onRemoveSub, onFreeLine, onCreate = null, similarOf = null, isTouched = null}) {
  const hot = x => !!(isTouched && isTouched(x));
  const sortW = list => [...list].sort((a, b) => Number(hot(b)) - Number(hot(a)) || (hot(a) && hot(b) ? String(b.updated_at || '').localeCompare(String(a.updated_at || '')) : wpRank(a) - wpRank(b) || teamOrder(a, b)));
  const mine = sortW(mine0), others = sortW(others0), all = [...mine, ...others];
@@ -3165,13 +3197,15 @@ function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '
  };
  const toggleProj = x => {
   const st = pState(x); if (st.off) return;
-  setSel(m => { const n = new Map(m); if (!x.checklist.length) { if (n.has(K(x.id))) n.delete(K(x.id)); else n.set(K(x.id), {tid: x.id, cid: '', pct: x.progress || 0}); } else if (st.on) st.av.forEach(c => n.delete(K(x.id, c.id))); else st.av.forEach(c => { if (!n.has(K(x.id, c.id))) n.set(K(x.id, c.id), {tid: x.id, cid: c.id, pct: c.pct}); }); return n; });
+  setSel(m => { const n = new Map(m); if (!x.checklist.length) { if (n.has(K(x.id))) n.delete(K(x.id)); else n.set(K(x.id), {tid: x.id, cid: '', pct: x.progress || 0, h: tlDay(x.time_log, who, day)}); } else if (st.on) st.av.forEach(c => n.delete(K(x.id, c.id))); else st.av.forEach(c => { if (!n.has(K(x.id, c.id))) n.set(K(x.id, c.id), {tid: x.id, cid: c.id, pct: c.pct}); }); return n; });
   if (!st.on && x.checklist.length) setOpen(s => new Set(s).add(x.id));
  };
- const toggleSub = (x, c) => setSel(m => { const n = new Map(m), k = K(x.id, c.id); if (n.has(k)) n.delete(k); else n.set(k, {tid: x.id, cid: c.id, pct: c.pct}); return n; });
+ const toggleSub = (x, c) => setSel(m => { const n = new Map(m), k = K(x.id, c.id); if (n.has(k)) n.delete(k); else n.set(k, {tid: x.id, cid: c.id, pct: c.pct, h: tlDay(c.time_log, who, day)}); return n; });
  const setPct = (k, v) => setSel(m => { const o = m.get(k); if (!o) return m; const n = new Map(m); n.set(k, {...o, pct: v}); return n; });
+ // 오늘 시간(11-09, 사용자 '업무 보고 고르기에도 time'): 고른 줄마다 오늘 쓴 시간, 넣을 때 내 · 오늘 칸에 적는다.
+ const setH = (k, v) => setSel(m => { const o = m.get(k); if (!o) return m; const n = new Map(m); n.set(k, {...o, h: v}); return n; });
  // 넣을 것: 목록 차례대로(업무 순서 → 세부 업무 순서). 그사이 지워진 것 · 이미 넣은 것은 뺀다.
- const picks = () => { const out = []; all.forEach(x => { const used = usedOf(x.id), p = sel.get(K(x.id)); if (p && !x.checklist.length && !projIn(x.id)) out.push({x, c: null, pct: p.pct}); x.checklist.forEach(c => { const s = sel.get(K(x.id, c.id)); if (s && !used.has(c.id)) out.push({x, c, pct: s.pct}); }); }); return out; };
+ const picks = () => { const out = []; all.forEach(x => { const used = usedOf(x.id), p = sel.get(K(x.id)); if (p && !x.checklist.length && !projIn(x.id)) out.push({x, c: null, pct: p.pct, h: p.h || 0}); x.checklist.forEach(c => { const s = sel.get(K(x.id, c.id)); if (s && !used.has(c.id)) out.push({x, c, pct: s.pct, h: s.h || 0}); }); }); return out; };
  const n = picks().length;
  async function insert() { const list = picks(); if (!list.length || busyAll) return; setSaving(true); try { await onInsert(list); setSel(new Map()); onClose(); } catch {} finally { setSaving(false); } }
  const close = () => { if (n && !confirm(`고른 ${n}개를 오늘 보고에 넣지 않고 닫을까요?`)) return; onClose(); };
@@ -3200,6 +3234,8 @@ function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '
  const pctOpts = v => [...new Set([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, v])].sort((a, b) => a - b);
  const tone = v => cx(v > 0 && v < 100 && 'mid', v >= 100 && 'full');
  const pctRO = v => html`<span class=${cx('check-pct wp-pct', tone(v))}><span class="check-pct-bar"><i style=${`width:${v}%`}></i></span><b>${v}%</b></span>`;
+ const timeSel = (v, set, label) => html`<${HourSelect} value=${v || 0} opts=${DAY_HOURS} label=${label} tip="오늘 이 일에 쓴 시간 · 넣을 때 내 오늘 시간으로 적혀요" disabled=${busyAll} onChange=${set} />`;
+ const timeRO = v => (v > 0 ? html`<span class="check-time ro set wp-time" title="오늘 적은 내 시간">${I('Clock', 12)}<b>${fmtH(v)}</b></span>` : html`<span class="check-time ro wp-time"></span>`);
  const pctSel = (v, set, label) => html`<label class=${cx('check-pct wp-pct on', tone(v))} title="오늘 진행률 · 넣을 때 업무에도 반영돼요"><span class="check-pct-bar"><i style=${`width:${v}%`}></i></span><select aria-label=${label} value=${String(v)} disabled=${busyAll} onChange=${e => set(Number(e.target.value))}>${pctOpts(v).map(o => html`<option key=${o} value=${String(o)}>${o}%</option>`)}</select></label>`;
  const editRow = (x, c) => html`<li key=${'e' + c.id} class="wp-sub editing"><form class="wp-edit" onSubmit=${e => save(e, x, c)}>
    <input class="wp-edit-text" aria-label="세부 업무 이름" maxLength="200" value=${edit.text} ref=${focusOnMount} onInput=${e => { const v = e.target.value; setEdit(o => o && {...o, text: v}); }} onKeyDown=${e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setEdit(null); } }} />
@@ -3212,6 +3248,7 @@ function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '
   return html`<li key=${c.id} class=${cx('wp-sub', on && 'on', used && 'used')}>
    <label class="check-tick wp-sub-main" title=${used ? '오늘 보고에 이미 넣었어요 · 빼려면 보고에서 ×' : on ? '눌러서 빼기' : '오늘 한 일로 고르기'}><input type="checkbox" data-nav aria-label=${c.text} checked=${used || on} disabled=${used || busyAll} onChange=${() => toggleSub(x, c)} /><span class="check-box">${I('Check', 12)}</span><span class="wp-sub-text">${c.text}</span><${CheckTag} c=${c} />${used ? html`<span class="wp-in">보고에 있음</span>` : ''}</label>
    ${cSeenName(c.by) ? html`<small class="check-by">${cSeenName(c.by)}</small>` : ''}
+   ${on ? timeSel(s.h, v => setH(k, v), `오늘 시간: ${c.text}`) : timeRO(tlDay(c.time_log, who, day))}
    ${on ? pctSel(s.pct, v => setPct(k, v), `오늘 진행률: ${c.text}`) : pctRO(c.pct)}
    <button type="button" class="wp-pen" aria-label=${`고치기: ${c.text}`} title="이름 · % 고치기 · 지우기" disabled=${busyAll} onClick=${() => setEdit({tid: x.id, id: c.id, text: c.text, pct: c.pct})}>${I('Pencil', 13)}</button>
   </li>`;
@@ -3224,6 +3261,7 @@ function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '
     <label class=${cx('check-tick wp-ptick', st.mixed && 'mixed', st.off && 'off')} title=${solo ? (st.off ? '오늘 보고에 이미 넣었어요' : '세부 업무 없이 이 업무로 고르기') : st.off ? '남은 세부 업무가 없어요' : '이 업무의 세부 업무 모두 고르기'}><input type="checkbox" aria-label=${`${x.title} · ${solo ? '업무로 고르기' : '세부 업무 모두 고르기'}`} checked=${st.on || (solo && st.off)} indeterminate=${st.mixed} disabled=${st.off || busyAll} onChange=${() => toggleProj(x)} /><span class="check-box">${I(st.mixed ? 'Minus' : 'Check', 12)}</span></label>
     <button type="button" class="wp-proj-btn" data-nav aria-expanded=${exp} title=${qq ? x.title : exp ? '접기' : '펼쳐서 세부 업무 보기'} onClick=${() => { if (!qq) flip(x.id); }}>${I('ChevronRight', 15)}<span class="wp-proj-main"><span class="wp-proj-title"><span class="wp-proj-name">${x.title}</span>${teamFresh(x) ? html`<${TeamNewTag} x=${x} />` : ''}${teamDelayed(x) ? html`<${TeamLateTag} x=${x} />` : ''}</span><span class="wp-proj-meta"><span>${meta}</span>${hot(x) ? html`<span class="wp-today" title=${`오늘 ${teamClock(x.updated_at)}에 내가 바꾼 업무`}>오늘 손댐</span>` : ''}${inRep ? html`<span class="wp-in">보고에 있음</span>` : ''}</span></span></button>
     <span class=${cx('wp-count', solo && 'none')} title=${solo ? '세부 업무가 없어요' : '끝낸 세부 업무 / 전체'}>${solo ? '세부 없음' : `세부 ${cs.done}/${cs.total}`}</span>
+    ${ps ? timeSel(ps.h, v => setH(K(x.id), v), `오늘 시간: ${x.title}`) : solo ? timeRO(tlDay(x.time_log, who, day)) : html`<span class="check-time ro wp-time"></span>`}
     ${ps ? pctSel(ps.pct, v => setPct(K(x.id), v), `오늘 진행률: ${x.title}`) : pctRO(x.progress || 0)}
    </div>
    ${exp && html`<ul class="wp-subs">
@@ -3377,6 +3415,10 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
   for (const p of list) if (p.c && p.c.pct !== p.pct) { const g = byTask.get(p.x.id) || {x: p.x, map: {}}; g.map[p.c.id] = p.pct; byTask.set(p.x.id, g); }
   for (const g of byTask.values()) await onCheck(g.x, {type: 'pcts', map: g.map});
   for (const p of list) if (!p.c && onProgress && !p.x.checklist.length && (p.x.progress || 0) !== p.pct) await onProgress(p.x, p.pct);
+  const tByTask = new Map();
+  for (const p of list) if (p.c && (p.h || 0) !== tlDay(p.c.time_log, me.name, day)) { const g = tByTask.get(p.x.id) || {x: p.x, map: {}}; g.map[p.c.id] = p.h || 0; tByTask.set(p.x.id, g); }
+  for (const g of tByTask.values()) await onCheck(g.x, {type: 'tlogs', name: me.name, day, map: g.map});
+  for (const p of list) if (!p.c && (p.h || 0) !== tlDay(p.x.time_log, me.name, day)) await onCheck(p.x, {type: 'tlog', name: me.name, day, h: p.h || 0});
   await onAct(day, cur => {
    const has = p => cur.lines.some(l => l.task_id === p.x.id && (p.c ? l.check_id === p.c.id : !l.check_id));
    const add = list.filter(p => !has(p)).map(p => (p.c ? {id: newCheckId(), text: p.c.text, task_id: p.x.id, task_title: p.x.title, check_id: p.c.id, pct: p.pct} : {...projOnly(p.x), pct: p.pct}));
@@ -3504,7 +3546,7 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
    <div class="tb-rep-comments"><div class="tb-sub"><span>댓글 ${cs.length || ''}</span></div><${TeamCommentList} cs=${cs} me=${me} busy=${busy} onMark=${onMark} onEdit=${onEditComment} onDelete=${onDeleteComment} />${onComment && html`<${ReplyForm} key=${rid} busy=${busy} label=${`${s.name} 업무보고 댓글`} placeholder=${isMe ? '덧붙일 말 · Shift+Enter 줄바꿈' : viewOnly && me.name !== ADMIN_NAME ? '이현성에게 남길 말 · 디자인팀에는 안 보여요' : `${s.name}님에게 댓글 · Shift+Enter 줄바꿈`} onSend=${t => onComment({id: rid}, t)} />`}</div>
   </article>`; })}</div>
   ${!people.some(s => { const r = repOf(s.key), rid = r ? r.id : `C-rep-${s.key}-${day}`; return (!viewOnly && s.key === me.id) || !!r || s.name !== ADMIN_NAME || comments.some(c => c.item_id === rid); }) && html`<p class="tb-none pad tb-rep-none">디자인팀 업무보고는 이현성만 볼 수 있어요.</p>`}
-  ${wp && !viewOnly && onCheck && html`<${WorkPick} mine=${mineT} others=${otherT} usedOf=${usedIn} projIn=${projIn} busy=${busy} focus=${wp.focus} draft=${wp.draft} onClose=${() => setWp(null)} onInsert=${insertPicks} onAddSub=${addSubTo} onSaveSub=${saveSubOf} onRemoveSub=${removeSubOf} onFreeLine=${addFreeLine} onCreate=${onCreate ? addTask : null} similarOf=${similar} isTouched=${touched} />`}
+  ${wp && !viewOnly && onCheck && html`<${WorkPick} mine=${mineT} others=${otherT} usedOf=${usedIn} projIn=${projIn} busy=${busy} focus=${wp.focus} draft=${wp.draft} who=${me.name} day=${day} onClose=${() => setWp(null)} onInsert=${insertPicks} onAddSub=${addSubTo} onSaveSub=${saveSubOf} onRemoveSub=${removeSubOf} onFreeLine=${addFreeLine} onCreate=${onCreate ? addTask : null} similarOf=${similar} isTouched=${touched} />`}
  </section>`;
 }
 

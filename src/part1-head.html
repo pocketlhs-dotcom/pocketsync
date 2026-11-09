@@ -2177,7 +2177,7 @@ a[data-hl-word]{background:#ffe680;color:#1d2a44;border-radius:2px;box-shadow:0 
 .check-time select:focus-visible{outline:2px solid #9bb2fd;border-radius:4px}
 .check-time.ro{cursor:default}.check-time.ro:hover{background:transparent}
 .check-time.ro b{font-size:13px;font-weight:600;color:#3f4f6b}
-.check-list .check-time{flex:0 0 auto;min-height:0;gap:3px;width:60px;box-sizing:border-box}
+.check-list .check-time{flex:0 0 auto;min-height:0;gap:3px;width:76px;box-sizing:border-box}
 .check-note-btn{display:inline-grid;place-items:center;flex:0 0 auto;width:26px;height:26px;padding:0;border:0;border-radius:6px;background:transparent;color:#c3cddc;cursor:pointer}
 .check-note-btn:hover:not(:disabled){background:#e9effa;color:#4f78e8}
 .check-note-btn.on{color:#d1603f}
@@ -2209,13 +2209,21 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .check-note-row .text-button{flex:none;font-size:12.5px;color:#a0a6b8}
 .check-br{display:none}
 /* 모바일: 1줄 = 체크 · 이름 · 삭제, 2줄 = 실무자 · 날짜 · % · 시간 · 특이사항(오른쪽 정렬), 3줄 = 특이사항 */
-@media(max-width:640px){.check-note-row{flex-wrap:wrap}.check-note-row input{flex-basis:100%}.check-note-top small{flex-basis:100%}
+@media(max-width:640px){.check-note-row{flex-wrap:wrap}.check-note-row input{flex-basis:100%}.check-note-top small{flex-basis:100%}}
+/* 좁은 세부 업무 목록(11-09, 사용자 '조정 간에 틀어진 것 확인'): 화면 폭이 아니라 목록 폭으로 — 옆 창 상세처럼 좁으면 이름 칸이 눌리지 않게 2줄로(Checklist가 재서 .narrow). 모바일은 늘 2줄. */
+.checklist.narrow .check-list>li{flex-wrap:wrap;justify-content:flex-end}
+.checklist.narrow .check-list>li>.check-text,.checklist.narrow .check-list>li>.check-edit{flex:1 1 0;min-width:0}
+.checklist.narrow .check-list>li>.check-remove{order:1}
+.checklist.narrow .check-list>li>.check-br{display:block;order:2;flex:0 0 100%;height:0}
+.checklist.narrow .check-list>li>.ck-tag,.checklist.narrow .check-list>li>.check-who,.checklist.narrow .check-list>li>.check-by,.checklist.narrow .check-list>li>.check-date,.checklist.narrow .check-list>li>.check-pct,.checklist.narrow .check-list>li>.check-time,.checklist.narrow .check-list>li>.check-ppl-add,.checklist.narrow .check-list>li>.check-note-btn{order:3}
+.checklist.narrow .check-list>li>.check-note-line,.checklist.narrow .check-list>li>.check-note-edit,.checklist.narrow .check-list>li>.check-ppl,.checklist.narrow .check-list>li>.check-ppl-edit{order:4}
+@media(max-width:640px){
  .check-list>li{flex-wrap:wrap;justify-content:flex-end}
  .check-list>li>.check-text,.check-list>li>.check-edit{flex:1 1 0;min-width:0}
  .check-list>li>.check-remove{order:1}
  .check-list>li>.check-br{display:block;order:2;flex:0 0 100%;height:0}
- .check-list>li>.ck-tag,.check-list>li>.check-who,.check-list>li>.check-by,.check-list>li>.check-date,.check-list>li>.check-pct,.check-list>li>.check-time,.check-list>li>.check-note-btn{order:3}
- .check-list>li>.check-note-line,.check-list>li>.check-note-edit{order:4}
+ .check-list>li>.ck-tag,.check-list>li>.check-who,.check-list>li>.check-by,.check-list>li>.check-date,.check-list>li>.check-pct,.check-list>li>.check-time,.check-list>li>.check-ppl-add,.check-list>li>.check-note-btn{order:3}
+ .check-list>li>.check-note-line,.check-list>li>.check-note-edit,.check-list>li>.check-ppl,.check-list>li>.check-ppl-edit{order:4}
 }
 /* 업무보고 줄 맞춤(11-05, 사용자 '삐뚤빼뚤한 거 맞춰 줘'): 머리 줄 · 세부 업무 줄이 같은 칸 */
 .tb-rep-proj .tb-rep-subs{padding:0}
@@ -2246,7 +2254,7 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 @media(max-width:640px){
  .tb-rep-proj .tb-rep-pct.none{width:36px}
  .tb-rep-work.me .tb-rep-proj .tb-rep-pct.none{width:76px}
- .tb-rep-tn .check-time{width:36px}.tb-rep-tn .check-time.ro>svg{display:none}
+ .tb-rep-tn .check-time{width:36px}.tb-rep-work:not(.me) .tb-rep-tn .check-time.ro>svg{display:none}
 }
 /* 좁은 카드(RepWork가 카드 폭을 재서 narrow): 1줄 = 이름(· 내 카드 버튼), 2줄 = 시간 · 특이사항 · % */
 .tb-rep-work.narrow .tb-rep-proj .tb-rep-row{grid-template-columns:16px minmax(0,1fr);row-gap:4px}
@@ -2275,11 +2283,11 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .check-ppl-add:hover:not(:disabled){background:#e9effa;color:#4f78e8}
 .check-ppl-add.open{background:#e9effa;color:#315df8}
 .check-ppl-add.ph{cursor:default}
-.check-ppl{flex:0 0 auto;width:calc(100% - 36px);margin:-2px 0 4px 36px;padding-right:var(--tr,0px);box-sizing:border-box;display:flex;flex-direction:column;gap:0}
+.check-ppl{flex:0 0 auto;width:calc(100% - 36px);margin:0 0 6px 36px;box-sizing:border-box;display:flex;flex-direction:column;gap:4px}
 .check-ppl-row{display:flex;align-items:center;gap:6px;min-height:28px;font-size:12.5px;color:#7d8ca6}
 .check-ppl-row>svg{color:#b6c1d2;flex:none}
 .check-ppl-name{font-weight:600;color:#5d6b86}
-.check-ppl-row>.check-time{margin-left:auto}
+.check-ppl-name{min-width:44px}
 .check-ppl-edit{flex:0 0 auto;width:calc(100% - 36px);box-sizing:border-box;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin:2px 0 8px 36px;padding:10px 12px;border:1px solid #e4e8f2;border-radius:7px;background:#fff;box-shadow:0 2px 8px rgba(17,34,85,.05)}
 .check-ppl-edit>b{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:#3a4b66}
 .check-ppl-edit>b>svg{color:#4f78e8}
@@ -2290,7 +2298,7 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .check-ppl-h select{height:28px;border:1px solid #dfe3ef;border-radius:6px;padding:0 8px;font-size:12.5px;background:#fff;color:#1d2a44}
 .check-ppl-acts{display:inline-flex;gap:6px;margin-left:auto}
 .check-ppl-acts .primary-button.small,.check-ppl-acts .secondary-button.small{min-height:30px;height:30px;padding:0 12px;font-size:12.5px}
-@media(max-width:640px){.check-ppl{padding-right:var(--trm,0px)}.check-list>li>.check-ppl-add{order:3}.check-ppl-edit,.check-ppl{margin-left:4px;width:calc(100% - 4px)}.check-ppl-acts{margin-left:0}}
+@media(max-width:640px){.check-list>li>.check-ppl-add{order:3}.check-ppl-edit,.check-ppl{margin-left:4px;width:calc(100% - 4px)}.check-ppl-acts{margin-left:0}}
 /* 업무보고: 이날 쓴 시간 합계 · 업무 없는 줄 시간 */
 .tb-sub{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .tb-rep-dayh{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#3f4f6b}
@@ -2319,4 +2327,56 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .kpi-proj-h em.none{margin:0}
 .kpi-proj-list small{grid-column:1/-1;font-size:12px;color:#7d8ca6}
 .kpi-proj-empty{margin:0;font-size:12.5px;color:#a0a6b8}
+
+/* 시간 버튼(11-09, 사용자 '[time] 버튼화 · 가시성 · 엣지 있게'): 테두리 버튼 + 시계 + 값 + ▾, 적힌 값이 있으면 파랑 */
+.check-time.btn{position:relative;display:inline-flex;align-items:center;gap:4px;height:26px;min-width:76px;padding:0 6px 0 7px;border:1px solid #d9e0ee;border-radius:3px;background:#fff;color:#8a97ad;font-size:12.5px;font-weight:700;cursor:pointer;box-shadow:0 1px 1px rgba(17,34,85,.04);box-sizing:border-box;transition:border-color .12s,background .12s,color .12s}
+.check-time.btn>svg:first-child{flex:none;color:#9fb0c8}
+.check-time.btn>svg:last-of-type{flex:none;margin-left:auto;color:#a6b2c6}
+.check-time.btn b{font-weight:800;color:inherit}
+.check-time.btn .ph{font-weight:600;color:#a6b2c6}
+.check-time.btn:hover{border-color:#a9bcf6;background:#f7f9ff}
+.check-time.btn:hover .ph,.check-time.btn:hover>svg{color:#315df8}
+.check-time.btn.set{border-color:#b9c9fa;background:#eef3ff;color:#2f56e8}
+.check-time.btn.set>svg{color:#4f78e8}
+.check-time.btn:focus-within{outline:2px solid #9bb2fd;outline-offset:1px}
+.check-time.btn.off{opacity:.55;cursor:default}
+.check-time.btn select{position:absolute;inset:0;width:100%!important;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer;font-size:16px}
+.check-time.btn select:disabled{cursor:default}
+.check-list .check-time.ro{padding-left:8px}
+.check-list .check-time.ro.sum{height:26px;border-radius:3px;background:#f1f4f9;padding:0 8px}
+.check-list .check-time.ro.sum b{color:#1d2a44}
+.check-ppl-row{min-height:30px}
+.check-ppl-row>.check-time{flex:none}
+/* 업무보고 시간 Pick: 시계 아이콘 + 값 있으면 파랑 */
+.check-time.pick .pk-btn>svg:first-child{flex:none;color:#9fb0c8;margin-right:-1px}
+.check-time.pick.set .pk-btn{border-color:#b9c9fa;background:#eef3ff}
+.check-time.pick.set .pk-btn .pk-label{color:#2f56e8}
+.check-time.pick.set .pk-btn>svg{color:#4f78e8}
+.check-time.pick .pk-btn{gap:4px;padding:0 6px 0 8px}
+.tb-rep-tn .check-time.pick .pk{width:86px}
+.tb-rep-work.me .tb-rep-tn .check-time{width:86px}
+.tb-rep-work.me .tb-rep-tn .check-time.ro{padding-left:9px}
+.tb-rep-free-tools .check-time.pick .pk{width:86px}
+/* 고르기 창: 고른 줄의 오늘 시간 */
+.wp-time{width:76px;flex:none;box-sizing:border-box;justify-content:flex-start;padding-left:8px;font-size:12.5px}
+.wp-time b{font-weight:700;color:#3f4f6b}
+.wp-sub .check-time.btn,.wp-proj-head .check-time.btn{flex:none}
+@media(max-width:640px){.check-time.btn{min-width:66px}.check-time.btn>svg:last-of-type{display:none}.check-list .check-time{width:66px}.wp-time{width:66px}}
+
+/* 사람 빼기(11-09): 사람별 줄 끝 작은 × */
+.check-ppl-del{display:inline-grid;place-items:center;width:22px;height:22px;padding:0;border:0;border-radius:3px;background:transparent;color:#b6c1d2;cursor:pointer}
+.check-ppl-del:hover:not(:disabled){background:#fbefea;color:#c0453a}
+
+/* 창 칸 폭(11-09 점검): 줄임표로 자르는 긴 글(링크 주소 등)이 창 폭을 넓히지 않게 — 모바일 '자세히 보기'에서 세부 업무 · 링크가 오른쪽으로 잘리던 것 */
+.dialog{grid-template-columns:minmax(0,1fr)}
+/* 좁은 카드 업무 없는 줄: 도구를 둘째 줄로 */
+.tb-rep-work.narrow .tb-rep-lines li{grid-template-columns:8px minmax(0,1fr);row-gap:4px}
+.tb-rep-work.narrow .tb-rep-lines li>.tb-rep-free-tools{grid-column:2;justify-self:start}
+
+/* 완료 줄 작업 기록 칩(11-09 점검): 좁으면 잘리지 않고 줄바꿈(모바일에서 '실제 작업 n일'이 잘리던 것) */
+.tb-wd{white-space:normal;flex-wrap:wrap;row-gap:1px;height:auto!important;min-height:26px;padding-top:3px!important;padding-bottom:3px!important;text-align:left;overflow:visible}
+.tb-wd>span,.tb-wd>b,.tb-wd>em{white-space:nowrap}
+
+/* 모바일 세부 업무 둘째 줄(11-09 점검): 실무자 여러 명 · 시간 칸까지 한 줄에 들어가게 만든 날짜와 % 막대는 숨김(% 숫자는 그대로) */
+@media(max-width:640px){.check-list>li>.check-date{display:none}.check-list>li>.check-pct .check-pct-bar{display:none}}
 </style>

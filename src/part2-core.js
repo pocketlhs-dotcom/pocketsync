@@ -410,7 +410,7 @@ function ToggleGroup({class: cls = '', value, onChange, items, label}) {
 // 앱 모양 드롭다운(기본 select 대신): 버튼을 누르면 아래(자리가 없으면 위)로 목록이 열리고, 위 · 아래 화살표 · Enter · Esc로도 고른다.
 // options: [{value, label, meta?, pct?, group?, action?, blank?}] — group이 바뀌는 곳에 묶음 이름, action은 맨 아래에 줄을 나눠 따로(예: 직접 적기), blank는 골라도 버튼에 안내 문구를 둔다.
 // grid: % 고르기처럼 칩 격자. size 'sm': 작은 버튼.
-function Pick({value, options, onChange, label, placeholder = '고르기', disabled = false, class: cls = '', grid = false, size = ''}) {
+function Pick({value, options, onChange, label, placeholder = '고르기', disabled = false, class: cls = '', grid = false, size = '', icon = ''}) {
  const [open, setOpen] = useState(false), [up, setUp] = useState(false), [right, setRight] = useState(false), [act, setAct] = useState(-1);
  const wrap = useRef(null), btn = useRef(null), list = useRef(null);
  const sel = options.find(o => !o.action && !o.blank && o.value === value);
@@ -436,7 +436,7 @@ function Pick({value, options, onChange, label, placeholder = '고르기', disab
   body.push(html`<button type="button" role="option" key=${'o' + i} data-i=${i} tabIndex="-1" aria-selected=${on} class=${cx('pk-opt', o.action && 'act', on && 'on', act === i && 'hl', has(o.pct) && o.pct >= 100 && 'full')} onMouseEnter=${() => setAct(i)} onClick=${() => choose(o)}>${grid ? o.label : html`<span class="pk-check">${on ? I('Check', 14) : o.icon ? I(o.icon, 14) : o.action ? I('Plus', 14) : ''}</span><span class="pk-main"><span class="pk-label">${o.label}</span>${o.meta ? html`<span class="pk-meta">${o.meta}</span>` : ''}</span>${has(o.pct) ? html`<span class="pk-pct"><span class="pk-bar"><i style=${`width:${o.pct}%`}></i></span><b>${o.pct}%</b></span>` : ''}`}</button>`);
  });
  return html`<div class=${cx('pk', cls, size && 'pk-' + size, open && 'open')} ref=${wrap}>
-  <button type="button" ref=${btn} class="pk-btn" aria-haspopup="listbox" aria-expanded=${open} aria-label=${label} disabled=${disabled} onClick=${() => (open ? setOpen(false) : show())} onKeyDown=${key}><span class="pk-val">${sel ? html`<span class="pk-label">${sel.label}</span>${sel.meta && !grid ? html`<span class="pk-meta">${sel.meta}</span>` : ''}` : html`<span class="pk-ph">${placeholder}</span>`}</span>${I('ChevronDown', 15)}</button>
+  <button type="button" ref=${btn} class="pk-btn" aria-haspopup="listbox" aria-expanded=${open} aria-label=${label} disabled=${disabled} onClick=${() => (open ? setOpen(false) : show())} onKeyDown=${key}>${icon ? I(icon, 12) : ''}<span class="pk-val">${sel ? html`<span class="pk-label">${sel.label}</span>${sel.meta && !grid ? html`<span class="pk-meta">${sel.meta}</span>` : ''}` : html`<span class="pk-ph">${placeholder}</span>`}</span>${I('ChevronDown', 15)}</button>
   ${open && html`<div class=${cx('pk-pop', up && 'up', right && 'right', grid && 'grid')} role="listbox" aria-label=${label} ref=${list}>${body}</div>`}
  </div>`;
 }

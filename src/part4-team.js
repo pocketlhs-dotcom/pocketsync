@@ -192,6 +192,9 @@ function TeamBoard() {
   else if (act.type === 'pct') list = list.map(c => c.id === act.cid ? {...c, pct: act.pct, done: act.pct >= 100} : c);
   // 세부 업무 시간(11-09): 사람 · 날짜별(checkTimeAct).
   else if ((act.type === 'tlog' || act.type === 'ttotal') && act.cid) list = list.map(c => c.id === act.cid ? checkTimeAct(c, act) : c);
+  else if (act.type === 'tdel' && act.cid) list = list.map(c => c.id === act.cid ? checkPplDel(c, act.name) : c);
+  // 고르기 창에서 한 번에(11-09): {name, day, map: {cid: h}}.
+  else if (act.type === 'tlogs') list = list.map(c => (act.map[c.id] !== undefined ? checkTimeAct(c, {type: 'tlog', name: act.name, day: act.day, h: act.map[c.id]}) : c));
   else if (act.type === 'note') list = list.map(c => c.id === act.cid ? (String(act.note || '').trim() ? {...c, note: String(act.note).trim().slice(0, 300)} : (({note, ...rest}) => rest)(c)) : c);
   // 여러 세부 업무 %를 한 번에(11-05, 업무보고 고르기 창에서 넣을 때 업무마다 한 번만 저장).
   else if (act.type === 'pcts') list = list.map(c => act.map[c.id] !== undefined ? {...c, pct: act.map[c.id], done: act.map[c.id] >= 100} : c);
@@ -207,7 +210,7 @@ function TeamBoard() {
   const fields = {checklist: list, ...(act.body !== undefined ? {body: act.body} : {})};
   if (list.length) fields.progress = st.pct;
   const one = act.cid ? list.find(c => c.id === act.cid) : null;
-  await patch(x, fields, one && (act.type === 'tlog' || act.type === 'ttotal') ? `세부 업무 시간 · ${one.text} · ${act.name} ${fmtH(act.type === 'ttotal' ? act.total : act.h)}${act.type === 'tlog' && act.day ? ` (${shortDate(act.day)})` : ''}` : one && act.type === 'note' ? `세부 업무 특이사항 · ${one.text}` : list.length ? `세부 업무 ${st.done}/${st.total}` : '세부 업무 정리');
+  await patch(x, fields, act.type === 'tdel' && one ? `세부 업무 사람 빼기 · ${one.text} · ${act.name}` : act.type === 'tlogs' ? `세부 업무 시간 · ${act.name} ${Object.keys(act.map).length}개` : one && (act.type === 'tlog' || act.type === 'ttotal') ? `세부 업무 시간 · ${one.text} · ${act.name} ${fmtH(act.type === 'ttotal' ? act.total : act.h)}${act.type === 'tlog' && act.day ? ` (${shortDate(act.day)})` : ''}` : one && act.type === 'note' ? `세부 업무 특이사항 · ${one.text}` : list.length ? `세부 업무 ${st.done}/${st.total}` : '세부 업무 정리');
  }
  // 끌어서 바꾼 순서: 걸러 본 목록이면 그 업무들의 자리만 새 순서로 바꾸고, 전체를 1..n으로 저장(바뀐 것만).
  async function reorder(visibleIds) {
@@ -1139,9 +1142,13 @@ const wpRank = x => ({doing: 0, todo: 1, hold: 2}[x.status] ?? 3);
 function RepWork({cls, children}) {
  const ref = useRef(null), [narrow, setNarrow] = useState(false);
  const fit = () => {
-  const el = ref.current, row = el && el.querySelector('.tb-rep-row'); if (!row) return;
-  const ctl = row.querySelector('.tb-rep-ctl'), acts = row.querySelector('.tb-rep-acts');
-  setNarrow(row.clientWidth > 0 && row.clientWidth < 16 + 8 + 200 + 8 + (ctl ? ctl.offsetWidth : 0) + (acts ? 8 + acts.offsetWidth : 0));
+  const el = ref.current; if (!el) return;
+  let nr = false;
+  const row = el.querySelector('.tb-rep-row');
+  if (row) { const ctl = row.querySelector('.tb-rep-ctl'), acts = row.querySelector('.tb-rep-acts'); nr = row.clientWidth > 0 && row.clientWidth < 16 + 8 + 200 + 8 + (ctl ? ctl.offsetWidth : 0) + (acts ? 8 + acts.offsetWidth : 0); }
+  // 업무 없는 줄(11-09): 도구(업무에 잇기 · 시간 · ×) 때문에 글 칸이 160px보다 좁아지면 도구를 둘째 줄로.
+  el.querySelectorAll('.tb-rep-lines > li').forEach(li => { const tools = li.querySelector(':scope > .tb-rep-free-tools'); if (tools && li.clientWidth > 0 && li.clientWidth < 8 + 8 + 160 + 8 + tools.offsetWidth) nr = true; });
+  setNarrow(nr);
  };
  useLayoutEffect(fit);
  useEffect(() => {
@@ -1153,7 +1160,7 @@ function RepWork({cls, children}) {
  }, []);
  return html`<div class=${cx(cls, narrow && 'narrow')} ref=${ref}>${children}</div>`;
 }
-function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '', draft = '', onClose, onInsert, onAddSub, onSaveSub, onRemoveSub, onFreeLine, onCreate = null, similarOf = null, isTouched = null}) {
+function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '', draft = '', who = '', day = '', onClose, onInsert, onAddSub, onSaveSub, onRemoveSub, onFreeLine, onCreate = null, similarOf = null, isTouched = null}) {
  const hot = x => !!(isTouched && isTouched(x));
  const sortW = list => [...list].sort((a, b) => Number(hot(b)) - Number(hot(a)) || (hot(a) && hot(b) ? String(b.updated_at || '').localeCompare(String(a.updated_at || '')) : wpRank(a) - wpRank(b) || teamOrder(a, b)));
  const mine = sortW(mine0), others = sortW(others0), all = [...mine, ...others];
@@ -1185,13 +1192,15 @@ function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '
  };
  const toggleProj = x => {
   const st = pState(x); if (st.off) return;
-  setSel(m => { const n = new Map(m); if (!x.checklist.length) { if (n.has(K(x.id))) n.delete(K(x.id)); else n.set(K(x.id), {tid: x.id, cid: '', pct: x.progress || 0}); } else if (st.on) st.av.forEach(c => n.delete(K(x.id, c.id))); else st.av.forEach(c => { if (!n.has(K(x.id, c.id))) n.set(K(x.id, c.id), {tid: x.id, cid: c.id, pct: c.pct}); }); return n; });
+  setSel(m => { const n = new Map(m); if (!x.checklist.length) { if (n.has(K(x.id))) n.delete(K(x.id)); else n.set(K(x.id), {tid: x.id, cid: '', pct: x.progress || 0, h: tlDay(x.time_log, who, day)}); } else if (st.on) st.av.forEach(c => n.delete(K(x.id, c.id))); else st.av.forEach(c => { if (!n.has(K(x.id, c.id))) n.set(K(x.id, c.id), {tid: x.id, cid: c.id, pct: c.pct}); }); return n; });
   if (!st.on && x.checklist.length) setOpen(s => new Set(s).add(x.id));
  };
- const toggleSub = (x, c) => setSel(m => { const n = new Map(m), k = K(x.id, c.id); if (n.has(k)) n.delete(k); else n.set(k, {tid: x.id, cid: c.id, pct: c.pct}); return n; });
+ const toggleSub = (x, c) => setSel(m => { const n = new Map(m), k = K(x.id, c.id); if (n.has(k)) n.delete(k); else n.set(k, {tid: x.id, cid: c.id, pct: c.pct, h: tlDay(c.time_log, who, day)}); return n; });
  const setPct = (k, v) => setSel(m => { const o = m.get(k); if (!o) return m; const n = new Map(m); n.set(k, {...o, pct: v}); return n; });
+ // 오늘 시간(11-09, 사용자 '업무 보고 고르기에도 time'): 고른 줄마다 오늘 쓴 시간, 넣을 때 내 · 오늘 칸에 적는다.
+ const setH = (k, v) => setSel(m => { const o = m.get(k); if (!o) return m; const n = new Map(m); n.set(k, {...o, h: v}); return n; });
  // 넣을 것: 목록 차례대로(업무 순서 → 세부 업무 순서). 그사이 지워진 것 · 이미 넣은 것은 뺀다.
- const picks = () => { const out = []; all.forEach(x => { const used = usedOf(x.id), p = sel.get(K(x.id)); if (p && !x.checklist.length && !projIn(x.id)) out.push({x, c: null, pct: p.pct}); x.checklist.forEach(c => { const s = sel.get(K(x.id, c.id)); if (s && !used.has(c.id)) out.push({x, c, pct: s.pct}); }); }); return out; };
+ const picks = () => { const out = []; all.forEach(x => { const used = usedOf(x.id), p = sel.get(K(x.id)); if (p && !x.checklist.length && !projIn(x.id)) out.push({x, c: null, pct: p.pct, h: p.h || 0}); x.checklist.forEach(c => { const s = sel.get(K(x.id, c.id)); if (s && !used.has(c.id)) out.push({x, c, pct: s.pct, h: s.h || 0}); }); }); return out; };
  const n = picks().length;
  async function insert() { const list = picks(); if (!list.length || busyAll) return; setSaving(true); try { await onInsert(list); setSel(new Map()); onClose(); } catch {} finally { setSaving(false); } }
  const close = () => { if (n && !confirm(`고른 ${n}개를 오늘 보고에 넣지 않고 닫을까요?`)) return; onClose(); };
@@ -1220,6 +1229,8 @@ function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '
  const pctOpts = v => [...new Set([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, v])].sort((a, b) => a - b);
  const tone = v => cx(v > 0 && v < 100 && 'mid', v >= 100 && 'full');
  const pctRO = v => html`<span class=${cx('check-pct wp-pct', tone(v))}><span class="check-pct-bar"><i style=${`width:${v}%`}></i></span><b>${v}%</b></span>`;
+ const timeSel = (v, set, label) => html`<${HourSelect} value=${v || 0} opts=${DAY_HOURS} label=${label} tip="오늘 이 일에 쓴 시간 · 넣을 때 내 오늘 시간으로 적혀요" disabled=${busyAll} onChange=${set} />`;
+ const timeRO = v => (v > 0 ? html`<span class="check-time ro set wp-time" title="오늘 적은 내 시간">${I('Clock', 12)}<b>${fmtH(v)}</b></span>` : html`<span class="check-time ro wp-time"></span>`);
  const pctSel = (v, set, label) => html`<label class=${cx('check-pct wp-pct on', tone(v))} title="오늘 진행률 · 넣을 때 업무에도 반영돼요"><span class="check-pct-bar"><i style=${`width:${v}%`}></i></span><select aria-label=${label} value=${String(v)} disabled=${busyAll} onChange=${e => set(Number(e.target.value))}>${pctOpts(v).map(o => html`<option key=${o} value=${String(o)}>${o}%</option>`)}</select></label>`;
  const editRow = (x, c) => html`<li key=${'e' + c.id} class="wp-sub editing"><form class="wp-edit" onSubmit=${e => save(e, x, c)}>
    <input class="wp-edit-text" aria-label="세부 업무 이름" maxLength="200" value=${edit.text} ref=${focusOnMount} onInput=${e => { const v = e.target.value; setEdit(o => o && {...o, text: v}); }} onKeyDown=${e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setEdit(null); } }} />
@@ -1232,6 +1243,7 @@ function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '
   return html`<li key=${c.id} class=${cx('wp-sub', on && 'on', used && 'used')}>
    <label class="check-tick wp-sub-main" title=${used ? '오늘 보고에 이미 넣었어요 · 빼려면 보고에서 ×' : on ? '눌러서 빼기' : '오늘 한 일로 고르기'}><input type="checkbox" data-nav aria-label=${c.text} checked=${used || on} disabled=${used || busyAll} onChange=${() => toggleSub(x, c)} /><span class="check-box">${I('Check', 12)}</span><span class="wp-sub-text">${c.text}</span><${CheckTag} c=${c} />${used ? html`<span class="wp-in">보고에 있음</span>` : ''}</label>
    ${cSeenName(c.by) ? html`<small class="check-by">${cSeenName(c.by)}</small>` : ''}
+   ${on ? timeSel(s.h, v => setH(k, v), `오늘 시간: ${c.text}`) : timeRO(tlDay(c.time_log, who, day))}
    ${on ? pctSel(s.pct, v => setPct(k, v), `오늘 진행률: ${c.text}`) : pctRO(c.pct)}
    <button type="button" class="wp-pen" aria-label=${`고치기: ${c.text}`} title="이름 · % 고치기 · 지우기" disabled=${busyAll} onClick=${() => setEdit({tid: x.id, id: c.id, text: c.text, pct: c.pct})}>${I('Pencil', 13)}</button>
   </li>`;
@@ -1244,6 +1256,7 @@ function WorkPick({mine: mine0, others: others0, usedOf, projIn, busy, focus = '
     <label class=${cx('check-tick wp-ptick', st.mixed && 'mixed', st.off && 'off')} title=${solo ? (st.off ? '오늘 보고에 이미 넣었어요' : '세부 업무 없이 이 업무로 고르기') : st.off ? '남은 세부 업무가 없어요' : '이 업무의 세부 업무 모두 고르기'}><input type="checkbox" aria-label=${`${x.title} · ${solo ? '업무로 고르기' : '세부 업무 모두 고르기'}`} checked=${st.on || (solo && st.off)} indeterminate=${st.mixed} disabled=${st.off || busyAll} onChange=${() => toggleProj(x)} /><span class="check-box">${I(st.mixed ? 'Minus' : 'Check', 12)}</span></label>
     <button type="button" class="wp-proj-btn" data-nav aria-expanded=${exp} title=${qq ? x.title : exp ? '접기' : '펼쳐서 세부 업무 보기'} onClick=${() => { if (!qq) flip(x.id); }}>${I('ChevronRight', 15)}<span class="wp-proj-main"><span class="wp-proj-title"><span class="wp-proj-name">${x.title}</span>${teamFresh(x) ? html`<${TeamNewTag} x=${x} />` : ''}${teamDelayed(x) ? html`<${TeamLateTag} x=${x} />` : ''}</span><span class="wp-proj-meta"><span>${meta}</span>${hot(x) ? html`<span class="wp-today" title=${`오늘 ${teamClock(x.updated_at)}에 내가 바꾼 업무`}>오늘 손댐</span>` : ''}${inRep ? html`<span class="wp-in">보고에 있음</span>` : ''}</span></span></button>
     <span class=${cx('wp-count', solo && 'none')} title=${solo ? '세부 업무가 없어요' : '끝낸 세부 업무 / 전체'}>${solo ? '세부 없음' : `세부 ${cs.done}/${cs.total}`}</span>
+    ${ps ? timeSel(ps.h, v => setH(K(x.id), v), `오늘 시간: ${x.title}`) : solo ? timeRO(tlDay(x.time_log, who, day)) : html`<span class="check-time ro wp-time"></span>`}
     ${ps ? pctSel(ps.pct, v => setPct(K(x.id), v), `오늘 진행률: ${x.title}`) : pctRO(x.progress || 0)}
    </div>
    ${exp && html`<ul class="wp-subs">
@@ -1397,6 +1410,10 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
   for (const p of list) if (p.c && p.c.pct !== p.pct) { const g = byTask.get(p.x.id) || {x: p.x, map: {}}; g.map[p.c.id] = p.pct; byTask.set(p.x.id, g); }
   for (const g of byTask.values()) await onCheck(g.x, {type: 'pcts', map: g.map});
   for (const p of list) if (!p.c && onProgress && !p.x.checklist.length && (p.x.progress || 0) !== p.pct) await onProgress(p.x, p.pct);
+  const tByTask = new Map();
+  for (const p of list) if (p.c && (p.h || 0) !== tlDay(p.c.time_log, me.name, day)) { const g = tByTask.get(p.x.id) || {x: p.x, map: {}}; g.map[p.c.id] = p.h || 0; tByTask.set(p.x.id, g); }
+  for (const g of tByTask.values()) await onCheck(g.x, {type: 'tlogs', name: me.name, day, map: g.map});
+  for (const p of list) if (!p.c && (p.h || 0) !== tlDay(p.x.time_log, me.name, day)) await onCheck(p.x, {type: 'tlog', name: me.name, day, h: p.h || 0});
   await onAct(day, cur => {
    const has = p => cur.lines.some(l => l.task_id === p.x.id && (p.c ? l.check_id === p.c.id : !l.check_id));
    const add = list.filter(p => !has(p)).map(p => (p.c ? {id: newCheckId(), text: p.c.text, task_id: p.x.id, task_title: p.x.title, check_id: p.c.id, pct: p.pct} : {...projOnly(p.x), pct: p.pct}));
@@ -1524,7 +1541,7 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
    <div class="tb-rep-comments"><div class="tb-sub"><span>댓글 ${cs.length || ''}</span></div><${TeamCommentList} cs=${cs} me=${me} busy=${busy} onMark=${onMark} onEdit=${onEditComment} onDelete=${onDeleteComment} />${onComment && html`<${ReplyForm} key=${rid} busy=${busy} label=${`${s.name} 업무보고 댓글`} placeholder=${isMe ? '덧붙일 말 · Shift+Enter 줄바꿈' : viewOnly && me.name !== ADMIN_NAME ? '이현성에게 남길 말 · 디자인팀에는 안 보여요' : `${s.name}님에게 댓글 · Shift+Enter 줄바꿈`} onSend=${t => onComment({id: rid}, t)} />`}</div>
   </article>`; })}</div>
   ${!people.some(s => { const r = repOf(s.key), rid = r ? r.id : `C-rep-${s.key}-${day}`; return (!viewOnly && s.key === me.id) || !!r || s.name !== ADMIN_NAME || comments.some(c => c.item_id === rid); }) && html`<p class="tb-none pad tb-rep-none">디자인팀 업무보고는 이현성만 볼 수 있어요.</p>`}
-  ${wp && !viewOnly && onCheck && html`<${WorkPick} mine=${mineT} others=${otherT} usedOf=${usedIn} projIn=${projIn} busy=${busy} focus=${wp.focus} draft=${wp.draft} onClose=${() => setWp(null)} onInsert=${insertPicks} onAddSub=${addSubTo} onSaveSub=${saveSubOf} onRemoveSub=${removeSubOf} onFreeLine=${addFreeLine} onCreate=${onCreate ? addTask : null} similarOf=${similar} isTouched=${touched} />`}
+  ${wp && !viewOnly && onCheck && html`<${WorkPick} mine=${mineT} others=${otherT} usedOf=${usedIn} projIn=${projIn} busy=${busy} focus=${wp.focus} draft=${wp.draft} who=${me.name} day=${day} onClose=${() => setWp(null)} onInsert=${insertPicks} onAddSub=${addSubTo} onSaveSub=${saveSubOf} onRemoveSub=${removeSubOf} onFreeLine=${addFreeLine} onCreate=${onCreate ? addTask : null} similarOf=${similar} isTouched=${touched} />`}
  </section>`;
 }
 
