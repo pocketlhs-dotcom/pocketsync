@@ -1332,7 +1332,9 @@ function usePop(width = 244, height = 280) {
   if (step && i >= 0) { e.preventDefault(); for (let j = Math.min(bs.length - 1, Math.max(0, i + step)); j >= 0 && j < bs.length; j += step) { if (!bs[j].disabled) { bs[j].focus(); break; } if (j === bs.length - 1 || j === 0) break; } }
  };
  const focusOn = () => { if (!grid.current) return; const b = grid.current.querySelector('button.on:not(:disabled)') || grid.current.querySelector('button:not(:disabled)'); if (b) b.focus({preventScroll: true}); };
- return {open, setOpen, pos, wrap, btn, grid, place, close, keys, focusOn};
+ // 창을 막 열어 포커스가 아직 버튼에 있을 때 Esc도 창만 닫는다(바깥 창 · 시트로 안 넘김).
+ const wrapKey = e => { if (open && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } };
+ return {open, setOpen, pos, wrap, btn, grid, place, close, keys, focusOn, wrapKey};
 }
 const peersText = ps => ps.map(p => `${p.name} ${fmtH(p.h)}`).join(' · ');
 function HourPop({label, who = '', head = '', day: day0 = today(), nav = false, show = 0, valueAt, usedAt = () => 0, peersAt = null, ro = false, disabled = false, tip = '', onChange}) {
@@ -1343,7 +1345,7 @@ function HourPop({label, who = '', head = '', day: day0 = today(), nav = false, 
  const v = valueAt(d), used = Math.max(0, usedAt(d)), left = Math.max(0, DAY_MAX - used), tot = used + v, mine = who && who === tlViewer(), peers = peersAt ? peersAt(d) : [];
  const pick = h => { p.close(); if (h !== v) onChange(h, d); };
  const shift = n => { const x = new Date(`${d}T03:00:00Z`); x.setUTCDate(x.getUTCDate() + n); const nd = x.toISOString().slice(0, 10); if (nd <= day0) setD(nd); };
- return html`<span class=${cx('hp', p.open && 'open')} ref=${p.wrap}>
+ return html`<span class=${cx('hp', p.open && 'open')} ref=${p.wrap} onKeyDown=${p.wrapKey}>
   <button type="button" ref=${p.btn} class=${cx('check-time btn', show > 0 && 'set')} aria-label=${label} aria-haspopup="dialog" aria-expanded=${p.open} title=${tip} disabled=${disabled} onClick=${toggle}>${I('Clock', 12)}${show > 0 ? html`<b>${fmtH(show)}</b>` : html`<span class="ph">시간</span>`}${I('ChevronDown', 12)}</button>
   ${p.open && html`<div class=${cx('hp-pop', p.pos.up && 'up', p.pos.right && 'right')} role="dialog" aria-label=${label} onKeyDown=${p.keys(4)}>
    ${head ? html`<div class="hp-head" title=${head}>${head}</div>` : ''}
@@ -1368,7 +1370,7 @@ function PctPop({value = 0, base = null, label, head = '', disabled = false, tip
  const pick = n => { p.close(); if (n !== v) onChange(n); };
  const sh = pv === null ? v : pv, tone = n => (n >= 100 ? 'full' : n > 0 ? 'mid' : '');
  const cell = n => html`<button type="button" key=${n} class=${cx(n === 100 && 'pp-full', n === v && 'on', b !== null && n === b && 'base')} aria-pressed=${n === v} title=${b !== null && n === b ? '지금 저장된 값' : ''} onPointerEnter=${() => setPv(n)} onFocus=${() => setPv(n)} onClick=${() => pick(n)}>${n === 100 ? html`${I('Check', 13)}100% 완료` : `${n}%`}</button>`;
- return html`<span class=${cx('pp', p.open && 'open', plain && 'plain', cls)} ref=${p.wrap}>
+ return html`<span class=${cx('pp', p.open && 'open', plain && 'plain', cls)} ref=${p.wrap} onKeyDown=${p.wrapKey}>
   <button type="button" ref=${p.btn} class=${cx('pp-btn', tone(v))} aria-label=${label} aria-haspopup="dialog" aria-expanded=${p.open} title=${tip} disabled=${disabled} onClick=${toggle}><b>${v}%</b>${I('ChevronDown', 12)}</button>
   ${p.open && html`<div class=${cx('hp-pop pp-pop', p.pos.up && 'up', p.pos.right && 'right')} role="dialog" aria-label=${label} onKeyDown=${p.keys(5)}>
    ${head ? html`<div class="hp-head" title=${head}>${head}</div>` : ''}

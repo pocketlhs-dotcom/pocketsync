@@ -72,7 +72,7 @@ const tlKey = (name, day) => `${name}${TL_SEP}${day || ''}`;
 const tlParse = k => { const s = String(k), i = s.lastIndexOf(TL_SEP); return i < 0 ? {name: s, day: ''} : {name: s.slice(0, i), day: s.slice(i + 1)}; };
 function normTimeLog(v, c) {
  const o = {};
- const put = (n0, d0, h0) => { const n = String(n0 || '').replace(/\|/g, '').trim().slice(0, 20), d = /^\d{4}-\d{2}-\d{2}$/.test(String(d0 || '')) ? String(d0) : '', h = Math.round((Number(h0) || 0) * 2) / 2; if (!n || !(h > 0)) return; const k = tlKey(n, d); o[k] = Math.min(999, Math.round(((o[k] || 0) + Math.min(99, h)) * 2) / 2); };
+ const put = (n0, d0, h0) => { const n = String(n0 || '').replace(/\|/g, '').trim().slice(0, 20), d = /^\d{4}-\d{2}-\d{2}$/.test(String(d0 || '')) ? String(d0) : '', h = Math.round((Number(h0) || 0) * 2) / 2; if (!n || !(h > 0)) return; const k = tlKey(n, d); o[k] = Math.min(999, Math.round(((o[k] || 0) + Math.min(d ? 99 : 999, h)) * 2) / 2); };
  if (v && typeof v === 'object' && !Array.isArray(v)) for (const [k, h] of Object.entries(v)) { const p = tlParse(k); put(p.name, p.day, h); }
  if (!Object.keys(o).length && c && Number(c.hours) > 0) put(String(c.by || '').split('·')[0].trim() || '미지정', '', c.hours);
  let keys = Object.keys(o).sort();
@@ -413,6 +413,7 @@ function useEscape(active, onClose) {
  const ref = useRef(onClose); ref.current = onClose;
  useEffect(() => { if (!active) return; escStack.push(ref); return () => { const i = escStack.indexOf(ref); if (i >= 0) escStack.splice(i, 1); }; }, [active]);
 }
+function focusQuiet(el) { if (el && !el.__focused) { el.__focused = true; setTimeout(() => { try { el.focus({preventScroll: true}); } catch {} }, 40); } }
 function focusOnMount(el) { if (el && !el.__focused) { el.__focused = true; setTimeout(() => { try { el.focus(); } catch {} }, 40); } }
 let lockCount = 0;
 function useLockBody(active) {
