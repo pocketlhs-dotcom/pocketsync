@@ -2616,6 +2616,28 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .tb-dw-chips.side button[aria-pressed="true"].scope{border-color:#7a4fd6;background:#f3effd;color:#7a4fd6}
 .tb-dw-note{height:38px;padding:0 12px;border:1px solid #dfe3ef;border-radius:5px;font-size:13.5px}
 .tb-cost-retry{display:inline-flex;align-items:center;gap:3px;margin-left:8px;font-size:12px!important}
+/* 세부 업무 줄(11-11, 사용자 '레이아웃 틀어진 것 조정' · '필요하면 폭을 넓혀도' · '진행 막대 더 얇고 좁게'):
+   옆 창 폭 640 → 780(한 줄에 들어가는 경우가 많아짐), 진행 막대 32 × 3, 날짜 칸 폭 고정, % 칸 폭 고정(오른쪽 칸이 줄마다 맞음).
+   두 줄일 때 둘째 줄 = 실무자 · 날짜(왼쪽, 글 시작선) | % · 시간 · 사람 · 메모(오른쪽). 시간 칸(.hp)도 둘째 줄로. */
+.sheet.tb-detail{width:min(780px,100vw);max-width:780px}
+.check-list .check-pct-bar{width:32px;height:3px}
+.check-list>li>.check-date{min-width:34px;text-align:right}
+.check-list .check-pct .pp.plain .pp-btn{width:50px;justify-content:flex-end}
+.checklist.narrow .check-list>li{justify-content:flex-start}
+.checklist.narrow .check-list>li>.hp{order:3}
+.checklist.narrow .check-list>li>.check-who,.checklist.narrow .check-list>li>.check-br+.check-date{margin-left:28px}
+.checklist.narrow .check-list>li>.check-who{flex:1 1 0;min-width:44px;overflow:hidden}
+.checklist.narrow .check-list>li>.check-who>*{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.checklist.narrow .check-list>li>.check-date{text-align:left;margin-right:0}
+.checklist.narrow .check-list>li>.check-pct{margin-left:auto}
+@media(max-width:640px){.check-list>li{justify-content:flex-start}.check-list>li>.hp{order:3}.check-list>li>.check-who,.check-list>li>.check-br+.check-date{margin-left:28px}.check-list>li>.check-who{flex:1 1 0;min-width:44px;overflow:hidden}.check-list>li>.check-who>*{max-width:100%;overflow:hidden;text-overflow:ellipsis}.check-list>li>.check-pct{margin-left:auto}}
+/* 비용 메모(11-11) */
+.tb-cost-memo{flex-basis:100%;display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:1px solid #e6eaf2;border-radius:6px;background:#fafbfe;color:#a0abc0;box-sizing:border-box;max-width:420px}
+.tb-cost-memo.focus{border-color:#9fb3f7;background:#fff;box-shadow:0 0 0 3px #eef2ff;color:#315df8}
+.tb-cost-memo input{flex:1;min-width:0;height:100%;border:0;outline:none;background:none;padding:0;font-size:13px;color:#1d2a44}
+.tb-cost-memo input::placeholder{color:#b4b9c6}
+.tb-cost-memo input:disabled{color:#b4b9c6}
+.kpi-cost-memo{display:inline-flex;align-items:center;gap:3px;min-width:0;max-width:100%;font-size:11.5px;font-weight:600;color:#7d8ca6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 프로젝트 비용(11-09, 이현성만) */
 .tb-cost-row{align-items:start!important}
 .tb-cost-row>span{padding-top:8px}
@@ -2656,6 +2678,6 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1794319483"></script>
-<script src="app.js?v=1794319483"></script>
+<script src="platform.js?v=1794361151"></script>
+<script src="app.js?v=1794361151"></script>
 </body></html>

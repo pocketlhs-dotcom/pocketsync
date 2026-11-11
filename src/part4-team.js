@@ -128,7 +128,7 @@ function TeamBoard() {
   const cur = costs[x.id] || {amount: 0, note: ''}, next = {amount: 'amount' in v ? v.amount : cur.amount, note: 'note' in v ? v.note : cur.note || ''};
   if (next.amount === cur.amount && next.note === (cur.note || '')) return;
   setBusy(true);
-  try { await window.PS_SET_COST(x.id, {...next, title: x.title}); toast.success(next.amount ? `비용 ${wonText(next.amount)}을 저장했어요.` : '비용을 지웠어요.'); }
+  try { await window.PS_SET_COST(x.id, {...next, title: x.title}); toast.success(next.amount === cur.amount && next.note !== (cur.note || '') ? (next.note ? '비용 메모를 저장했어요.' : '비용 메모를 지웠어요.') : next.amount ? `비용 ${wonText(next.amount)}을 저장했어요.` : '비용을 지웠어요.'); }
   catch (e) { console.warn('cost save', e && e.code); if (e && e.code === 'permission-denied') { setCostErr('rules'); toast.error("비용은 Firebase 규칙에서 이현성 줄에 'P'를 넣어야 저장돼요."); } else toast.error(friendlyError(e)); }
   finally { setBusy(false); }
  }
@@ -789,20 +789,29 @@ function CostInput({id, value = 0, label = '비용', disabled = false, autoFocus
  };
  return html`<span class=${cx('cost-in', bad && 'bad', focus && 'focus')}>${I('Wallet', 14)}<input id=${id} ref=${ref} type="text" inputmode="numeric" autocomplete="off" aria-label=${label} placeholder="예: 300만" maxLength="24" value=${t} disabled=${disabled} onFocus=${() => setFocus(true)} onBlur=${() => { setFocus(false); commit(); }} onInput=${e => setT(e.target.value)} onKeyDown=${keys} /><em>원</em>${t.trim() && Number.isFinite(n) && n > 0 ? html`<small>${wonText(n)}</small>` : bad ? html`<small class="bad">숫자 · 만 · 억으로</small>` : ''}</span>`;
 }
+// 비용 메모(11-11, 사용자 '비용 아래 메모 살짝'): 한 줄(100자), Enter · 칸을 벗어나면 저장, Esc는 되돌림. costs 문서의 note.
+const costMemo = (costs, x) => String(((costs || {})[x.id] || {}).note || '');
+function CostMemo({id, value = '', disabled = false, label = '비용 메모', onCommit}) {
+ const [t, setT] = useState(value), [focus, setFocus] = useState(false), skip = useRef(false);
+ useEffect(() => { if (!focus) setT(value); }, [value]);
+ const commit = () => { if (skip.current) { skip.current = false; return; } const v = t.trim().slice(0, 100); setT(v); if (v !== value) onCommit(v); };
+ return html`<label class=${cx('tb-cost-memo', focus && 'focus')}>${I('NotebookPen', 13)}<input id=${id} type="text" maxLength="100" aria-label=${label} placeholder="메모 (예: 외주비 포함 · 부가세 별도)" value=${t} disabled=${disabled} onFocus=${() => setFocus(true)} onBlur=${() => { setFocus(false); commit(); }} onInput=${e => setT(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); skip.current = true; setT(value); e.target.blur(); } }} /></label>`;
+}
 // 업무 상세의 비용 줄(이현성만): 입력 + 계산식(시간당 · 1일당).
 function CostField({x, kit}) {
- const amt = costAmt(kit.costs, x), blocked = kit.err === 'rules';
+ const amt = costAmt(kit.costs, x), memo = costMemo(kit.costs, x), blocked = kit.err === 'rules';
  return html`<div class="tb-cost">
   <${CostInput} value=${amt} label=${`프로젝트 비용: ${x.title}`} disabled=${blocked} onCommit=${a => kit.onSave(x, {amount: a})} />
   <small class="tb-cost-lock">${I('Lock', 11)}이현성에게만 보여요</small>
   ${blocked ? html`<p class="tb-cost-calc warn">Firebase 규칙에서 이현성 줄에 'P'를 넣으면 저장 · 표시돼요<button type="button" class="text-button tb-cost-retry" onClick=${kit.retry}>${I('RefreshCw', 12)}다시 확인</button></p>` : amt > 0 ? html`<p class="tb-cost-calc">${costFormula(amt, costCalc(x, amt))}</p>` : html`<p class="tb-cost-calc muted">적으면 완료 KPI에서 시간당 · 1일당 · 사람별 몫을 계산해요</p>`}
+  <${CostMemo} value=${memo} disabled=${blocked} label=${`비용 메모: ${x.title}`} onCommit=${t => kit.onSave(x, {note: t})} />
  </div>`;
 }
 // 완료 KPI 프로젝트 줄의 비용(이현성만): 누르면 그 자리에서 고치기.
 function KpiProjCost({x, kit}) {
- const [ed, setEd] = useState(false), amt = costAmt(kit.costs, x), blocked = kit.err === 'rules';
+ const [ed, setEd] = useState(false), amt = costAmt(kit.costs, x), memo = costMemo(kit.costs, x), blocked = kit.err === 'rules';
  if (ed) return html`<div class="kpi-proj-cost edit"><${CostInput} value=${amt} autoFocus=${true} label=${`프로젝트 비용: ${x.title}`} onCommit=${v => { setEd(false); kit.onSave(x, {amount: v}); }} onCancel=${() => setEd(false)} /></div>`;
- return html`<div class="kpi-proj-cost">${amt > 0 ? html`<button type="button" class="kpi-cost-btn on" disabled=${blocked} title="비용 고치기" onClick=${() => setEd(true)}>${I('Wallet', 12)}비용 <b>${wonText(amt)}</b>${I('Pencil', 11)}</button><span>${costFormula(amt, costCalc(x, amt))}</span>` : html`<button type="button" class="kpi-cost-btn" disabled=${blocked} onClick=${() => setEd(true)}>${I('Plus', 12)}비용 적기</button>`}</div>`;
+ return html`<div class="kpi-proj-cost">${amt > 0 ? html`<button type="button" class="kpi-cost-btn on" disabled=${blocked} title="비용 고치기" onClick=${() => setEd(true)}>${I('Wallet', 12)}비용 <b>${wonText(amt)}</b>${I('Pencil', 11)}</button><span>${costFormula(amt, costCalc(x, amt))}</span>` : html`<button type="button" class="kpi-cost-btn" disabled=${blocked} onClick=${() => setEd(true)}>${I('Plus', 12)}비용 적기</button>`}${memo ? html`<small class="kpi-cost-memo" title=${memo}>${I('NotebookPen', 11)}${memo}</small>` : ''}</div>`;
 }
 function TeamKpi({items, all = items, cost = null, onMonth, onBack, onOpen = null}) {
  const names = teamNames(), cur = thisMonth(), [pm, setPm] = useState(cur);
@@ -912,8 +921,8 @@ function TeamFinalDone({x, mode = 'done', cost = null, onCancel, onSave}) {
   if (add.length) setDelay(d => [d.trim(), ...add].filter(Boolean).join(' · ').slice(0, 300));
  };
  // 비용(11-09, 이현성만): 최종 완료 때 같이 적고 · 고친다. 업무 문서가 아니라 costs(board 'P')에 따로 저장.
- const cost0 = cost ? costAmt(cost.costs, x) : 0, [costV, setCostV] = useState(cost0), costRef = useRef(cost0);
- const save = async e => { e.preventDefault(); if (!ok) return; const tl = tlNext(), f = {work_start: start, work_end: end, work_days: Math.round(n * 2) / 2, work_delay_tags: WORK_DELAYS.filter(k => tags.includes(k)), work_delay: delay.trim().slice(0, 300), work_note: note.trim().slice(0, 2000), ...(tl ? {time_log: tl} : {})}; if (cost && cost.err !== 'rules' && costRef.current !== cost0) await cost.onSave(x, {amount: costRef.current}); onSave(f); };
+ const cost0 = cost ? costAmt(cost.costs, x) : 0, [costV, setCostV] = useState(cost0), costRef = useRef(cost0), note0 = cost ? costMemo(cost.costs, x) : '', noteRef = useRef(note0);
+ const save = async e => { e.preventDefault(); if (!ok) return; const tl = tlNext(), f = {work_start: start, work_end: end, work_days: Math.round(n * 2) / 2, work_delay_tags: WORK_DELAYS.filter(k => tags.includes(k)), work_delay: delay.trim().slice(0, 300), work_note: note.trim().slice(0, 2000), ...(tl ? {time_log: tl} : {})}; const amtCh = costRef.current !== cost0, noteCh = noteRef.current !== note0; if (cost && cost.err !== 'rules' && (amtCh || noteCh)) await cost.onSave(x, {...(amtCh ? {amount: costRef.current} : {}), ...(noteCh ? {note: noteRef.current} : {})}); onSave(f); };
  return html`<${Dialog} class="tb-final" title=${mode === 'done' ? '최종 완료' : '최종 완료 기록'} description=${x.title} onClose=${onCancel}>
   <form class="tb-final-form" onSubmit=${save}>
    <${FdBoard} x=${x} start=${start} end=${end} pick=${pick} okDates=${okDates} late=${late} guess=${guess} days=${ok ? n : 0} people=${people} hd=${hd} fixed=${fixed} onHours=${(nm, v) => setHd(o => ({...o, [nm]: v}))} onAdd=${nm => setHd(o => ({...o, [nm]: '0'}))} cost=${cost} costV=${costV} />
@@ -933,7 +942,7 @@ function TeamFinalDone({x, mode = 'done', cost = null, onCancel, onSave}) {
     <div class="tb-fd-work"><div class="tb-fd-step"><button type="button" aria-label="반나절 빼기" onClick=${() => step(-0.5)}>${I('Minus', 15)}</button><input id="tb-final-n" type="number" inputmode="decimal" min="0.5" max="999" step="0.5" value=${days} ref=${focusQuiet} onInput=${e => { setTouched(true); setDays(e.target.value); }} /><em>일</em><button type="button" aria-label="반나절 더하기" onClick=${() => step(0.5)}>${I('Plus', 15)}</button></div>
      <span class="tb-fd-sub">${okDates ? `기간 ${guess}일 중` : ''}</span>${okDates && n !== guess ? html`<button type="button" class="text-button tb-fd-fit" onClick=${() => { setDays(String(guess)); setTouched(false); }}>${guess}일로 맞추기</button>` : ''}${H > 0 ? html`<p class="tb-fd-hours">${I('Clock', 12)}<span>작업 시간 <b>${fmtH(H)}</b> ÷ 8h ≈ ${tDays(H)}일</span>${n !== tDays(H) ? html`<button type="button" class="text-button" onClick=${() => { setDays(String(tDays(H))); setTouched(true); }}>${tDays(H)}일로 맞추기</button>` : ''}</p>` : ''}</div>
    </div>
-   ${cost && html`<div class="tb-fd-row tb-fd-cost"><label for="tb-final-c">비용<small>선택</small></label><div class="tb-fd-costbox"><${CostInput} id="tb-final-c" value=${costV} label="프로젝트 비용" disabled=${cost.err === 'rules'} onCommit=${v => { costRef.current = v; setCostV(v); }} />${cost.err === 'rules' ? html`<p class="tb-cost-calc warn">Firebase 규칙에서 이현성 줄에 'P'를 넣으면 저장돼요</p>` : costV > 0 ? html`<p class="tb-cost-calc">${costFormula(costV, {h: H, d: ok ? n : 0, perH: H > 0 ? costV / H : 0, perD: ok && n > 0 ? costV / n : 0})}</p>` : html`<p class="tb-cost-calc muted">적으면 완료 KPI에서 시간당 · 1일당 · 사람별 몫을 계산해요</p>`}</div></div>`}
+   ${cost && html`<div class="tb-fd-row tb-fd-cost"><label for="tb-final-c">비용<small>선택</small></label><div class="tb-fd-costbox"><${CostInput} id="tb-final-c" value=${costV} label="프로젝트 비용" disabled=${cost.err === 'rules'} onCommit=${v => { costRef.current = v; setCostV(v); }} />${cost.err === 'rules' ? html`<p class="tb-cost-calc warn">Firebase 규칙에서 이현성 줄에 'P'를 넣으면 저장돼요</p>` : costV > 0 ? html`<p class="tb-cost-calc">${costFormula(costV, {h: H, d: ok ? n : 0, perH: H > 0 ? costV / H : 0, perD: ok && n > 0 ? costV / n : 0})}</p>` : html`<p class="tb-cost-calc muted">적으면 완료 KPI에서 시간당 · 1일당 · 사람별 몫을 계산해요</p>`}<${CostMemo} id="tb-final-cm" value=${note0} disabled=${cost.err === 'rules'} label="비용 메모" onCommit=${t => { noteRef.current = t; }} /></div></div>`}
    <div class="tb-fd-row top"><span class="tb-fd-label">딜레이 사유${late > 0 ? html`<em>${late}일 늦음</em>` : html`<small>선택</small>`}</span>
     <div class="tb-fd-delay"><div class="tb-fd-chips">${WORK_DELAYS.map(k => html`<button type="button" key=${k} aria-pressed=${tags.includes(k)} onClick=${() => toggleTag(k)}>${k}</button>`)}</div><input type="text" maxLength="300" aria-label="딜레이 사유" placeholder=${late > 0 ? '늦어진 이유를 짧게 (예: 원고 회신이 3일 늦음)' : '늦어진 게 있으면 짧게'} value=${delay} onInput=${e => setDelay(e.target.value)} />${subNotes.length ? html`<div class="tb-fd-subnotes"><div class="tb-fd-subnotes-head"><small>세부 업무 특이사항 ${subNotes.length}개</small><button type="button" class="text-button" onClick=${pullNotes}>사유에 옮기기</button></div><ul>${subNotes.map(c => { const p = noteParts(c.note); return html`<li key=${c.id}><b>${c.text}</b>${tlSum(c.time_log) ? html`<i>${fmtH(tlSum(c.time_log))}</i>` : ''}${p.tags.map(k => html`<em key=${k}>${k}</em>`)}${p.text ? html`<span>${p.text}</span>` : ''}</li>`; })}</ul></div>` : ''}</div>
    </div>
@@ -970,14 +979,14 @@ function PjWho({x, by = hoursBy(x), amt = 0}) {
 // 완료 줄 · 상세 요약 칸(11-10, 사용자 '레이아웃도 이쁘게'): 기간(시작 → 종료 · 마감 · 늦음) | 총 작업 시간 | 실제 작업일 | 참여 · 기여 | 비용(이현성만).
 // 칸마다 이름(작게) → 값(굵게) → 보조(작게). 칸 폭은 줄마다 같아서 완료 목록에서 위아래로 줄이 맞는다. 좁으면 칸이 다음 줄로 넘어간다.
 function ProjStrip({x, kit = null, busy = false, onOpen = null}) {
- const by = hoursBy(x), ps = pjPeople(x, by), H = ps.reduce((a, p) => a + p.h, 0), pc = pjSplit(ps.map(p => p.h)), late = workLate(x), amt = kit ? costAmt(kit.costs, x) : 0;
+ const by = hoursBy(x), ps = pjPeople(x, by), H = ps.reduce((a, p) => a + p.h, 0), pc = pjSplit(ps.map(p => p.h)), late = workLate(x), amt = kit ? costAmt(kit.costs, x) : 0, memo = kit ? costMemo(kit.costs, x) : '';
  const cell = (cls, ic, label, value, sub = '', subCls = '') => html`<span class=${cx('pj-cell', cls)}><small class="pj-lab">${I(ic, 12)}${label}</small><b class="pj-val">${value}</b>${sub ? html`<small class=${cx('pj-sub', subCls)}>${sub}</small>` : ''}</span>`;
  const body = html`
   ${cell('pj-period', 'CalendarDays', '기간', `${shortDate(workStartOf(x))} → ${shortDate(workEndOf(x))}`, x.due ? `마감 ${shortDate(x.due)} · ${late > 0 ? `${late}일 늦음` : '제때'}${dueMoves(x).length ? ` · 조정 ${dueMoves(x).length}번` : ''}` : '마감 없음', x.due ? (late > 0 ? 'late' : 'ok') : '')}
   ${cell(cx('pj-time', !H && 'none'), 'Clock', '총 작업 시간', H ? fmtH(H) : '기록 없음', H ? `≈ ${fmtDays(tDays(H))} (8h = 1일)` : '')}
   ${cell(cx('pj-days', !x.work_days && 'none', !x.work_days && H > 0 && 'est'), 'CalendarClock', '실제 작업일', x.work_days ? fmtDays(x.work_days) : H ? `≈ ${fmtDays(tDays(H))}` : '적기 전', x.work_days ? '' : H ? '시간 ÷ 8h' : '')}
   <span class="pj-cell pj-who"><small class="pj-lab">${I('Users', 12)}참여 · 기여</small>${ps.length ? html`<span class="pj-names">${ps.slice(0, 5).map((p, i) => html`<span class="pj-p" key=${p.name}><i style=${{background: pjColor(p.name)}}></i>${p.name}${H && p.h > 0 ? html`<em>${pcTxt(pc[i], p.h)}</em>` : ''}</span>`)}${ps.length > 5 ? html`<small>외 ${ps.length - 5}명</small>` : ''}</span>${H ? html`<${PjBar} ps=${ps} />` : ''}` : html`<b class="pj-val">-</b>`}</span>
-  ${kit ? cell(cx('pj-cost', !amt && 'none'), 'Wallet', '비용', amt ? wonText(amt) : '미입력', amt && H ? `시간당 ${wonText(amt / H)}` : '') : ''}`;
+  ${kit ? cell(cx('pj-cost', !amt && 'none'), 'Wallet', '비용', amt ? wonText(amt) : '미입력', [amt && H ? `시간당 ${wonText(amt / H)}` : '', memo.length > 24 ? `${memo.slice(0, 24)}…` : memo].filter(Boolean).join(' · ')) : ''}`;
  return onOpen ? html`<button type="button" class=${cx('pj-strip pj-panel btn', !x.work_days && 'none')} disabled=${busy} title="최종 완료 기록 · 누르면 고치기" onClick=${onOpen}>${body}<span class="pj-edit" aria-hidden="true">${I('Pencil', 12)}</span></button>` : html`<div class="pj-strip pj-panel">${body}</div>`;
 }
 // 완료 줄 제목 옆 표시: 딜레이 · 히스토리 메모(최종 완료 기록에 적은 것).
