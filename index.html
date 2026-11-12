@@ -2670,9 +2670,15 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .pjm-list>li.next .n,.pjm-list>li.today .n{color:#315df8}
 .pjm-list>li.past{color:#9aa1b4}
 .pjm-list>li.past .t,.pjm-list>li.past .d,.pjm-list>li.past .n{color:#9aa1b4}
-.pjm-list>li .pjm-pen{width:26px;height:26px;color:#a3a8b8;opacity:0}
-.pjm-list>li:hover .pjm-pen,.pjm-list>li .pjm-pen:focus-visible{opacity:1}
-@media(hover:none){.pjm-list>li .pjm-pen{opacity:1}}
+.pjm-racts{display:inline-flex;align-items:center;gap:1px}
+.pjm-list>li .pjm-pen{width:26px;height:26px;color:#a3a8b8;opacity:.55}
+.pjm-x{height:26px;min-width:26px;display:inline-flex;align-items:center;justify-content:center;padding:0 4px;border:0;border-radius:5px;background:transparent;color:#a3a8b8;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:700;white-space:nowrap;opacity:.55}
+.pjm-list>li:hover .pjm-pen,.pjm-list>li:hover .pjm-x,.pjm-list>li .pjm-pen:focus-visible,.pjm-x:focus-visible{opacity:1}
+.pjm-x:hover{color:#e5484d;background:#fff1f1}
+.pjm-x.sure{opacity:1;color:#fff;background:#e5484d;padding:0 8px}
+.pjm-x.sure:hover{background:#d93d42;color:#fff}
+@media(hover:none){.pjm-list>li .pjm-pen,.pjm-x{opacity:1}}
+.pjm-hint{grid-column:1/-1;font-size:11.5px;line-height:1.4;color:#b07a12}
 .pjm-list>li.editing{display:flex;align-items:flex-start;gap:8px;padding:8px;background:#f8f9fd;border:1px solid #e3e8f4}
 .pjm-list>li.editing .n{padding-top:7px;color:#315df8}
 .pjm-ed{flex:1;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) 104px;gap:6px}
@@ -2693,6 +2699,13 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .pjm-panel.inline .pjm-add .pjm-note-in{grid-column:auto}
 .pjm-panel.inline .pjm-list:not(:empty)+.pjm-add{padding-top:6px}
 @media(max-width:640px){.pjm-panel.inline .pjm-add{grid-template-columns:minmax(0,1fr) 104px}.pjm-panel.inline .pjm-add .pjm-note-in{grid-column:1/2}.pjm-list>li{grid-template-columns:30px auto auto minmax(0,1fr) auto}.pjm-list>li .tg{display:none}}
+/* '실제 미팅일' 이름이 들어가게 상세 이름 칸 76px(PC) */
+@media(min-width:641px){.tb-fields>div{grid-template-columns:76px minmax(0,1fr)}.dm-fields>div{grid-template-columns:76px minmax(0,1fr)}}
+/* 말줄임 툴팁(11-12): …로 잘린 글에 마우스를 올리면 전체 글(아래 작은 글 = 원래 title) */
+.ell-tip{position:fixed;z-index:1000;left:0;top:0;max-width:min(360px,calc(100vw - 16px));box-sizing:border-box;padding:7px 10px;border-radius:7px;background:#1f2a44;color:#fff;font-size:12.5px;line-height:1.45;box-shadow:0 10px 26px rgba(17,34,85,.22);pointer-events:none;opacity:0;visibility:hidden;transition:opacity .1s ease-out;white-space:pre-wrap;overflow-wrap:anywhere;word-break:keep-all;display:flex;flex-direction:column;gap:2px;text-align:left}
+.ell-tip.on{opacity:1;visibility:visible}
+.ell-tip b{font-weight:600}
+.ell-tip small{font-size:11.5px;color:#c8d1ea}
 /* 비용 메모(11-11) */
 .tb-cost-memo{flex-basis:100%;display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:1px solid #e6eaf2;border-radius:6px;background:#fafbfe;color:#a0abc0;box-sizing:border-box;max-width:420px}
 .tb-cost-memo.focus{border-color:#9fb3f7;background:#fff;box-shadow:0 0 0 3px #eef2ff;color:#315df8}
@@ -2740,6 +2753,6 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1794449754"></script>
-<script src="app.js?v=1794449754"></script>
+<script src="platform.js?v=1794455075"></script>
+<script src="app.js?v=1794455075"></script>
 </body></html>

@@ -435,6 +435,32 @@ function TabsList({class: cls = '', value, onChange, tabs, label}) {
 function ToggleGroup({class: cls = '', value, onChange, items, label}) {
  return html`<div class=${cx('toggle-group', cls)} role="group" aria-label=${label}>${items.map(i => html`<button type="button" key=${i.value} data-slot="toggle-group-item" data-state=${value === i.value ? 'on' : 'off'} aria-pressed=${value === i.value} class=${i.class || ''} title=${i.title} aria-label=${i.ariaLabel} onClick=${() => onChange(i.value)}>${i.content}</button>`)}</div>`;
 }
+// 말줄임 툴팁(11-12, 사용자 '오버플로우 되는 것들(…)은 호버하면 전체 내용이 보이게'): 글이 …로 잘린 곳에 마우스를 올리면 0.25초 뒤 전체 글을 띄운다.
+// 앱 전체 공통(문서 한 곳에서 듣는다). text-overflow: ellipsis(한 줄) · -webkit-line-clamp(여러 줄)가 실제로 잘렸을 때만. 가장 가까운 title은 아래 작은 글로 함께 보여 주고,
+// 보이는 동안 브라우저 기본 툴팁은 끈다(두 개가 겹치지 않게). 마우스가 없는 기기는 안 씀. 화면 맨 위(body)에 붙여 어떤 창 안에서도 잘리지 않는다.
+(function ellTip() {
+ if (typeof document === 'undefined' || !window.matchMedia || !window.matchMedia('(hover: hover)').matches) return;
+ let tip = null, cur = null, timer = 0, saved = null;
+ const cut = el => { const st = getComputedStyle(el); if (st.textOverflow === 'ellipsis' && st.overflowX !== 'visible' && el.scrollWidth > el.clientWidth + 1) return true; return !!st.webkitLineClamp && st.webkitLineClamp !== 'none' && el.scrollHeight > el.clientHeight + 1; };
+ const find = t => { for (let e = t, i = 0; e && e.nodeType === 1 && i < 4; e = e.parentElement, i++) { if (e.closest('input, textarea, select, .ell-tip, [data-notip]')) return null; if (cut(e)) return e; } return null; };
+ const hide = () => { clearTimeout(timer); if (saved && saved.node.isConnected && !saved.node.hasAttribute('title')) saved.node.setAttribute('title', saved.title); saved = null; cur = null; if (tip) tip.classList.remove('on'); };
+ const show = el => {
+  const text = (el.innerText || el.textContent || '').trim(); if (!text) return;
+  if (!tip) { tip = document.createElement('div'); tip.className = 'ell-tip'; tip.setAttribute('role', 'tooltip'); document.body.appendChild(tip); }
+  const host = el.closest('[title]'), hint = host ? host.getAttribute('title') : '';
+  if (host) { saved = {node: host, title: hint}; host.removeAttribute('title'); }
+  tip.textContent = ''; const b = document.createElement('b'); b.textContent = text.slice(0, 400); tip.appendChild(b);
+  if (hint && hint.trim() && hint.trim() !== text) { const sm = document.createElement('small'); sm.textContent = hint.slice(0, 300); tip.appendChild(sm); }
+  tip.style.left = '0px'; tip.style.top = '0px'; tip.classList.add('on');
+  const r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight, m = 8;
+  let y = r.bottom + 6; if (y + h > window.innerHeight - m && r.top - 6 - h >= m) y = r.top - 6 - h;
+  tip.style.left = `${Math.round(Math.max(m, Math.min(r.left, window.innerWidth - m - w)))}px`; tip.style.top = `${Math.round(y)}px`;
+ };
+ document.addEventListener('mouseover', e => { const el = find(e.target); if (el === cur) return; hide(); if (!el) return; cur = el; timer = setTimeout(() => { if (cur === el && el.isConnected) show(el); }, 250); }, true);
+ document.addEventListener('mouseout', e => { if (cur && !(e.relatedTarget && cur.contains(e.relatedTarget))) hide(); }, true);
+ ['scroll', 'pointerdown', 'keydown'].forEach(k => document.addEventListener(k, hide, true));
+ window.addEventListener('blur', hide);
+})();
 // 작은 창 자리 잡기(11-12, 사용자 '이거 잘린데' · '오늘의 업무보고(고르기 창)에서 여전히 잘려'): 창이 열린 직후 실제 크기를 재서
 // 그 창을 실제로 자르는 상자 안에 둔다 — 버튼 아래(자리가 모자라면 위), 가로는 버튼 왼쪽(또는 오른쪽)에 맞추되 넘치면 반대쪽 끝 맞춤 → 그래도 넘치면 상자 안으로 밀어 넣기.
 // 자르는 상자 = 화면 ∩ overflow가 있는 조상(스크롤 칸 · 창). 창이 position:fixed면 변형된 조상(.dialog 등, fixed의 기준 상자)부터 위로만 본다.

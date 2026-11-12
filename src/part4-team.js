@@ -431,23 +431,27 @@ const meetWhen = m => `${hpDay(m.day)} ${m.time || '시간 미정'}`;
 function meetState(x) {
  const list = x.meetings || [], t = today(), hm = seoulHM(), past = m => m.day < t || (m.day === t && !!m.time && m.time < hm);
  const iNext = list.findIndex(m => !past(m)), i = iNext >= 0 ? iNext : list.length - 1, m = list[i];
- if (!m) return {list, i: -1, past, label: '미팅', cls: 'empty', tip: '미팅 날짜 · 시간 적기'};
+ if (!m) return {list, i: -1, past, label: '실제 미팅일', cls: 'empty', tip: '실제 미팅일 · 시간 적기'};
  const dl = m.day === t ? '오늘' : m.day === offsetDate(t, 1) ? '내일' : shortDate(m.day);
  return {list, i, past, label: `${i + 1}차 ${dl}`, cls: iNext < 0 ? 'past' : m.day === t ? 'today' : 'next', tip: `${iNext < 0 ? '지난 미팅' : '다음 미팅'} ${i + 1}차 · ${meetWhen(m)}${m.note ? ` · ${m.note}` : ''} · 모두 ${list.length}번 (눌러서 보기)`};
 }
 function TeamMeetPanel({x, busy = false, onPatch, editable = true, inline = false}) {
  const s = meetState(x), list = s.list, t = today(), who = tlViewer() || '', ul = useRef(null);
- const [day, setDay] = useState(t), [time, setTime] = useState(''), [note, setNote] = useState(''), [ed, setEd] = useState(null), [del, setDel] = useState('');
+ const [day, setDay] = useState(''), [time, setTime] = useState(''), [note, setNote] = useState(''), [ed, setEd] = useState(null), [del, setDel] = useState('');
+ // 지우기 확인은 4초 뒤 풀림.
+ useEffect(() => { if (!del) return; const k = setTimeout(() => setDel(''), 4000); return () => clearTimeout(k); }, [del]);
  // 다음 미팅(없으면 마지막)이 보이게 목록만 스크롤.
  useEffect(() => { const u = ul.current; if (!u) return; const el = u.querySelector('li.today, li.next') || u.lastElementChild; if (el) u.scrollTop = Math.max(0, el.offsetTop + el.offsetHeight - u.clientHeight + 4); }, []);
  const put = (next, text) => onPatch(x, {meetings: meetSort(next).slice(-40)}, text);
  const nth = (d, tm) => list.filter(m => `${m.day} ${m.time || '24:00'}` <= `${d} ${tm || '24:00'}`).length + 1;
+ // 추가할 차수: 날짜를 고르기 전엔 다음 차수(지금 n번 + 1), 고르면 날짜 순 자리.
+ const addN = DATE_RE.test(day) ? nth(day, MEET_HM.test(time) ? time : '') : list.length + 1;
  const add = async () => {
   if (busy || !DATE_RE.test(day)) return;
   const m = {id: uuid().slice(0, 8), day, time: MEET_HM.test(time) ? time : '', note: note.trim().slice(0, 60), by: who, at: nowIso(), moves: []};
   const next = meetSort([...list, m]);
-  await put(next, `미팅 ${next.indexOf(m) + 1}차 ${meetWhen(m)} 추가${m.note ? ` · ${m.note}` : ''}`);
-  setTime(''); setNote('');
+  await put(next, `실제 미팅일 ${next.indexOf(m) + 1}차 ${meetWhen(m)} 추가${m.note ? ` · ${m.note}` : ''}`);
+  setDay(''); setTime(''); setNote('');
  };
  const saveEd = async () => {
   const o = list.find(m => m.id === ed.id); if (!o || busy || !DATE_RE.test(ed.day)) return;
@@ -455,10 +459,10 @@ function TeamMeetPanel({x, busy = false, onPatch, editable = true, inline = fals
   if (!moved && nt === o.note) { setEd(null); return; }
   const m = {...o, day: ed.day, time: tm, note: nt, moves: moved ? [...(o.moves || []), {day: o.day, time: o.time, at: nowIso(), by: who}].slice(-5) : o.moves || []};
   const next = meetSort(list.map(v => (v.id === o.id ? m : v)));
-  await put(next, moved ? `미팅 ${next.indexOf(m) + 1}차 ${meetWhen(o)} → ${meetWhen(m)}` : `미팅 ${next.indexOf(m) + 1}차 메모 ${nt || '지움'}`);
+  await put(next, moved ? `실제 미팅일 ${next.indexOf(m) + 1}차 ${meetWhen(o)} → ${meetWhen(m)}` : `실제 미팅일 ${next.indexOf(m) + 1}차 메모 ${nt || '지움'}`);
   setEd(null);
  };
- const remove = async m => { if (busy) return; if (del !== m.id) { setDel(m.id); return; } await put(list.filter(v => v.id !== m.id), `미팅 ${list.indexOf(m) + 1}차 ${meetWhen(m)} 지움`); setDel(''); setEd(null); };
+ const remove = async m => { if (busy) return; if (del !== m.id) { setDel(m.id); return; } await put(list.filter(v => v.id !== m.id), `실제 미팅일 ${list.indexOf(m) + 1}차 ${meetWhen(m)} 지움`); setDel(''); setEd(null); };
  const keyEd = e => { if (e.key === 'Enter') { e.preventDefault(); saveEd(); } };
  const row = (m, i) => {
   const cls = s.past(m) ? 'past' : m.day === t ? 'today' : i === s.i ? 'next' : 'later';
@@ -471,14 +475,15 @@ function TeamMeetPanel({x, busy = false, onPatch, editable = true, inline = fals
    <b class="n">${i + 1}차</b><span class="d">${hpDay(m.day)}</span><span class=${cx('t', !m.time && 'none')}>${m.time || '시간 미정'}</span>
    <span class="tg">${cls === 'today' ? html`<em class="tag-today">오늘</em>` : cls === 'next' ? html`<em class="tag-next">다음</em>` : ''}${mv.length ? html`<i class="mv">${I('History', 10)}${mv.length}</i>` : ''}</span>
    <span class="note">${m.note}</span>
-   ${editable ? html`<button type="button" class="icon-button pjm-pen" aria-label=${`${i + 1}차 미팅 고치기`} disabled=${busy} onClick=${() => { setDel(''); setEd({id: m.id, day: m.day, time: m.time, note: m.note}); }}>${I('Pencil', 12)}</button>` : html`<span></span>`}</li>`;
+   ${editable ? html`<span class="pjm-racts"><button type="button" class="icon-button pjm-pen" aria-label=${`${i + 1}차 미팅 고치기`} title="날짜 · 시간 · 메모 고치기" disabled=${busy} onClick=${() => { setDel(''); setEd({id: m.id, day: m.day, time: m.time, note: m.note}); }}>${I('Pencil', 12)}</button><button type="button" class=${cx('pjm-x', del === m.id && 'sure')} aria-label=${del === m.id ? `${i + 1}차 미팅 지우기 확인` : `${i + 1}차 미팅 지우기`} title=${del === m.id ? '한 번 더 누르면 지워져요' : '지우기'} disabled=${busy} onClick=${() => remove(m)}>${del === m.id ? '지울까요?' : I('Trash2', 12)}</button></span>` : html`<span></span>`}</li>`;
  };
  return html`<div class=${cx('pjm-panel', inline && 'inline')}>
-  ${!inline && html`<div class="pjm-head"><strong>${I('MessagesSquare', 14)}미팅</strong><span>${list.length ? `모두 ${list.length}번${s.cls !== 'past' && s.i >= 0 ? ` · 다음 ${s.i + 1}차` : ''}` : '아직 없어요'}</span></div>`}
+  ${!inline && html`<div class="pjm-head"><strong>${I('MessagesSquare', 14)}실제 미팅일</strong><span>${list.length ? `모두 ${list.length}번${s.cls !== 'past' && s.i >= 0 ? ` · 다음 ${s.i + 1}차` : ''}` : '아직 없어요'}</span></div>`}
   ${list.length ? html`<ul class="pjm-list" ref=${ul}>${list.map(row)}</ul>` : !editable ? html`<p class="pjm-none">적힌 미팅이 없어요.</p>` : ''}
   ${editable && html`<div class="pjm-add"><input type="date" aria-label="새 미팅 날짜" value=${day} onInput=${e => setDay(e.target.value)} /><input type="time" step="600" aria-label="새 미팅 시간" value=${time} onInput=${e => setTime(e.target.value)} />
    <input type="text" class="pjm-note-in" maxLength="60" aria-label="새 미팅 메모" placeholder="메모 (예: 킥오프 · 시안 리뷰)" value=${note} onInput=${e => setNote(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} />
-   <button type="button" class="primary-button small pjm-go" disabled=${busy || !DATE_RE.test(day)} onClick=${add}>${I('Plus', 13)}${DATE_RE.test(day) ? `${nth(day, MEET_HM.test(time) ? time : '')}차 ` : ''}추가</button></div>`}
+   <button type="button" class="primary-button small pjm-go" disabled=${busy || !DATE_RE.test(day)} title=${DATE_RE.test(day) ? '' : '날짜를 먼저 골라 주세요'} onClick=${add}>${I('Plus', 13)}${addN}차 추가</button>
+   ${addN <= list.length && html`<small class="pjm-hint">${hpDay(list[addN - 1].day)} ${addN}차보다 앞 날짜라 ${addN}차로 들어가요 · 뒤 미팅 차수는 하나씩 밀려요</small>`}</div>`}
  </div>`;
 }
 function TeamMeetChip({x, busy = false, onPatch, editable = true}) {
@@ -487,8 +492,8 @@ function TeamMeetChip({x, busy = false, onPatch, editable = true}) {
  useEffect(() => { if (!open) return; const off = e => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); }; document.addEventListener('pointerdown', off, true); return () => document.removeEventListener('pointerdown', off, true); }, [open]);
  if (!s.list.length && !editable) return '';
  return html`<span class=${cx('pjm', open && 'open')} ref=${wrap} onKeyDown=${e => { if (open && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); if (btn.current) btn.current.focus({preventScroll: true}); } }}>
-  <button type="button" ref=${btn} class=${cx('pjm-chip', s.cls)} aria-haspopup="dialog" aria-expanded=${open} aria-label=${s.i >= 0 ? `미팅: ${s.tip}` : '미팅 적기'} title=${s.tip} onClick=${() => setOpen(v => !v)}>${I('MessagesSquare', 12)}${s.label}</button>
-  ${open && html`<div class="pjm-pop" ref=${pop} role="dialog" aria-label=${`미팅: ${x.title}`}><${TeamMeetPanel} x=${x} busy=${busy} onPatch=${onPatch} editable=${editable} /></div>`}
+  <button type="button" ref=${btn} class=${cx('pjm-chip', s.cls)} aria-haspopup="dialog" aria-expanded=${open} aria-label=${s.i >= 0 ? `실제 미팅일: ${s.tip}` : '실제 미팅일 적기'} title=${s.tip} onClick=${() => setOpen(v => !v)}>${I('MessagesSquare', 12)}${s.label}</button>
+  ${open && html`<div class="pjm-pop" ref=${pop} role="dialog" aria-label=${`실제 미팅일: ${x.title}`}><${TeamMeetPanel} x=${x} busy=${busy} onPatch=${onPatch} editable=${editable} /></div>`}
  </span>`;
 }
 function TeamMini({x, cmap, onOpen, showWho = true, extra, self = ''}) {
@@ -1148,7 +1153,7 @@ function TeamDetail({focus = null, handoffFrom = null, item: x, comments, me, is
    <div class="tb-fields">
     <div><span>담당</span><div class="tb-chips">${[['', '미배정'], ...names.map(n => [n, n]), ['모두', '셋 다']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${teamOn(x.assignee, v)} disabled=${busy} onClick=${() => { const n = teamToggle(x.assignee, v); if (n !== x.assignee) onPatch(x, {assignee: n}, n ? `담당 ${teamWho(n)}` : '담당 비움'); }}>${l}</button>`)}<small class="tb-multi-hint">여러 명 선택 가능</small></div></div>
     <div><span>마감</span><div class="tb-chips">${[['', '없음'], [today(), '오늘'], [offsetDate(today(), 1), '내일'], [offsetDate(today(), 2), '모레']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${x.due === v} disabled=${busy} onClick=${() => x.due !== v && onPatch(x, {due: v}, v ? `마감 ${shortDate(v)}` : '마감 지움')}>${l}</button>`)}<input type="date" class="chip-date" aria-label="마감일" value=${x.due} disabled=${busy} onChange=${e => onPatch(x, {due: e.target.value}, e.target.value ? `마감 ${shortDate(e.target.value)}` : '마감 지움')} /><b class=${cx('dday', x.status === 'hold' ? 'hold' : dDay(x.due).cls)}>${dDay(x.due).label}</b>${dueMoves(x).length ? html`<div class="tb-due-log"><span class="tb-due-first">${I('History', 12)}처음 마감 <b>${fdDay(dueFirst(x))}</b> · ${dueMoves(x).length}번 조정</span><ol>${dueMoves(x).map(h => html`<li key=${h.at}><span class="tb-due-mv">${shortDate(h.from)} → <b>${shortDate(h.to)}</b>${(n => html`<i class=${n < 0 ? 'early' : ''}>${n > 0 ? '+' : ''}${n}일</i>`)(teamDayNum(h.to) - teamDayNum(h.from))}</span>${dueWhy(h) ? html`<em class=${h.side}>${dueWhy(h)}</em>` : ''}${h.note ? html`<span class="tb-due-note">${h.note}</span>` : ''}<small>${h.by} · ${teamDay(inSeoul(h.at))}</small></li>`)}</ol></div>` : ''}</div></div>
-    <div class="pjm-row"><span>미팅</span><${TeamMeetPanel} x=${x} busy=${busy} onPatch=${onPatch} inline=${true} /></div>
+    <div class="pjm-row"><span>실제 미팅일</span><${TeamMeetPanel} x=${x} busy=${busy} onPatch=${onPatch} inline=${true} /></div>
     <div><span>중요도</span><div class="tb-chips">${Object.entries(taskPriorities).map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${x.priority === v} disabled=${busy} onClick=${() => x.priority !== v && onPatch(x, {priority: v}, `중요도 ${l}`)}>${l}</button>`)}</div></div>
     <div><span>상태</span><div class="tb-chips">${Object.entries(statuses).map(([v, l]) => html`<button type="button" key=${v} class="chip" aria-pressed=${x.status === v} disabled=${busy} onClick=${() => x.status !== v && onPatch(x, {status: v}, `상태 ${l}`)}>${l}</button>`)}</div></div>
     ${x.status === 'todo' && html`<div><span>착수 예정</span><div class="tb-chips">${[['', '미정'], [today(), '오늘'], [offsetDate(today(), 1), '내일'], [offsetDate(today(), 2), '모레'], [mondayOf(offsetDate(today(), 7)), '다음 주']].map(([v, l]) => html`<button type="button" key=${l} class="chip" aria-pressed=${x.start_on === v} disabled=${busy} onClick=${() => x.start_on !== v && onPatch(x, {start_on: v}, v ? `착수 예정 ${shortDate(v)}` : '착수 예정 미정')}>${l}${l === '다음 주' ? html`<small class="tb-chip-sub">${shortDate(v)}</small>` : ''}</button>`)}<input type="date" class="chip-date" aria-label="착수 예정일" value=${x.start_on} disabled=${busy} onChange=${e => onPatch(x, {start_on: e.target.value}, e.target.value ? `착수 예정 ${shortDate(e.target.value)}` : '착수 예정 미정')} />${x.start_on && html`<b class=${cx('tb-start-tag', x.start_on < today() && 'late')}>${teamStartLabel(x)}</b>`}</div></div>`}
@@ -1190,7 +1195,7 @@ const teamNormText = t => String(t || '').replace(/\s+/g, ' ').trim();
 const specLeftOf = x => { const have = new Set(x.checklist.map(c => teamNormText(c.text))); return x.spec.filter(s => teamNormText(s.text) && !have.has(teamNormText(s.text))); };
 const pullSrcChecks = (x, onPatch) => { const list = normChecklist(x.src_checks).map(c => ({...c, id: newCheckId()})); return onPatch(x, {checklist: list, progress: checkStat({checklist: list}).pct}, `원본 세부 업무 ${list.length}개 가져옴`); };
 // 업무 기록: 날짜별로 묶고, 같은 사람이 10분 안에 같은 항목을 여러 번 바꾸면 '처음 → 마지막' 한 줄로 합친다.
-const HIST = {assign: ['UserRound', '담당'], status: ['Check', '상태'], due: ['CalendarClock', '마감'], priority: ['Flag', '중요도'], progress: ['Gauge', '진행률'], check: ['ListChecks', '세부 업무'], spec: ['NotebookPen', '처음 요청'], start: ['CalendarDays', '시작일'], issue: ['AlertCircle', '특이사항'], handoff: ['MoveRight', '인수인계'], link: ['Link2', '링크'], title: ['Pencil', '제목'], body: ['NotebookPen', '설명'], create: ['Plus', '등록'], sync: ['RefreshCw', '보드 연동'], meet: ['MessagesSquare', '미팅']};
+const HIST = {assign: ['UserRound', '담당'], status: ['Check', '상태'], due: ['CalendarClock', '마감'], priority: ['Flag', '중요도'], progress: ['Gauge', '진행률'], check: ['ListChecks', '세부 업무'], spec: ['NotebookPen', '처음 요청'], start: ['CalendarDays', '시작일'], issue: ['AlertCircle', '특이사항'], handoff: ['MoveRight', '인수인계'], link: ['Link2', '링크'], title: ['Pencil', '제목'], body: ['NotebookPen', '설명'], create: ['Plus', '등록'], sync: ['RefreshCw', '보드 연동'], meet: ['MessagesSquare', '실제 미팅일']};
 function TeamHistory({x}) {
  const [all, setAll] = useState(false), [memo, setMemo] = useState({});
  const merged = [];
@@ -1212,7 +1217,7 @@ function TeamHistory({x}) {
  const noteOf = h => h.note || ((x.handoffs || []).find(o => Math.abs(Date.parse(o.at) - Date.parse(h.at)) < 10000) || {}).note || '';
  const rows = merged.reverse().filter(h => !(h.from !== null && h.to !== null && h.from === h.to && h.kind !== 'handoff')), shown = all ? rows : rows.slice(0, 10);
  const groups = []; shown.forEach(h => { const d = inSeoul(h.at); const g = groups[groups.length - 1]; if (g && g.day === d) g.list.push(h); else groups.push({day: d, list: [h]}); });
- const detail = h => h.from !== null && h.to !== null ? (h.kind === 'handoff' && h.from === h.to ? html`<span class="th-val">담당 ${h.to}</span>` : html`<span class="th-val"><s>${h.from}</s><b>→</b><em>${h.to}</em></span>`) : html`<span class="th-val plain">${h.kind && HIST[h.kind] ? h.text.replace(new RegExp('^' + HIST[h.kind][1] + '\\s*'), '') : h.text}</span>`;
+ const detail = h => h.from !== null && h.to !== null ? (h.kind === 'handoff' && h.from === h.to ? html`<span class="th-val">담당 ${h.to}</span>` : html`<span class="th-val"><s>${h.from}</s><b>→</b><em>${h.to}</em></span>`) : html`<span class="th-val plain">${h.kind && HIST[h.kind] ? h.text.replace(new RegExp('^' + HIST[h.kind][1] + '\\s*'), '').replace(h.kind === 'meet' ? /^미팅\s*/ : /^$/, '') : h.text}</span>`;
  return html`<section class="tb-history"><h3>${I('History', 15)}기록 <span>${rows.length}</span></h3>
   ${!rows.length ? html`<p class="tb-none">아직 기록이 없어요. 이제부터 바뀐 내용이 여기에 쌓여요.</p>` : groups.map(g => html`<div class="th-day" key=${g.day}><div class="th-date">${teamDay(g.day)}</div><ul>${g.list.map((h, i) => { const meta = HIST[h.kind] || ['Pencil', '변경'], note = h.kind === 'handoff' ? noteOf(h) : ''; return html`<li key=${h.at + i} class=${'th-' + (h.kind || 'etc')}>
    <time>${teamClock(h.at)}</time><span class="th-ico">${I(meta[0], 13)}</span><span class="th-label">${meta[1]}</span>${detail(h)}${h.n > 1 ? html`<small class="th-n">${h.n}번 바꿈</small>` : ''}${note && html`<button type="button" class=${cx('th-memo', memo[h.at] && 'on')} title="인수인계 메모 보기" onClick=${() => setMemo(m => ({...m, [h.at]: !m[h.at]}))}>${I('NotebookPen', 13)}메모</button>`}<span class="th-by">${h.by}</span>
@@ -2083,7 +2088,7 @@ function MirrorDetail({focus = null, x, comments, me, busy, writable, onClose, o
     ${field('상태', html`<span class=${'tb-stbadge dm-st st-' + x.status}><i></i>${C_ST[x.status]}</span>`)}
     ${field('마감', x.due ? html`${shortDate(x.due)} <b class=${cx('dday', x.status === 'hold' ? 'hold' : d.cls)}>${d.label}</b>` : '없음')}
     ${field(x.status === 'todo' ? '착수 예정' : '시작일', x.status === 'todo' ? (x.start_on ? `${shortDate(x.start_on)} · ${teamStartLabel(x)}` : '미정') : start ? shortDate(start) : '없음')}
-    ${field('미팅', (x.meetings || []).length ? html`<${TeamMeetPanel} x=${x} editable=${false} inline=${true} />` : '없음')}
+    ${field('실제 미팅일', (x.meetings || []).length ? html`<${TeamMeetPanel} x=${x} editable=${false} inline=${true} />` : '없음')}
     ${field('중요도', x.priority === 'share' ? taskPriorities.share : html`<span class=${'tag priority-tag ' + x.priority}>${taskPriorities[x.priority]}</span>`)}
     ${field('진행률', html`<span class="dm-prog"><i><b style=${`width:${x.progress || 0}%`}></b></i><em>${x.progress || 0}%</em></span>`)}
    </div>
