@@ -2634,6 +2634,64 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .tb-stpop{position:fixed}
 /* 아래 여유(스크롤 칸 맨 끝에서 열 때 창 아래가 딱 붙거나 여는 애니메이션만큼 잘리지 않게 넘침 영역을 조금 늘림, 보이지 않음) */
 .hp-pop:not(.up)::after,.tb-duepop:not(.up):not(.tb-stpop)::after{content:'';position:absolute;left:0;right:0;top:100%;height:14px;pointer-events:none}
+/* 프로젝트 미팅(11-12, 사용자 '업무 줄에 미팅일 작게 · 개요는 며칠, 누르면 몇 시까지 · 5차 이상 · 히스토리'): 줄 칩 → 작은 창(1차 ~ n차 · 추가 · 고치기), 상세는 같은 목록을 바로 */
+.pjm{position:relative;display:inline-flex;flex:none}
+.pjm-chip{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 7px;border-radius:3px;border:1px solid #e1e5f0;background:#fff;color:#6b7591;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pjm-chip:hover,.pjm.open .pjm-chip{border-color:#95a8eb;color:#315df8}
+.pjm-chip.next{background:#f3f6ff;border-color:#cdd8fb;color:#315df8}
+.pjm-chip.today{background:#315df8;border-color:#315df8;color:#fff}
+.pjm-chip.today:hover,.pjm.open .pjm-chip.today{background:#2348d8;color:#fff}
+.pjm-chip.past{color:#9aa1b4;background:#f7f8fb}
+.pjm-chip.empty{border-style:dashed;color:#a3a8b8}
+@media(hover:hover){.tb-arow:not(:hover):not(:focus-within) .pjm:not(.open) .pjm-chip.empty{display:none}}
+@media(hover:none){.pjm-chip.empty{display:none}}
+.pjm-pop{position:absolute;z-index:90;top:calc(100% + 6px);left:0;width:348px;max-width:calc(100vw - 24px);box-sizing:border-box;padding:12px;border:1px solid #dde3ef;border-radius:10px;background:#fff;box-shadow:0 14px 34px rgba(17,34,85,.16),0 2px 6px rgba(17,34,85,.06);text-align:left;cursor:default;animation:hpIn .12s ease-out;white-space:normal}
+.pjm-pop:not(.up)::after{content:'';position:absolute;left:0;right:0;top:100%;height:14px;pointer-events:none}
+.pjm-panel{display:flex;flex-direction:column;gap:8px;min-width:0}
+.pjm-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pjm-head strong{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:#1f2a44}
+.pjm-head strong svg{color:#315df8}
+.pjm-head span{font-size:12px;color:#8a92a8;font-weight:600}
+.pjm-list{list-style:none;margin:0;padding:2px;position:relative;max-height:232px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;overscroll-behavior:contain}
+.pjm-list>li{display:grid;grid-template-columns:32px auto auto auto minmax(0,1fr) auto;align-items:center;column-gap:7px;min-height:32px;padding:0 4px 0 8px;border-radius:6px;font-size:13px;color:#2b3550;font-variant-numeric:tabular-nums}
+.pjm-list>li .n{font-size:12px;font-weight:700;color:#6b7591}
+.pjm-list>li .d{font-weight:600;white-space:nowrap}
+.pjm-list>li .t{font-weight:700;color:#1f2a44;white-space:nowrap}
+.pjm-list>li .t.none{font-weight:500;color:#a3a8b8;font-size:12px}
+.pjm-list>li .note{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#6b7591;font-size:12.5px}
+.pjm-list>li em{font-style:normal;font-size:11px;font-weight:700;padding:1px 6px;border-radius:3px;white-space:nowrap}
+.pjm-list>li .tg{display:inline-flex;align-items:center;gap:4px}
+.pjm-list>li .tg:empty{margin-left:-7px}
+.pjm-list>li .tag-next{background:#e8edff;color:#315df8}
+.pjm-list>li .tag-today{background:#315df8;color:#fff}
+.pjm-list>li .mv{display:inline-flex;align-items:center;gap:2px;font-style:normal;font-size:11px;font-weight:700;color:#b07a12;background:#fdf5e4;border-radius:3px;padding:1px 5px}
+.pjm-list>li.next,.pjm-list>li.today{background:#f3f6ff}
+.pjm-list>li.next .n,.pjm-list>li.today .n{color:#315df8}
+.pjm-list>li.past{color:#9aa1b4}
+.pjm-list>li.past .t,.pjm-list>li.past .d,.pjm-list>li.past .n{color:#9aa1b4}
+.pjm-list>li .pjm-pen{width:26px;height:26px;color:#a3a8b8;opacity:0}
+.pjm-list>li:hover .pjm-pen,.pjm-list>li .pjm-pen:focus-visible{opacity:1}
+@media(hover:none){.pjm-list>li .pjm-pen{opacity:1}}
+.pjm-list>li.editing{display:flex;align-items:flex-start;gap:8px;padding:8px;background:#f8f9fd;border:1px solid #e3e8f4}
+.pjm-list>li.editing .n{padding-top:7px;color:#315df8}
+.pjm-ed{flex:1;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) 104px;gap:6px}
+.pjm-ed .pjm-note-in,.pjm-ed .pjm-acts{grid-column:1/-1}
+.pjm-acts{display:flex;align-items:center;justify-content:flex-end;gap:6px}
+.pjm-del{margin-right:auto;color:#a3a8b8;font-size:12.5px}
+.pjm-del.sure{color:#e5484d;font-weight:700}
+.pjm-panel input{height:32px;box-sizing:border-box;border:1px solid #e1e5f0;border-radius:6px;padding:0 8px;font-size:13px;font-family:inherit;color:#2b3550;background:#fff;min-width:0;width:100%}
+.pjm-panel input:focus{outline:none;border-color:#95a8eb;box-shadow:0 0 0 3px #eef2ff}
+.pjm-add{display:grid;grid-template-columns:minmax(0,1fr) 104px;gap:6px;padding-top:8px;border-top:1px dashed #e6e9f2}
+.pjm-add .pjm-note-in{grid-column:1/2}
+.pjm-go{height:32px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap}
+.pjm-none{margin:0;font-size:12.5px;color:#a3a8b8}
+.pjm-row{align-items:start!important}
+.pjm-row>span{padding-top:7px}
+.pjm-panel.inline .pjm-list{max-height:212px}
+.pjm-panel.inline .pjm-add{grid-template-columns:150px 112px minmax(0,1fr) auto;border-top:0;padding-top:0}
+.pjm-panel.inline .pjm-add .pjm-note-in{grid-column:auto}
+.pjm-panel.inline .pjm-list:not(:empty)+.pjm-add{padding-top:6px}
+@media(max-width:640px){.pjm-panel.inline .pjm-add{grid-template-columns:minmax(0,1fr) 104px}.pjm-panel.inline .pjm-add .pjm-note-in{grid-column:1/2}.pjm-list>li{grid-template-columns:30px auto auto minmax(0,1fr) auto}.pjm-list>li .tg{display:none}}
 /* 비용 메모(11-11) */
 .tb-cost-memo{flex-basis:100%;display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:1px solid #e6eaf2;border-radius:6px;background:#fafbfe;color:#a0abc0;box-sizing:border-box;max-width:420px}
 .tb-cost-memo.focus{border-color:#9fb3f7;background:#fff;box-shadow:0 0 0 3px #eef2ff;color:#315df8}
