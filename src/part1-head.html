@@ -2630,6 +2630,10 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .checklist.narrow .check-list>li>.check-date{text-align:left;margin-right:0}
 .checklist.narrow .check-list>li>.check-pct{margin-left:auto}
 @media(max-width:640px){.check-list>li{justify-content:flex-start}.check-list>li>.hp{order:3}.check-list>li>.check-who,.check-list>li>.check-br+.check-date{margin-left:28px}.check-list>li>.check-who{flex:1 1 0;min-width:44px;overflow:hidden}.check-list>li>.check-who>*{max-width:100%;overflow:hidden;text-overflow:ellipsis;margin-left:0}.check-list>li>.check-pct{margin-left:auto}}
+/* 작은 창 자리(11-12, 사용자 '이거 잘린데'): 자리는 fitPop이 정한다(inline left · top). 상태 창은 줄 overflow에 안 잘리게 fixed(변형된 창 안에서는 fitPop이 기준 상자를 보정). */
+.tb-stpop{position:fixed}
+/* 아래 여유(스크롤 칸 맨 끝에서 열 때 창 아래가 딱 붙거나 여는 애니메이션만큼 잘리지 않게 넘침 영역을 조금 늘림, 보이지 않음) */
+.hp-pop:not(.up)::after,.tb-duepop:not(.up):not(.tb-stpop)::after{content:'';position:absolute;left:0;right:0;top:100%;height:14px;pointer-events:none}
 /* 비용 메모(11-11) */
 .tb-cost-memo{flex-basis:100%;display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:1px solid #e6eaf2;border-radius:6px;background:#fafbfe;color:#a0abc0;box-sizing:border-box;max-width:420px}
 .tb-cost-memo.focus{border-color:#9fb3f7;background:#fff;box-shadow:0 0 0 3px #eef2ff;color:#315df8}

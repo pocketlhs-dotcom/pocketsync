@@ -1284,11 +1284,12 @@ function ShareView({token, watch}) {
 }
 // 세부 업무 실무자: 여러 명 가능('이현성·안은지'). 눌러서 체크로 고른다.
 function CheckWho({c, busy, onSet}) {
- const [open, setOpen] = useState(null), ref = useRef(null), names = SEATS.map(s => s.name);
+ const [open, setOpen] = useState(false), ref = useRef(null), btn = useRef(null), pop = useRef(null), names = SEATS.map(s => s.name);
+ usePopFit(open, pop, btn, 'right', 4);
  const cur = String(c.by || '').split('·').map(t => t.trim()).filter(Boolean), shown = cOnly() ? cur.filter(cPerson) : cur;
- useEffect(() => { if (!open) return; const off = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(null); }; const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(null); } }; const close = () => setOpen(null); window.addEventListener('scroll', close, true); document.addEventListener('pointerdown', off); document.addEventListener('keydown', esc, true); return () => { document.removeEventListener('pointerdown', off); document.removeEventListener('keydown', esc, true); window.removeEventListener('scroll', close, true); }; }, [open]);
+ useEffect(() => { if (!open) return; const off = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }; const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); } }; const close = () => setOpen(false); window.addEventListener('scroll', close, true); document.addEventListener('pointerdown', off); document.addEventListener('keydown', esc, true); return () => { document.removeEventListener('pointerdown', off); document.removeEventListener('keydown', esc, true); window.removeEventListener('scroll', close, true); }; }, [open]);
  const toggle = n => { const set = new Set(cur.includes(n) ? cur.filter(x => x !== n) : [...cur, n]); const all = [...names, ...cur.filter(x => !names.includes(x))]; onSet(all.filter(x => set.has(x)).join('·')); };
- return html`<span class="check-who" ref=${ref}><button type="button" class=${cx('check-by', !shown.length && 'empty')} title="실무자 고르기 (여러 명 가능)" disabled=${busy} onClick=${e => { if (open) { setOpen(null); return; } const r = e.currentTarget.getBoundingClientRect(), h = 40 + 32 * (names.length + 1); setOpen({left: Math.max(8, Math.min(window.innerWidth - 178, r.right - 170)), top: r.bottom + 4 + h > window.innerHeight ? Math.max(8, r.top - 4 - h) : r.bottom + 4}); }}>${shown.length ? shown.join('·') : '실무자'}</button>${open && html`<div class="check-who-pop" role="dialog" aria-label="실무자 고르기" style=${`left:${open.left}px;top:${open.top}px`}>${[...new Set([...names, ...shown])].map(n => html`<button type="button" key=${n} class=${cx('chip', cur.includes(n) && 'on')} disabled=${busy} onClick=${() => toggle(n)}>${n}<span class="tb-check">${cur.includes(n) ? I('Check', 12) : ''}</span></button>`)}${shown.length > 0 && html`<button type="button" class="chip clear" disabled=${busy} onClick=${() => { onSet(''); setOpen(null); }}>비우기</button>`}<small>여러 명 선택 가능</small></div>`}</span>`;
+ return html`<span class="check-who" ref=${ref}><button type="button" ref=${btn} class=${cx('check-by', !shown.length && 'empty')} title="실무자 고르기 (여러 명 가능)" disabled=${busy} onClick=${() => setOpen(v => !v)}>${shown.length ? shown.join('·') : '실무자'}</button>${open && html`<div class="check-who-pop" ref=${pop} role="dialog" aria-label="실무자 고르기">${[...new Set([...names, ...shown])].map(n => html`<button type="button" key=${n} class=${cx('chip', cur.includes(n) && 'on')} disabled=${busy} onClick=${() => toggle(n)}>${n}<span class="tb-check">${cur.includes(n) ? I('Check', 12) : ''}</span></button>`)}${shown.length > 0 && html`<button type="button" class="chip clear" disabled=${busy} onClick=${() => { onSet(''); setOpen(false); }}>비우기</button>`}<small>여러 명 선택 가능</small></div>`}</span>`;
 }
 // 시간 act(11-09): tlog = 그 사람 · 그날 칸, ttotal = 그 사람 합계(차이를 오늘 칸에). 시간을 적으면 실무자에도 넣는다.
 function checkTimeAct(c, act) {
@@ -1317,14 +1318,11 @@ function HourSelect({value, label = '', tip = '', disabled = false, ro = false, 
 // 버튼을 누르면 작은 창 — 날짜(세부 업무 줄은 ‹ ›로 지난날도) · 0.5h~12h 칸(4열, 8h 넘는 칸은 점선 = 초과) · 지우기 · 그날 그 사람 합계 n / 12h.
 // 하루 최대 12h: 그 사람이 그날 다른 일에 적은 시간을 빼고 남은 만큼만 고를 수 있다(usedAt = 이 칸 말고 그날 쓴 시간).
 // 버튼 + 작은 창 공통(11-09, 시간 · 진행률): 바깥 누르면 닫기 · 위/오른쪽 자리 보기 · Esc · 화살표로 칸 옮기기.
-function usePop(width = 244, height = 280) {
- const [open, setOpen] = useState(false), [pos, setPos] = useState({up: false, right: false}), wrap = useRef(null), btn = useRef(null), grid = useRef(null);
+function usePop() {
+ const [open, setOpen] = useState(false), wrap = useRef(null), btn = useRef(null), grid = useRef(null), pop = useRef(null);
  useEffect(() => { if (!open) return; const off = e => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); }; document.addEventListener('pointerdown', off, true); return () => document.removeEventListener('pointerdown', off, true); }, [open]);
- const place = () => {
-  const r = btn.current.getBoundingClientRect(), sp = btn.current.closest('.tb-full, .sheet, .wp-body, .dialog'), box = sp ? sp.getBoundingClientRect() : {top: 0, bottom: window.innerHeight};
-  const below = Math.min(window.innerHeight, box.bottom) - r.bottom, above = r.top - Math.max(0, box.top);
-  setPos({up: below < height && above > below, right: r.left + width > window.innerWidth - 8});
- };
+ // 자리(11-12): 열린 뒤 실제 크기로 fitPop — 고르기 창 · 자세히 보기 같은 좁은 창 안에서도 안 잘리게.
+ usePopFit(open, pop, btn);
  const close = () => { setOpen(false); if (btn.current) btn.current.focus({preventScroll: true}); };
  const keys = cols => e => {
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
@@ -1334,20 +1332,20 @@ function usePop(width = 244, height = 280) {
  const focusOn = () => { if (!grid.current) return; const b = grid.current.querySelector('button.on:not(:disabled)') || grid.current.querySelector('button:not(:disabled)'); if (b) b.focus({preventScroll: true}); };
  // 창을 막 열어 포커스가 아직 버튼에 있을 때 Esc도 창만 닫는다(바깥 창 · 시트로 안 넘김).
  const wrapKey = e => { if (open && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } };
- return {open, setOpen, pos, wrap, btn, grid, place, close, keys, focusOn, wrapKey};
+ return {open, setOpen, wrap, btn, grid, pop, close, keys, focusOn, wrapKey};
 }
 const peersText = ps => ps.map(p => `${p.name} ${fmtH(p.h)}`).join(' · ');
 function HourPop({label, who = '', head = '', day: day0 = today(), nav = false, show = 0, valueAt, usedAt = () => 0, peersAt = null, ro = false, disabled = false, tip = '', onChange}) {
- const p = usePop(244, 280), [d, setD] = useState(day0);
+ const p = usePop(), [d, setD] = useState(day0);
  useEffect(() => { if (p.open) p.focusOn(); }, [p.open, d]);
  if (ro) return html`<span class=${cx('check-time ro', show > 0 && 'set')} title=${tip}>${show > 0 ? html`${I('Clock', 12)}<b>${fmtH(show)}</b>` : ''}</span>`;
- const toggle = () => { if (p.open) { p.setOpen(false); return; } p.place(); setD(day0); p.setOpen(true); };
+ const toggle = () => { if (p.open) { p.setOpen(false); return; } setD(day0); p.setOpen(true); };
  const v = valueAt(d), used = Math.max(0, usedAt(d)), left = Math.max(0, DAY_MAX - used), tot = used + v, mine = who && who === tlViewer(), peers = peersAt ? peersAt(d) : [];
  const pick = h => { p.close(); if (h !== v) onChange(h, d); };
  const shift = n => { const x = new Date(`${d}T03:00:00Z`); x.setUTCDate(x.getUTCDate() + n); const nd = x.toISOString().slice(0, 10); if (nd <= day0) setD(nd); };
  return html`<span class=${cx('hp', p.open && 'open')} ref=${p.wrap} onKeyDown=${p.wrapKey}>
   <button type="button" ref=${p.btn} class=${cx('check-time btn', show > 0 && 'set')} aria-label=${label} aria-haspopup="dialog" aria-expanded=${p.open} title=${tip} disabled=${disabled} onClick=${toggle}>${I('Clock', 12)}${show > 0 ? html`<b>${fmtH(show)}</b>` : html`<span class="ph">시간</span>`}${I('ChevronDown', 12)}</button>
-  ${p.open && html`<div class=${cx('hp-pop', p.pos.up && 'up', p.pos.right && 'right')} role="dialog" aria-label=${label} onKeyDown=${p.keys(4)}>
+  ${p.open && html`<div class="hp-pop" ref=${p.pop} role="dialog" aria-label=${label} onKeyDown=${p.keys(4)}>
    ${head ? html`<div class="hp-head" title=${head}>${head}</div>` : ''}
    <div class="hp-day">${nav ? html`<button type="button" class="hp-nav" aria-label="전날" onClick=${() => shift(-1)}>${I('ChevronLeft', 14)}</button>` : ''}<span><b>${hpDay(d)}</b>${d === today() ? html`<em>오늘</em>` : ''}</span>${nav ? html`<button type="button" class="hp-nav" aria-label="다음 날" disabled=${d >= day0} onClick=${() => shift(1)}>${I('ChevronRight', 14)}</button>` : ''}</div>
    ${peers.length ? html`<div class="hp-peers" title="같이 한 사람의 이날 시간(각자 적어요)">${I('Users', 12)}<span>같이 · ${peersText(peers)}</span></div>` : ''}
@@ -1364,15 +1362,15 @@ function HourPop({label, who = '', head = '', day: day0 = today(), nav = false, 
 // base = 고르기 전 저장된 값(오늘 % 고르기에서 '지금 n% → m%'), shared = 같이 하는 세부 업무(%는 모두에게 같이 바뀜).
 const PCT_GRID = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90];
 function PctPop({value = 0, base = null, label, head = '', disabled = false, tip = '', plain = false, shared = false, cls = '', onChange}) {
- const p = usePop(236, 240), [pv, setPv] = useState(null), v = Number(value) || 0, b = base === null || base === undefined ? null : Number(base) || 0;
+ const p = usePop(), [pv, setPv] = useState(null), v = Number(value) || 0, b = base === null || base === undefined ? null : Number(base) || 0;
  useEffect(() => { if (p.open) { setPv(null); p.focusOn(); } }, [p.open]);
- const toggle = () => { if (p.open) { p.setOpen(false); return; } p.place(); p.setOpen(true); };
+ const toggle = () => { if (p.open) { p.setOpen(false); return; } p.setOpen(true); };
  const pick = n => { p.close(); if (n !== v) onChange(n); };
  const sh = pv === null ? v : pv, tone = n => (n >= 100 ? 'full' : n > 0 ? 'mid' : '');
  const cell = n => html`<button type="button" key=${n} class=${cx(n === 100 && 'pp-full', n === v && 'on', b !== null && n === b && 'base')} aria-pressed=${n === v} title=${b !== null && n === b ? '지금 저장된 값' : ''} onPointerEnter=${() => setPv(n)} onFocus=${() => setPv(n)} onClick=${() => pick(n)}>${n === 100 ? html`${I('Check', 13)}100% 완료` : `${n}%`}</button>`;
  return html`<span class=${cx('pp', p.open && 'open', plain && 'plain', cls)} ref=${p.wrap} onKeyDown=${p.wrapKey}>
   <button type="button" ref=${p.btn} class=${cx('pp-btn', tone(v))} aria-label=${label} aria-haspopup="dialog" aria-expanded=${p.open} title=${tip} disabled=${disabled} onClick=${toggle}><b>${v}%</b>${I('ChevronDown', 12)}</button>
-  ${p.open && html`<div class=${cx('hp-pop pp-pop', p.pos.up && 'up', p.pos.right && 'right')} role="dialog" aria-label=${label} onKeyDown=${p.keys(5)}>
+  ${p.open && html`<div class="hp-pop pp-pop" ref=${p.pop} role="dialog" aria-label=${label} onKeyDown=${p.keys(5)}>
    ${head ? html`<div class="hp-head" title=${head}>${head}</div>` : ''}
    <div class="pp-now"><span>진행률</span><span>${b !== null && b !== sh ? html`<s>지금 ${b}% →</s>` : ''}<b class=${tone(sh)}>${sh}%</b></span></div>
    <div class=${cx('pp-bar', tone(sh))} aria-hidden="true"><i style=${{width: `${Math.max(0, Math.min(100, sh))}%`}}></i>${b !== null ? html`<u style=${{left: `${Math.max(0, Math.min(100, b))}%`}}></u>` : ''}</div>

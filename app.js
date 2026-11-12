@@ -436,17 +436,67 @@ function TabsList({class: cls = '', value, onChange, tabs, label}) {
 function ToggleGroup({class: cls = '', value, onChange, items, label}) {
  return html`<div class=${cx('toggle-group', cls)} role="group" aria-label=${label}>${items.map(i => html`<button type="button" key=${i.value} data-slot="toggle-group-item" data-state=${value === i.value ? 'on' : 'off'} aria-pressed=${value === i.value} class=${i.class || ''} title=${i.title} aria-label=${i.ariaLabel} onClick=${() => onChange(i.value)}>${i.content}</button>`)}</div>`;
 }
+// 작은 창 자리 잡기(11-12, 사용자 '이거 잘린데' · '오늘의 업무보고(고르기 창)에서 여전히 잘려'): 창이 열린 직후 실제 크기를 재서
+// 그 창을 실제로 자르는 상자 안에 둔다 — 버튼 아래(자리가 모자라면 위), 가로는 버튼 왼쪽(또는 오른쪽)에 맞추되 넘치면 반대쪽 끝 맞춤 → 그래도 넘치면 상자 안으로 밀어 넣기.
+// 자르는 상자 = 화면 ∩ overflow가 있는 조상(스크롤 칸 · 창). 창이 position:fixed면 변형된 조상(.dialog 등, fixed의 기준 상자)부터 위로만 본다.
+// 예전에는 화면 폭만 봐서, 고르기 창 · 자세히 보기처럼 화면 안의 좁은 창에서 오른쪽이 잘리고, 변형된 창 안의 fixed 창은 엉뚱한 곳에 떴다.
+function fitPop(pop, anchor, align = 'left', gap = 6, again = false) {
+ if (!pop || !anchor || !pop.isConnected) return;
+ const fixed = getComputedStyle(pop).position === 'fixed', m = 8;
+ let l = 0, t = 0, r = window.innerWidth, b = window.innerHeight, cb = null, pos = fixed ? 'fixed' : 'absolute';
+ // 기준 상자 사슬을 따라 올라가며, 사슬에 든 조상의 overflow만 자른다(사이에 낀 조상은 못 자름 — 예: 옆 창 안에 그린 자세히 보기는 fixed 덮개라 옆 창 overflow 밖).
+ for (let e = pop.parentElement; e && e !== document.body && e !== document.documentElement; e = e.parentElement) {
+  const st = getComputedStyle(e), tf = st.transform !== 'none' || st.filter !== 'none' || st.perspective !== 'none' || /paint|layout|strict|content/.test(st.contain || '');
+  if (fixed && !cb && tf) cb = e;
+  if (pos === 'fixed' ? !tf : pos === 'absolute' ? !(tf || st.position !== 'static') : false) continue;
+  pos = st.position;
+  const ox = st.overflowX !== 'visible', oy = st.overflowY !== 'visible';
+  if (!ox && !oy) continue;
+  const q = e.getBoundingClientRect();
+  if (ox) { l = Math.max(l, q.left + e.clientLeft); r = Math.min(r, q.left + e.clientLeft + e.clientWidth); }
+  if (oy) { t = Math.max(t, q.top + e.clientTop); b = Math.min(b, q.top + e.clientTop + e.clientHeight); }
+ }
+ const a = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+ const below = b - a.bottom - gap, above = a.top - t - gap, okB = below >= h + (again ? -1 : 4), okA = above >= h + 4;
+ // 아래 → 위. 둘 다 모자라면 아래로 열고 스크롤 칸을 움직여 보이게(위로 넘친 부분은 스크롤로 못 본다) → 그래도 모자라면 상자 안으로(버튼을 조금 덮더라도).
+ const up = !okB && okA, scroll = !okB && !okA && !fixed && !again && b - t >= a.height + gap + h + 2;
+ const fits = v => v >= l + m && v + w <= r - m;
+ let x = align === 'right' ? a.right - w : a.left, y = up ? a.top - gap - h : a.bottom + gap;
+ if (!fits(x)) { const alt = align === 'right' ? a.left : a.right - w; x = fits(alt) ? alt : Math.max(l + m, Math.min(x, r - m - w)); }
+ if (!okB && !okA && !scroll && h + 2 * m <= b - t) y = Math.max(t + m, Math.min(y, b - m - h));
+ const base = fixed ? cb : pop.offsetParent;
+ let bx = 0, by = 0;
+ if (base && base !== document.body) { const q = base.getBoundingClientRect(); bx = q.left + base.clientLeft - base.scrollLeft; by = q.top + base.clientTop - base.scrollTop; }
+ Object.assign(pop.style, {left: `${Math.round(x - bx)}px`, top: `${Math.round(y - by)}px`, right: 'auto', bottom: 'auto'});
+ pop.classList.toggle('up', up);
+ if (scroll) { // 가장 가까운 스크롤 칸을 모자란 만큼만 올린다(여는 애니메이션의 transform이 넘침 계산을 줄이지 않게 잠깐 끔).
+  let sc = null; for (let e = pop.parentElement; e && e !== document.body; e = e.parentElement) { const oy = getComputedStyle(e).overflowY; if (oy === 'auto' || oy === 'scroll') { sc = e; break; } }
+  sc = sc || document.scrollingElement; const an = pop.style.animation; pop.style.animation = 'none';
+  if (sc) sc.scrollTop += Math.ceil(a.bottom + gap + h + m - b);
+  pop.style.animation = an; fitPop(pop, anchor, align, gap, true);
+ }
+}
+// 열려 있는 동안 창 크기가 바뀌면(날짜 넘김 등) 다시 맞춘다.
+function usePopFit(open, pop, anchor, align = 'left', gap = 6) {
+ useLayoutEffect(() => {
+  if (!open) return;
+  const f = () => fitPop(pop.current, anchor.current, align, gap); f();
+  if (typeof ResizeObserver !== 'function' || !pop.current) return;
+  const ro = new ResizeObserver(f); ro.observe(pop.current); return () => ro.disconnect();
+ }, [open]);
+}
 // 앱 모양 드롭다운(기본 select 대신): 버튼을 누르면 아래(자리가 없으면 위)로 목록이 열리고, 위 · 아래 화살표 · Enter · Esc로도 고른다.
 // options: [{value, label, meta?, pct?, group?, action?, blank?}] — group이 바뀌는 곳에 묶음 이름, action은 맨 아래에 줄을 나눠 따로(예: 직접 적기), blank는 골라도 버튼에 안내 문구를 둔다.
 // grid: % 고르기처럼 칩 격자. size 'sm': 작은 버튼.
 function Pick({value, options, onChange, label, placeholder = '고르기', disabled = false, class: cls = '', grid = false, size = '', icon = ''}) {
- const [open, setOpen] = useState(false), [up, setUp] = useState(false), [right, setRight] = useState(false), [act, setAct] = useState(-1);
+ const [open, setOpen] = useState(false), [act, setAct] = useState(-1);
  const wrap = useRef(null), btn = useRef(null), list = useRef(null);
  const sel = options.find(o => !o.action && !o.blank && o.value === value);
  useEffect(() => { if (!open) return; const off = e => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); }; document.addEventListener('pointerdown', off); return () => document.removeEventListener('pointerdown', off); }, [open]);
  useEffect(() => { if (!open || act < 0 || !list.current) return; const el = list.current.querySelector(`[data-i="${act}"]`); if (el && el.scrollIntoView) el.scrollIntoView({block: 'nearest'}); }, [open, act]);
- // 목록은 버튼보다 좁아지지 않고 최소 260px. 오른쪽 자리가 모자라면 오른쪽 끝에 맞춘다.
- const show = () => { if (disabled || !btn.current) return; const r = btn.current.getBoundingClientRect(), below = window.innerHeight - r.bottom; setUp(below < 300 && r.top > below); setRight(grid ? r.right - 228 >= 8 : r.left + Math.max(r.width, 260) > window.innerWidth - 12); setAct(Math.max(0, options.findIndex(o => !o.action && o.value === value))); setOpen(true); };
+ // 목록은 버튼보다 좁아지지 않고 최소 260px. 자리는 fitPop(아래 → 위, 넘치면 오른쪽 끝 맞춤, % 칩 격자는 오른쪽 끝 맞춤 먼저).
+ usePopFit(open, list, btn, grid ? 'right' : 'left', 4);
+ const show = () => { if (disabled || !btn.current) return; setAct(Math.max(0, options.findIndex(o => !o.action && o.value === value))); setOpen(true); };
  const choose = o => { setOpen(false); if (btn.current) btn.current.focus(); if (o.action || o.value !== value) onChange(o.value); };
  const key = e => {
   if (!open) { if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); show(); } return; }
@@ -466,7 +516,7 @@ function Pick({value, options, onChange, label, placeholder = '고르기', disab
  });
  return html`<div class=${cx('pk', cls, size && 'pk-' + size, open && 'open')} ref=${wrap}>
   <button type="button" ref=${btn} class="pk-btn" aria-haspopup="listbox" aria-expanded=${open} aria-label=${label} disabled=${disabled} onClick=${() => (open ? setOpen(false) : show())} onKeyDown=${key}>${icon ? I(icon, 12) : ''}<span class="pk-val">${sel ? html`<span class="pk-label">${sel.label}</span>${sel.meta && !grid ? html`<span class="pk-meta">${sel.meta}</span>` : ''}` : html`<span class="pk-ph">${placeholder}</span>`}</span>${I('ChevronDown', 15)}</button>
-  ${open && html`<div class=${cx('pk-pop', up && 'up', right && 'right', grid && 'grid')} role="listbox" aria-label=${label} ref=${list}>${body}</div>`}
+  ${open && html`<div class=${cx('pk-pop', grid && 'grid')} role="listbox" aria-label=${label} ref=${list}>${body}</div>`}
  </div>`;
 }
 function Choice({value, onChange, options, label, disabled = false, class: cls = '', id}) {
@@ -1802,11 +1852,12 @@ function ShareView({token, watch}) {
 }
 // 세부 업무 실무자: 여러 명 가능('이현성·안은지'). 눌러서 체크로 고른다.
 function CheckWho({c, busy, onSet}) {
- const [open, setOpen] = useState(null), ref = useRef(null), names = SEATS.map(s => s.name);
+ const [open, setOpen] = useState(false), ref = useRef(null), btn = useRef(null), pop = useRef(null), names = SEATS.map(s => s.name);
+ usePopFit(open, pop, btn, 'right', 4);
  const cur = String(c.by || '').split('·').map(t => t.trim()).filter(Boolean), shown = cOnly() ? cur.filter(cPerson) : cur;
- useEffect(() => { if (!open) return; const off = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(null); }; const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(null); } }; const close = () => setOpen(null); window.addEventListener('scroll', close, true); document.addEventListener('pointerdown', off); document.addEventListener('keydown', esc, true); return () => { document.removeEventListener('pointerdown', off); document.removeEventListener('keydown', esc, true); window.removeEventListener('scroll', close, true); }; }, [open]);
+ useEffect(() => { if (!open) return; const off = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }; const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); } }; const close = () => setOpen(false); window.addEventListener('scroll', close, true); document.addEventListener('pointerdown', off); document.addEventListener('keydown', esc, true); return () => { document.removeEventListener('pointerdown', off); document.removeEventListener('keydown', esc, true); window.removeEventListener('scroll', close, true); }; }, [open]);
  const toggle = n => { const set = new Set(cur.includes(n) ? cur.filter(x => x !== n) : [...cur, n]); const all = [...names, ...cur.filter(x => !names.includes(x))]; onSet(all.filter(x => set.has(x)).join('·')); };
- return html`<span class="check-who" ref=${ref}><button type="button" class=${cx('check-by', !shown.length && 'empty')} title="실무자 고르기 (여러 명 가능)" disabled=${busy} onClick=${e => { if (open) { setOpen(null); return; } const r = e.currentTarget.getBoundingClientRect(), h = 40 + 32 * (names.length + 1); setOpen({left: Math.max(8, Math.min(window.innerWidth - 178, r.right - 170)), top: r.bottom + 4 + h > window.innerHeight ? Math.max(8, r.top - 4 - h) : r.bottom + 4}); }}>${shown.length ? shown.join('·') : '실무자'}</button>${open && html`<div class="check-who-pop" role="dialog" aria-label="실무자 고르기" style=${`left:${open.left}px;top:${open.top}px`}>${[...new Set([...names, ...shown])].map(n => html`<button type="button" key=${n} class=${cx('chip', cur.includes(n) && 'on')} disabled=${busy} onClick=${() => toggle(n)}>${n}<span class="tb-check">${cur.includes(n) ? I('Check', 12) : ''}</span></button>`)}${shown.length > 0 && html`<button type="button" class="chip clear" disabled=${busy} onClick=${() => { onSet(''); setOpen(null); }}>비우기</button>`}<small>여러 명 선택 가능</small></div>`}</span>`;
+ return html`<span class="check-who" ref=${ref}><button type="button" ref=${btn} class=${cx('check-by', !shown.length && 'empty')} title="실무자 고르기 (여러 명 가능)" disabled=${busy} onClick=${() => setOpen(v => !v)}>${shown.length ? shown.join('·') : '실무자'}</button>${open && html`<div class="check-who-pop" ref=${pop} role="dialog" aria-label="실무자 고르기">${[...new Set([...names, ...shown])].map(n => html`<button type="button" key=${n} class=${cx('chip', cur.includes(n) && 'on')} disabled=${busy} onClick=${() => toggle(n)}>${n}<span class="tb-check">${cur.includes(n) ? I('Check', 12) : ''}</span></button>`)}${shown.length > 0 && html`<button type="button" class="chip clear" disabled=${busy} onClick=${() => { onSet(''); setOpen(false); }}>비우기</button>`}<small>여러 명 선택 가능</small></div>`}</span>`;
 }
 // 시간 act(11-09): tlog = 그 사람 · 그날 칸, ttotal = 그 사람 합계(차이를 오늘 칸에). 시간을 적으면 실무자에도 넣는다.
 function checkTimeAct(c, act) {
@@ -1835,14 +1886,11 @@ function HourSelect({value, label = '', tip = '', disabled = false, ro = false, 
 // 버튼을 누르면 작은 창 — 날짜(세부 업무 줄은 ‹ ›로 지난날도) · 0.5h~12h 칸(4열, 8h 넘는 칸은 점선 = 초과) · 지우기 · 그날 그 사람 합계 n / 12h.
 // 하루 최대 12h: 그 사람이 그날 다른 일에 적은 시간을 빼고 남은 만큼만 고를 수 있다(usedAt = 이 칸 말고 그날 쓴 시간).
 // 버튼 + 작은 창 공통(11-09, 시간 · 진행률): 바깥 누르면 닫기 · 위/오른쪽 자리 보기 · Esc · 화살표로 칸 옮기기.
-function usePop(width = 244, height = 280) {
- const [open, setOpen] = useState(false), [pos, setPos] = useState({up: false, right: false}), wrap = useRef(null), btn = useRef(null), grid = useRef(null);
+function usePop() {
+ const [open, setOpen] = useState(false), wrap = useRef(null), btn = useRef(null), grid = useRef(null), pop = useRef(null);
  useEffect(() => { if (!open) return; const off = e => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); }; document.addEventListener('pointerdown', off, true); return () => document.removeEventListener('pointerdown', off, true); }, [open]);
- const place = () => {
-  const r = btn.current.getBoundingClientRect(), sp = btn.current.closest('.tb-full, .sheet, .wp-body, .dialog'), box = sp ? sp.getBoundingClientRect() : {top: 0, bottom: window.innerHeight};
-  const below = Math.min(window.innerHeight, box.bottom) - r.bottom, above = r.top - Math.max(0, box.top);
-  setPos({up: below < height && above > below, right: r.left + width > window.innerWidth - 8});
- };
+ // 자리(11-12): 열린 뒤 실제 크기로 fitPop — 고르기 창 · 자세히 보기 같은 좁은 창 안에서도 안 잘리게.
+ usePopFit(open, pop, btn);
  const close = () => { setOpen(false); if (btn.current) btn.current.focus({preventScroll: true}); };
  const keys = cols => e => {
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
@@ -1852,20 +1900,20 @@ function usePop(width = 244, height = 280) {
  const focusOn = () => { if (!grid.current) return; const b = grid.current.querySelector('button.on:not(:disabled)') || grid.current.querySelector('button:not(:disabled)'); if (b) b.focus({preventScroll: true}); };
  // 창을 막 열어 포커스가 아직 버튼에 있을 때 Esc도 창만 닫는다(바깥 창 · 시트로 안 넘김).
  const wrapKey = e => { if (open && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } };
- return {open, setOpen, pos, wrap, btn, grid, place, close, keys, focusOn, wrapKey};
+ return {open, setOpen, wrap, btn, grid, pop, close, keys, focusOn, wrapKey};
 }
 const peersText = ps => ps.map(p => `${p.name} ${fmtH(p.h)}`).join(' · ');
 function HourPop({label, who = '', head = '', day: day0 = today(), nav = false, show = 0, valueAt, usedAt = () => 0, peersAt = null, ro = false, disabled = false, tip = '', onChange}) {
- const p = usePop(244, 280), [d, setD] = useState(day0);
+ const p = usePop(), [d, setD] = useState(day0);
  useEffect(() => { if (p.open) p.focusOn(); }, [p.open, d]);
  if (ro) return html`<span class=${cx('check-time ro', show > 0 && 'set')} title=${tip}>${show > 0 ? html`${I('Clock', 12)}<b>${fmtH(show)}</b>` : ''}</span>`;
- const toggle = () => { if (p.open) { p.setOpen(false); return; } p.place(); setD(day0); p.setOpen(true); };
+ const toggle = () => { if (p.open) { p.setOpen(false); return; } setD(day0); p.setOpen(true); };
  const v = valueAt(d), used = Math.max(0, usedAt(d)), left = Math.max(0, DAY_MAX - used), tot = used + v, mine = who && who === tlViewer(), peers = peersAt ? peersAt(d) : [];
  const pick = h => { p.close(); if (h !== v) onChange(h, d); };
  const shift = n => { const x = new Date(`${d}T03:00:00Z`); x.setUTCDate(x.getUTCDate() + n); const nd = x.toISOString().slice(0, 10); if (nd <= day0) setD(nd); };
  return html`<span class=${cx('hp', p.open && 'open')} ref=${p.wrap} onKeyDown=${p.wrapKey}>
   <button type="button" ref=${p.btn} class=${cx('check-time btn', show > 0 && 'set')} aria-label=${label} aria-haspopup="dialog" aria-expanded=${p.open} title=${tip} disabled=${disabled} onClick=${toggle}>${I('Clock', 12)}${show > 0 ? html`<b>${fmtH(show)}</b>` : html`<span class="ph">시간</span>`}${I('ChevronDown', 12)}</button>
-  ${p.open && html`<div class=${cx('hp-pop', p.pos.up && 'up', p.pos.right && 'right')} role="dialog" aria-label=${label} onKeyDown=${p.keys(4)}>
+  ${p.open && html`<div class="hp-pop" ref=${p.pop} role="dialog" aria-label=${label} onKeyDown=${p.keys(4)}>
    ${head ? html`<div class="hp-head" title=${head}>${head}</div>` : ''}
    <div class="hp-day">${nav ? html`<button type="button" class="hp-nav" aria-label="전날" onClick=${() => shift(-1)}>${I('ChevronLeft', 14)}</button>` : ''}<span><b>${hpDay(d)}</b>${d === today() ? html`<em>오늘</em>` : ''}</span>${nav ? html`<button type="button" class="hp-nav" aria-label="다음 날" disabled=${d >= day0} onClick=${() => shift(1)}>${I('ChevronRight', 14)}</button>` : ''}</div>
    ${peers.length ? html`<div class="hp-peers" title="같이 한 사람의 이날 시간(각자 적어요)">${I('Users', 12)}<span>같이 · ${peersText(peers)}</span></div>` : ''}
@@ -1882,15 +1930,15 @@ function HourPop({label, who = '', head = '', day: day0 = today(), nav = false, 
 // base = 고르기 전 저장된 값(오늘 % 고르기에서 '지금 n% → m%'), shared = 같이 하는 세부 업무(%는 모두에게 같이 바뀜).
 const PCT_GRID = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90];
 function PctPop({value = 0, base = null, label, head = '', disabled = false, tip = '', plain = false, shared = false, cls = '', onChange}) {
- const p = usePop(236, 240), [pv, setPv] = useState(null), v = Number(value) || 0, b = base === null || base === undefined ? null : Number(base) || 0;
+ const p = usePop(), [pv, setPv] = useState(null), v = Number(value) || 0, b = base === null || base === undefined ? null : Number(base) || 0;
  useEffect(() => { if (p.open) { setPv(null); p.focusOn(); } }, [p.open]);
- const toggle = () => { if (p.open) { p.setOpen(false); return; } p.place(); p.setOpen(true); };
+ const toggle = () => { if (p.open) { p.setOpen(false); return; } p.setOpen(true); };
  const pick = n => { p.close(); if (n !== v) onChange(n); };
  const sh = pv === null ? v : pv, tone = n => (n >= 100 ? 'full' : n > 0 ? 'mid' : '');
  const cell = n => html`<button type="button" key=${n} class=${cx(n === 100 && 'pp-full', n === v && 'on', b !== null && n === b && 'base')} aria-pressed=${n === v} title=${b !== null && n === b ? '지금 저장된 값' : ''} onPointerEnter=${() => setPv(n)} onFocus=${() => setPv(n)} onClick=${() => pick(n)}>${n === 100 ? html`${I('Check', 13)}100% 완료` : `${n}%`}</button>`;
  return html`<span class=${cx('pp', p.open && 'open', plain && 'plain', cls)} ref=${p.wrap} onKeyDown=${p.wrapKey}>
   <button type="button" ref=${p.btn} class=${cx('pp-btn', tone(v))} aria-label=${label} aria-haspopup="dialog" aria-expanded=${p.open} title=${tip} disabled=${disabled} onClick=${toggle}><b>${v}%</b>${I('ChevronDown', 12)}</button>
-  ${p.open && html`<div class=${cx('hp-pop pp-pop', p.pos.up && 'up', p.pos.right && 'right')} role="dialog" aria-label=${label} onKeyDown=${p.keys(5)}>
+  ${p.open && html`<div class="hp-pop pp-pop" ref=${p.pop} role="dialog" aria-label=${label} onKeyDown=${p.keys(5)}>
    ${head ? html`<div class="hp-head" title=${head}>${head}</div>` : ''}
    <div class="pp-now"><span>진행률</span><span>${b !== null && b !== sh ? html`<s>지금 ${b}% →</s>` : ''}<b class=${tone(sh)}>${sh}%</b></span></div>
    <div class=${cx('pp-bar', tone(sh))} aria-hidden="true"><i style=${{width: `${Math.max(0, Math.min(100, sh))}%`}}></i>${b !== null ? html`<u style=${{left: `${Math.max(0, Math.min(100, b))}%`}}></u>` : ''}</div>
@@ -2496,24 +2544,27 @@ function TeamBoard() {
 // D-day 칩을 누르면 바로 마감일을 바꾼다.
 // 오더 목록의 담당: 눌러서 여러 명 고르기.
 function TeamWhoPick({x, busy, onPatch, onHandoff}) {
- const [open, setOpen] = useState(false), ref = useRef(null);
+ const [open, setOpen] = useState(false), ref = useRef(null), btn = useRef(null), pop = useRef(null);
+ usePopFit(open, pop, btn, 'right');
  useEffect(() => { if (!open) return; const off = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }; const esc = e => { if (e.key === 'Escape') setOpen(false); }; document.addEventListener('pointerdown', off); document.addEventListener('keydown', esc); return () => { document.removeEventListener('pointerdown', off); document.removeEventListener('keydown', esc); }; }, [open]);
  const set = async v => { const n = teamToggle(x.assignee, v); if (n === x.assignee) return; await onPatch(x, {assignee: n}, n ? `담당 ${teamWho(n)}` : '담당 비움'); if (x.assignee && onHandoff) onHandoff(x, x.assignee, n); };
- return html`<span class="tb-whopick" ref=${ref}><button type="button" class=${cx('tb-who', !x.assignee && 'none')} disabled=${busy} title=${teamWho(x.assignee)} onClick=${() => setOpen(v => !v)}>${teamWho(x.assignee)}${I('ChevronDown', 12)}</button>${open && html`<div class="tb-duepop tb-whopop" role="dialog" aria-label="담당 고르기">${[...teamNames().map(n => [n, n]), ['모두', '셋 다'], ['', '미배정']].map(([v, l]) => html`<button type="button" key=${l} class=${cx('chip', teamOn(x.assignee, v) && 'on')} disabled=${busy} onClick=${() => set(v)}>${l}${v && v !== '모두' ? html`<span class="tb-check">${teamOn(x.assignee, v) ? I('Check', 12) : ''}</span>` : ''}</button>`)}<small>여러 명 선택 가능</small></div>`}</span>`;
+ return html`<span class="tb-whopick" ref=${ref}><button type="button" ref=${btn} class=${cx('tb-who', !x.assignee && 'none')} disabled=${busy} title=${teamWho(x.assignee)} onClick=${() => setOpen(v => !v)}>${teamWho(x.assignee)}${I('ChevronDown', 12)}</button>${open && html`<div class="tb-duepop tb-whopop" ref=${pop} role="dialog" aria-label="담당 고르기">${[...teamNames().map(n => [n, n]), ['모두', '셋 다'], ['', '미배정']].map(([v, l]) => html`<button type="button" key=${l} class=${cx('chip', teamOn(x.assignee, v) && 'on')} disabled=${busy} onClick=${() => set(v)}>${l}${v && v !== '모두' ? html`<span class="tb-check">${teamOn(x.assignee, v) ? I('Check', 12) : ''}</span>` : ''}</button>`)}<small>여러 명 선택 가능</small></div>`}</span>`;
 }
 // 상태 배지: 눌러서 바로 바꾼다(예정 · 진행 중 · 보류 · 완료).
 function TeamStatusPick({x, busy, onPatch}) {
- const [open, setOpen] = useState(null), ref = useRef(null);
- useEffect(() => { if (!open) return; const off = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(null); }; const close = () => setOpen(null); document.addEventListener('pointerdown', off); window.addEventListener('scroll', close, true); return () => { document.removeEventListener('pointerdown', off); window.removeEventListener('scroll', close, true); }; }, [open]);
+ const [open, setOpen] = useState(false), ref = useRef(null), btn = useRef(null), pop = useRef(null);
+ usePopFit(open, pop, btn, 'left', 4);
+ useEffect(() => { if (!open) return; const off = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }; const close = () => setOpen(false); document.addEventListener('pointerdown', off); window.addEventListener('scroll', close, true); return () => { document.removeEventListener('pointerdown', off); window.removeEventListener('scroll', close, true); }; }, [open]);
  const L = {todo: '예정', doing: '진행 중', hold: '보류', done: '완료'};
- return html`<span class="tb-stpick" ref=${ref}><button type="button" class=${'tb-stbadge st-' + x.status} disabled=${busy} title="상태 바꾸기" onClick=${e => { if (open) { setOpen(null); return; } const r = e.currentTarget.getBoundingClientRect(); setOpen({left: Math.min(window.innerWidth - 150, r.left), top: r.bottom + 4 + 150 > window.innerHeight ? r.top - 154 : r.bottom + 4}); }}><i></i>${L[x.status]}${I('ChevronDown', 11)}</button>${open && html`<div class="tb-duepop tb-stpop" style=${`position:fixed;left:${open.left}px;top:${open.top}px`}>${Object.entries(L).map(([k, l]) => html`<button type="button" key=${k} class=${cx('chip', 'st-' + k, x.status === k && 'on')} onClick=${() => { setOpen(null); if (x.status !== k) onPatch(x, {status: k}, `상태 ${statuses[k]}`); }}><span><i></i>${l}</span></button>`)}</div>`}</span>`;
+ return html`<span class="tb-stpick" ref=${ref}><button type="button" ref=${btn} class=${'tb-stbadge st-' + x.status} disabled=${busy} title="상태 바꾸기" onClick=${() => setOpen(v => !v)}><i></i>${L[x.status]}${I('ChevronDown', 11)}</button>${open && html`<div class="tb-duepop tb-stpop" ref=${pop}>${Object.entries(L).map(([k, l]) => html`<button type="button" key=${k} class=${cx('chip', 'st-' + k, x.status === k && 'on')} onClick=${() => { setOpen(false); if (x.status !== k) onPatch(x, {status: k}, `상태 ${statuses[k]}`); }}><span><i></i>${l}</span></button>`)}</div>`}</span>`;
 }
 function TeamDuePick({x, busy, onPatch}) {
- const [open, setOpen] = useState(false), ref = useRef(null), d = dDay(x.due);
+ const [open, setOpen] = useState(false), ref = useRef(null), btn = useRef(null), pop = useRef(null), d = dDay(x.due);
+ usePopFit(open, pop, btn);
  useEffect(() => { if (!open) return; const off = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }; const esc = e => { if (e.key === 'Escape') setOpen(false); }; document.addEventListener('pointerdown', off); document.addEventListener('keydown', esc); return () => { document.removeEventListener('pointerdown', off); document.removeEventListener('keydown', esc); }; }, [open]);
  const set = v => { setOpen(false); if (v !== x.due) onPatch(x, {due: v}, v ? `마감 ${shortDate(v)}` : '마감 지움'); }, mv = dueMoves(x);
  if (x.status === 'done') { const dd = inSeoul(doneAt(x)); return html`<span class="tb-duepick"><span class="dday none" title=${x.due ? `마감 ${shortDate(x.due)}${dd && dd > x.due ? ' · 마감 지나 완료' : ''}` : '마감 없음'}>완료</span></span>`; }
- return html`<span class="tb-duepick" ref=${ref}><button type="button" class=${cx('dday', x.status === 'hold' ? 'hold' : d.cls)} title=${x.due ? `마감 ${shortDate(x.due)} · 눌러서 바꾸기` : '마감일 정하기'} disabled=${busy} onClick=${() => setOpen(v => !v)}>${d.label}${mv.length ? html`<i class="dday-mv" title=${`마감 ${mv.length}번 조정 · 처음 ${shortDate(dueFirst(x))}`}>${I('History', 10)}${mv.length}</i>` : ''}</button>${open && html`<div class="tb-duepop" role="dialog" aria-label="마감일 바꾸기">${[['', '없음'], [today(), '오늘'], [offsetDate(today(), 1), '내일'], [offsetDate(today(), 2), '모레'], [offsetDate(today(), 7), '일주일 뒤']].map(([v, l]) => html`<button type="button" key=${l} class=${cx('chip', x.due === v && 'on')} onClick=${() => set(v)}>${l}${v ? html`<small>${shortDate(v)}</small>` : ''}</button>`)}<input type="date" aria-label="날짜 직접 선택" value=${x.due} onChange=${e => set(e.target.value)} />${mv.length ? html`<div class="tb-duehist"><b>${I('History', 12)}처음 마감 ${shortDate(dueFirst(x))} · ${mv.length}번 조정</b><ol>${mv.slice(-4).map(h => html`<li key=${h.at} title=${`${h.by} · ${teamDay(inSeoul(h.at))}${h.note ? ` · ${h.note}` : ''}`}><span>${shortDate(h.from)} → ${shortDate(h.to)}</span>${dueWhy(h) ? html`<em class=${h.side}>${dueWhy(h)}</em>` : ''}</li>`)}</ol></div>` : ''}</div>`}</span>`;
+ return html`<span class="tb-duepick" ref=${ref}><button type="button" ref=${btn} class=${cx('dday', x.status === 'hold' ? 'hold' : d.cls)} title=${x.due ? `마감 ${shortDate(x.due)} · 눌러서 바꾸기` : '마감일 정하기'} disabled=${busy} onClick=${() => setOpen(v => !v)}>${d.label}${mv.length ? html`<i class="dday-mv" title=${`마감 ${mv.length}번 조정 · 처음 ${shortDate(dueFirst(x))}`}>${I('History', 10)}${mv.length}</i>` : ''}</button>${open && html`<div class="tb-duepop" ref=${pop} role="dialog" aria-label="마감일 바꾸기">${[['', '없음'], [today(), '오늘'], [offsetDate(today(), 1), '내일'], [offsetDate(today(), 2), '모레'], [offsetDate(today(), 7), '일주일 뒤']].map(([v, l]) => html`<button type="button" key=${l} class=${cx('chip', x.due === v && 'on')} onClick=${() => set(v)}>${l}${v ? html`<small>${shortDate(v)}</small>` : ''}</button>`)}<input type="date" aria-label="날짜 직접 선택" value=${x.due} onChange=${e => set(e.target.value)} />${mv.length ? html`<div class="tb-duehist"><b>${I('History', 12)}처음 마감 ${shortDate(dueFirst(x))} · ${mv.length}번 조정</b><ol>${mv.slice(-4).map(h => html`<li key=${h.at} title=${`${h.by} · ${teamDay(inSeoul(h.at))}${h.note ? ` · ${h.note}` : ''}`}><span>${shortDate(h.from)} → ${shortDate(h.to)}</span>${dueWhy(h) ? html`<em class=${h.side}>${dueWhy(h)}</em>` : ''}</li>`)}</ol></div>` : ''}</div>`}</span>`;
 }
 function TeamMini({x, cmap, onOpen, showWho = true, extra, self = ''}) {
  const d = dDay(x.due), co = self ? teamList(x.assignee).filter(n => n !== self) : [];

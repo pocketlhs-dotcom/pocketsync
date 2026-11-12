@@ -435,17 +435,67 @@ function TabsList({class: cls = '', value, onChange, tabs, label}) {
 function ToggleGroup({class: cls = '', value, onChange, items, label}) {
  return html`<div class=${cx('toggle-group', cls)} role="group" aria-label=${label}>${items.map(i => html`<button type="button" key=${i.value} data-slot="toggle-group-item" data-state=${value === i.value ? 'on' : 'off'} aria-pressed=${value === i.value} class=${i.class || ''} title=${i.title} aria-label=${i.ariaLabel} onClick=${() => onChange(i.value)}>${i.content}</button>`)}</div>`;
 }
+// 작은 창 자리 잡기(11-12, 사용자 '이거 잘린데' · '오늘의 업무보고(고르기 창)에서 여전히 잘려'): 창이 열린 직후 실제 크기를 재서
+// 그 창을 실제로 자르는 상자 안에 둔다 — 버튼 아래(자리가 모자라면 위), 가로는 버튼 왼쪽(또는 오른쪽)에 맞추되 넘치면 반대쪽 끝 맞춤 → 그래도 넘치면 상자 안으로 밀어 넣기.
+// 자르는 상자 = 화면 ∩ overflow가 있는 조상(스크롤 칸 · 창). 창이 position:fixed면 변형된 조상(.dialog 등, fixed의 기준 상자)부터 위로만 본다.
+// 예전에는 화면 폭만 봐서, 고르기 창 · 자세히 보기처럼 화면 안의 좁은 창에서 오른쪽이 잘리고, 변형된 창 안의 fixed 창은 엉뚱한 곳에 떴다.
+function fitPop(pop, anchor, align = 'left', gap = 6, again = false) {
+ if (!pop || !anchor || !pop.isConnected) return;
+ const fixed = getComputedStyle(pop).position === 'fixed', m = 8;
+ let l = 0, t = 0, r = window.innerWidth, b = window.innerHeight, cb = null, pos = fixed ? 'fixed' : 'absolute';
+ // 기준 상자 사슬을 따라 올라가며, 사슬에 든 조상의 overflow만 자른다(사이에 낀 조상은 못 자름 — 예: 옆 창 안에 그린 자세히 보기는 fixed 덮개라 옆 창 overflow 밖).
+ for (let e = pop.parentElement; e && e !== document.body && e !== document.documentElement; e = e.parentElement) {
+  const st = getComputedStyle(e), tf = st.transform !== 'none' || st.filter !== 'none' || st.perspective !== 'none' || /paint|layout|strict|content/.test(st.contain || '');
+  if (fixed && !cb && tf) cb = e;
+  if (pos === 'fixed' ? !tf : pos === 'absolute' ? !(tf || st.position !== 'static') : false) continue;
+  pos = st.position;
+  const ox = st.overflowX !== 'visible', oy = st.overflowY !== 'visible';
+  if (!ox && !oy) continue;
+  const q = e.getBoundingClientRect();
+  if (ox) { l = Math.max(l, q.left + e.clientLeft); r = Math.min(r, q.left + e.clientLeft + e.clientWidth); }
+  if (oy) { t = Math.max(t, q.top + e.clientTop); b = Math.min(b, q.top + e.clientTop + e.clientHeight); }
+ }
+ const a = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+ const below = b - a.bottom - gap, above = a.top - t - gap, okB = below >= h + (again ? -1 : 4), okA = above >= h + 4;
+ // 아래 → 위. 둘 다 모자라면 아래로 열고 스크롤 칸을 움직여 보이게(위로 넘친 부분은 스크롤로 못 본다) → 그래도 모자라면 상자 안으로(버튼을 조금 덮더라도).
+ const up = !okB && okA, scroll = !okB && !okA && !fixed && !again && b - t >= a.height + gap + h + 2;
+ const fits = v => v >= l + m && v + w <= r - m;
+ let x = align === 'right' ? a.right - w : a.left, y = up ? a.top - gap - h : a.bottom + gap;
+ if (!fits(x)) { const alt = align === 'right' ? a.left : a.right - w; x = fits(alt) ? alt : Math.max(l + m, Math.min(x, r - m - w)); }
+ if (!okB && !okA && !scroll && h + 2 * m <= b - t) y = Math.max(t + m, Math.min(y, b - m - h));
+ const base = fixed ? cb : pop.offsetParent;
+ let bx = 0, by = 0;
+ if (base && base !== document.body) { const q = base.getBoundingClientRect(); bx = q.left + base.clientLeft - base.scrollLeft; by = q.top + base.clientTop - base.scrollTop; }
+ Object.assign(pop.style, {left: `${Math.round(x - bx)}px`, top: `${Math.round(y - by)}px`, right: 'auto', bottom: 'auto'});
+ pop.classList.toggle('up', up);
+ if (scroll) { // 가장 가까운 스크롤 칸을 모자란 만큼만 올린다(여는 애니메이션의 transform이 넘침 계산을 줄이지 않게 잠깐 끔).
+  let sc = null; for (let e = pop.parentElement; e && e !== document.body; e = e.parentElement) { const oy = getComputedStyle(e).overflowY; if (oy === 'auto' || oy === 'scroll') { sc = e; break; } }
+  sc = sc || document.scrollingElement; const an = pop.style.animation; pop.style.animation = 'none';
+  if (sc) sc.scrollTop += Math.ceil(a.bottom + gap + h + m - b);
+  pop.style.animation = an; fitPop(pop, anchor, align, gap, true);
+ }
+}
+// 열려 있는 동안 창 크기가 바뀌면(날짜 넘김 등) 다시 맞춘다.
+function usePopFit(open, pop, anchor, align = 'left', gap = 6) {
+ useLayoutEffect(() => {
+  if (!open) return;
+  const f = () => fitPop(pop.current, anchor.current, align, gap); f();
+  if (typeof ResizeObserver !== 'function' || !pop.current) return;
+  const ro = new ResizeObserver(f); ro.observe(pop.current); return () => ro.disconnect();
+ }, [open]);
+}
 // 앱 모양 드롭다운(기본 select 대신): 버튼을 누르면 아래(자리가 없으면 위)로 목록이 열리고, 위 · 아래 화살표 · Enter · Esc로도 고른다.
 // options: [{value, label, meta?, pct?, group?, action?, blank?}] — group이 바뀌는 곳에 묶음 이름, action은 맨 아래에 줄을 나눠 따로(예: 직접 적기), blank는 골라도 버튼에 안내 문구를 둔다.
 // grid: % 고르기처럼 칩 격자. size 'sm': 작은 버튼.
 function Pick({value, options, onChange, label, placeholder = '고르기', disabled = false, class: cls = '', grid = false, size = '', icon = ''}) {
- const [open, setOpen] = useState(false), [up, setUp] = useState(false), [right, setRight] = useState(false), [act, setAct] = useState(-1);
+ const [open, setOpen] = useState(false), [act, setAct] = useState(-1);
  const wrap = useRef(null), btn = useRef(null), list = useRef(null);
  const sel = options.find(o => !o.action && !o.blank && o.value === value);
  useEffect(() => { if (!open) return; const off = e => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); }; document.addEventListener('pointerdown', off); return () => document.removeEventListener('pointerdown', off); }, [open]);
  useEffect(() => { if (!open || act < 0 || !list.current) return; const el = list.current.querySelector(`[data-i="${act}"]`); if (el && el.scrollIntoView) el.scrollIntoView({block: 'nearest'}); }, [open, act]);
- // 목록은 버튼보다 좁아지지 않고 최소 260px. 오른쪽 자리가 모자라면 오른쪽 끝에 맞춘다.
- const show = () => { if (disabled || !btn.current) return; const r = btn.current.getBoundingClientRect(), below = window.innerHeight - r.bottom; setUp(below < 300 && r.top > below); setRight(grid ? r.right - 228 >= 8 : r.left + Math.max(r.width, 260) > window.innerWidth - 12); setAct(Math.max(0, options.findIndex(o => !o.action && o.value === value))); setOpen(true); };
+ // 목록은 버튼보다 좁아지지 않고 최소 260px. 자리는 fitPop(아래 → 위, 넘치면 오른쪽 끝 맞춤, % 칩 격자는 오른쪽 끝 맞춤 먼저).
+ usePopFit(open, list, btn, grid ? 'right' : 'left', 4);
+ const show = () => { if (disabled || !btn.current) return; setAct(Math.max(0, options.findIndex(o => !o.action && o.value === value))); setOpen(true); };
  const choose = o => { setOpen(false); if (btn.current) btn.current.focus(); if (o.action || o.value !== value) onChange(o.value); };
  const key = e => {
   if (!open) { if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); show(); } return; }
@@ -465,7 +515,7 @@ function Pick({value, options, onChange, label, placeholder = '고르기', disab
  });
  return html`<div class=${cx('pk', cls, size && 'pk-' + size, open && 'open')} ref=${wrap}>
   <button type="button" ref=${btn} class="pk-btn" aria-haspopup="listbox" aria-expanded=${open} aria-label=${label} disabled=${disabled} onClick=${() => (open ? setOpen(false) : show())} onKeyDown=${key}>${icon ? I(icon, 12) : ''}<span class="pk-val">${sel ? html`<span class="pk-label">${sel.label}</span>${sel.meta && !grid ? html`<span class="pk-meta">${sel.meta}</span>` : ''}` : html`<span class="pk-ph">${placeholder}</span>`}</span>${I('ChevronDown', 15)}</button>
-  ${open && html`<div class=${cx('pk-pop', up && 'up', right && 'right', grid && 'grid')} role="listbox" aria-label=${label} ref=${list}>${body}</div>`}
+  ${open && html`<div class=${cx('pk-pop', grid && 'grid')} role="listbox" aria-label=${label} ref=${list}>${body}</div>`}
  </div>`;
 }
 function Choice({value, onChange, options, label, disabled = false, class: cls = '', id}) {
