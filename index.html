@@ -2708,6 +2708,24 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .ell-tip.on{opacity:1;visibility:visible}
 .ell-tip b{font-weight:600}
 .ell-tip small{font-size:11.5px;color:#c8d1ea}
+/* 미팅 시간 고르기(11-17, 사용자 '분 단위 이상해'): 기본 time 입력 대신 시(00~23) · 분(5분) 칸 */
+.tpk{position:relative;display:inline-flex;min-width:0}
+.tpk-btn{width:100%;height:32px;box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;padding:0 8px;border:1px solid #e1e5f0;border-radius:6px;background:#fff;color:#2b3550;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;font-variant-numeric:tabular-nums;min-width:0}
+.tpk-btn>span{flex:1;min-width:0;text-align:left;white-space:nowrap}
+.tpk-btn.empty{color:#a3a8b8;font-weight:500}
+.tpk-btn svg{color:#a3a8b8;flex:none}
+.tpk-btn:hover,.tpk.open .tpk-btn{border-color:#95a8eb}
+.tpk-btn:focus-visible{outline:none;border-color:#95a8eb;box-shadow:0 0 0 3px #eef2ff}
+.tpk-pop{position:fixed;z-index:120;top:0;left:0;width:258px;box-sizing:border-box;padding:10px;border:1px solid #dde3ef;border-radius:10px;background:#fff;box-shadow:0 14px 34px rgba(17,34,85,.16),0 2px 6px rgba(17,34,85,.06);animation:hpIn .12s ease-out;text-align:left;cursor:default}
+.tpk-lab{font-size:11.5px;font-weight:700;color:#8a92a8;margin:0 2px 5px}
+.tpk-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;margin-bottom:9px}
+.tpk-grid button{height:28px;padding:0;border:1px solid #e6e9f2;border-radius:5px;background:#fff;color:#2b3550;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;font-variant-numeric:tabular-nums}
+.tpk-grid button:hover{border-color:#95a8eb;color:#315df8}
+.tpk-grid button:focus-visible{outline:2px solid #95a8eb;outline-offset:1px}
+.tpk-grid button.dim{color:#b3b8c6;background:#fafbfd}
+.tpk-grid button.on{background:#315df8;border-color:#315df8;color:#fff}
+.tpk-foot{display:flex;align-items:center;justify-content:space-between;padding-top:7px;border-top:1px dashed #e6e9f2}
+.tpk-foot>b{font-size:13.5px;color:#1f2a44;font-variant-numeric:tabular-nums}
 /* 비용 메모(11-11) */
 .tb-cost-memo{flex-basis:100%;display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:1px solid #e6eaf2;border-radius:6px;background:#fafbfe;color:#a0abc0;box-sizing:border-box;max-width:420px}
 .tb-cost-memo.focus{border-color:#9fb3f7;background:#fff;box-shadow:0 0 0 3px #eef2ff;color:#315df8}
@@ -2755,6 +2773,6 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="vendor/firebase-firestore-compat.js"></script>
-<script src="platform.js?v=1794460682"></script>
-<script src="app.js?v=1794460682"></script>
+<script src="platform.js?v=1794881176"></script>
+<script src="app.js?v=1794881176"></script>
 </body></html>

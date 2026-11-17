@@ -2611,6 +2611,33 @@ function meetState(x) {
  const dl = m.day === t ? '오늘' : m.day === offsetDate(t, 1) ? '내일' : shortDate(m.day);
  return {list, i, past, label: `${i + 1}차 ${dl}`, cls: iNext < 0 ? 'past' : m.day === t ? 'today' : 'next', tip: `${iNext < 0 ? '지난 미팅' : '다음 미팅'} ${i + 1}차 · ${meetWhen(m)}${m.note ? ` · ${m.note}` : ''} · 모두 ${list.length}번 (눌러서 보기)`};
 }
+// 미팅 시간 고르기(11-17, 사용자 '분 단위 이상해'): 기본 time 입력(step 10분)은 브라우저 목록이 10 · 20 · … · 50 뒤에 지금 시각의 분(04)이 끼는 등
+// 들쭉날쭉해서 앱 모양 작은 창으로 바꿈. 시 00~23(6칸 × 4줄, 07시 전 · 22시 뒤는 흐리게) · 분 5분 간격(6칸 × 2줄) · 시간 미정. 24시간 표기(목록과 같게).
+// 시를 고르면 분은 그대로(없으면 00), 분을 고르면 닫힘. 창은 fixed(목록 스크롤 칸 안 고치기 줄에서도 안 잘리게) — 스크롤하면 닫힘.
+function TimePick({value = '', onChange, label = '시간', disabled = false}) {
+ const [open, setOpen] = useState(false), wrap = useRef(null), btn = useRef(null), pop = useRef(null);
+ usePopFit(open, pop, btn);
+ useEffect(() => {
+  if (!open) return;
+  const off = e => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); }, sc = e => { if (!(pop.current && pop.current.contains(e.target))) setOpen(false); };
+  document.addEventListener('pointerdown', off, true); window.addEventListener('scroll', sc, true);
+  const f = pop.current && (pop.current.querySelector('.tpk-grid.h button.on') || pop.current.querySelector('.tpk-grid.h button[data-h="10"]')); if (f) f.focus({preventScroll: true});
+  return () => { document.removeEventListener('pointerdown', off, true); window.removeEventListener('scroll', sc, true); };
+ }, [open]);
+ const [h, m] = MEET_HM.test(value) ? value.split(':') : ['', ''];
+ const close = () => { setOpen(false); if (btn.current) btn.current.focus({preventScroll: true}); };
+ const HS = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0')), MS = Array.from({length: 12}, (_, i) => String(i * 5).padStart(2, '0'));
+ return html`<span class=${cx('tpk', open && 'open')} ref=${wrap} onKeyDown=${e => { if (open && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } }}>
+  <button type="button" ref=${btn} class=${cx('tpk-btn', !value && 'empty')} aria-label=${label} aria-haspopup="dialog" aria-expanded=${open} disabled=${disabled} onClick=${() => setOpen(v => !v)}>${I('Clock', 13)}<span>${value || '시간'}</span>${I('ChevronDown', 12)}</button>
+  ${open && html`<div class="tpk-pop" ref=${pop} role="dialog" aria-label=${label}>
+   <div class="tpk-lab">시</div>
+   <div class="tpk-grid h">${HS.map(hh => html`<button type="button" key=${hh} data-h=${hh} class=${cx(hh === h && 'on', (hh < '07' || hh > '22') && 'dim')} aria-pressed=${hh === h} aria-label=${`${hh}시`} onClick=${() => onChange(`${hh}:${m || '00'}`)}>${hh}</button>`)}</div>
+   <div class="tpk-lab">분</div>
+   <div class="tpk-grid m">${MS.map(mm => html`<button type="button" key=${mm} class=${cx(mm === m && 'on')} aria-pressed=${mm === m} aria-label=${`${mm}분`} onClick=${() => { onChange(`${h || '10'}:${mm}`); close(); }}>${mm}</button>`)}</div>
+   <div class="tpk-foot"><button type="button" class="text-button" onClick=${() => { onChange(''); close(); }}>시간 미정</button><b>${value || '—'}</b></div>
+  </div>`}
+ </span>`;
+}
 function TeamMeetPanel({x, busy = false, onPatch, editable = true, inline = false}) {
  const s = meetState(x), list = s.list, t = today(), who = tlViewer() || '', ul = useRef(null);
  const [day, setDay] = useState(''), [time, setTime] = useState(''), [note, setNote] = useState(''), [ed, setEd] = useState(null), [del, setDel] = useState('');
@@ -2643,7 +2670,7 @@ function TeamMeetPanel({x, busy = false, onPatch, editable = true, inline = fals
  const row = (m, i) => {
   const cls = s.past(m) ? 'past' : m.day === t ? 'today' : i === s.i ? 'next' : 'later';
   if (ed && ed.id === m.id) return html`<li key=${m.id} class="editing"><b class="n">${i + 1}차</b>
-   <div class="pjm-ed"><input type="date" aria-label=${`${i + 1}차 미팅 날짜`} value=${ed.day} onInput=${e => setEd(o => ({...o, day: e.target.value}))} onKeyDown=${keyEd} /><input type="time" step="600" aria-label=${`${i + 1}차 미팅 시간`} value=${ed.time} onInput=${e => setEd(o => ({...o, time: e.target.value}))} onKeyDown=${keyEd} />
+   <div class="pjm-ed"><input type="date" aria-label=${`${i + 1}차 미팅 날짜`} value=${ed.day} onInput=${e => setEd(o => ({...o, day: e.target.value}))} onKeyDown=${keyEd} /><${TimePick} value=${ed.time} label=${`${i + 1}차 미팅 시간`} onChange=${v => setEd(o => ({...o, time: v}))} />
     <input type="text" class="pjm-note-in" maxLength="60" aria-label=${`${i + 1}차 미팅 메모`} placeholder="메모 (예: 시안 리뷰)" value=${ed.note} onInput=${e => setEd(o => ({...o, note: e.target.value}))} onKeyDown=${keyEd} />
     <span class="pjm-acts"><button type="button" class=${cx('text-button pjm-del', del === m.id && 'sure')} disabled=${busy} onClick=${() => remove(m)}>${del === m.id ? '지울까요?' : '지우기'}</button><button type="button" class="secondary-button small" onClick=${() => { setEd(null); setDel(''); }}>취소</button><button type="button" class="primary-button small" disabled=${busy || !DATE_RE.test(ed.day)} onClick=${saveEd}>저장</button></span></div></li>`;
   const mv = m.moves || [];
@@ -2656,7 +2683,7 @@ function TeamMeetPanel({x, busy = false, onPatch, editable = true, inline = fals
  return html`<div class=${cx('pjm-panel', inline && 'inline')}>
   ${!inline && html`<div class="pjm-head"><strong>${I('MessagesSquare', 14)}실제 미팅일</strong><span>${list.length ? `모두 ${list.length}번${s.cls !== 'past' && s.i >= 0 ? ` · 다음 ${s.i + 1}차` : ''}` : '아직 없어요'}</span></div>`}
   ${list.length ? html`<ul class="pjm-list" ref=${ul}>${list.map(row)}</ul>` : !editable ? html`<p class="pjm-none">적힌 미팅이 없어요.</p>` : ''}
-  ${editable && html`<div class="pjm-add"><input type="date" aria-label="새 미팅 날짜" value=${day} onInput=${e => setDay(e.target.value)} /><input type="time" step="600" aria-label="새 미팅 시간" value=${time} onInput=${e => setTime(e.target.value)} />
+  ${editable && html`<div class="pjm-add"><input type="date" aria-label="새 미팅 날짜" value=${day} onInput=${e => setDay(e.target.value)} /><${TimePick} value=${time} label="새 미팅 시간" onChange=${setTime} />
    <input type="text" class="pjm-note-in" maxLength="60" aria-label="새 미팅 메모" placeholder="메모 (예: 킥오프 · 시안 리뷰)" value=${note} onInput=${e => setNote(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} />
    <button type="button" class="primary-button small pjm-go" disabled=${busy || !DATE_RE.test(day)} title=${DATE_RE.test(day) ? '' : '날짜를 먼저 골라 주세요'} onClick=${add}>${I('Plus', 13)}${addN}차 추가</button>
    ${addN <= list.length && html`<small class="pjm-hint">${hpDay(list[addN - 1].day)} ${addN}차보다 앞 날짜라 ${addN}차로 들어가요 · 뒤 미팅 차수는 하나씩 밀려요</small>`}</div>`}
