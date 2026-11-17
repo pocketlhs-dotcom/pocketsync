@@ -141,6 +141,9 @@ const tDays = h => Math.max(0.5, Math.round((Number(h) || 0) / 8 * 2) / 2);
 // 세부 업무 표시(11-05): 새로 넣은 것(at) 'New', 이름 · %를 고친 것(ed) '조정됨' — 7시간 동안(업무 NEW와 같은 기준). 둘 다면 New.
 const CHECK_FRESH_MS = 7 * 36e5;
 const checkTag = c => { const now = Date.now(); if (!c) return ''; if (now - Date.parse(c.at || '') < CHECK_FRESH_MS) return 'new'; if (now - Date.parse(c.ed || '') < CHECK_FRESH_MS) return 'edit'; return ''; };
+// 세부 업무의 차수(11-17): 업무의 차수 시작일(rounds[].day)과 세부 업무를 만든 날을 비교해 2차부터 작은 표시. A·B 업무는 차수가 없어 안 보임.
+const roundOfDay = (item, day) => { let n = 1; ((item && item.rounds) || []).forEach((r, i) => { if (day && r.day && day >= r.day) n = i + 2; }); return n; };
+const RoundMark = ({item, c}) => { if (!item || !(item.rounds || []).length || !c || !c.at) return null; const n = roundOfDay(item, inSeoul(c.at)); return n > 1 ? html`<span class="ck-round" title=${`${n}차에 추가된 세부 업무`}>${n}차</span>` : null; };
 const CheckTag = ({c}) => { const k = checkTag(c); return k ? html`<span class=${'ck-tag ' + k} title=${k === 'new' ? `새로 추가 · ${fullTime(c.at)}` : `조정 · ${fullTime(c.ed)}`}>${k === 'new' ? 'New' : '조정됨'}</span>` : null; };
 // 이미지 복사(11-05): PNG를 클립보드에(카톡 대화창에 바로 붙여넣기). 클릭한 그 순간에 써야 해서 이미지는 Promise로 넘긴다. 안 되면 파일로 저장.
 async function copyImage(make, filename) {

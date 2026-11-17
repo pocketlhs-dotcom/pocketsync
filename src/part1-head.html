@@ -2215,14 +2215,14 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .checklist.narrow .check-list>li>.check-text,.checklist.narrow .check-list>li>.check-edit{flex:1 1 0;min-width:0}
 .checklist.narrow .check-list>li>.check-remove{order:1}
 .checklist.narrow .check-list>li>.check-br{display:block;order:2;flex:0 0 100%;height:0}
-.checklist.narrow .check-list>li>.ck-tag,.checklist.narrow .check-list>li>.check-who,.checklist.narrow .check-list>li>.check-by,.checklist.narrow .check-list>li>.check-date,.checklist.narrow .check-list>li>.check-pct,.checklist.narrow .check-list>li>.check-time,.checklist.narrow .check-list>li>.check-ppl-add,.checklist.narrow .check-list>li>.check-note-btn{order:3}
+.checklist.narrow .check-list>li>.ck-tag,.checklist.narrow .check-list>li>.ck-round,.checklist.narrow .check-list>li>.check-who,.checklist.narrow .check-list>li>.check-by,.checklist.narrow .check-list>li>.check-date,.checklist.narrow .check-list>li>.check-pct,.checklist.narrow .check-list>li>.check-time,.checklist.narrow .check-list>li>.check-ppl-add,.checklist.narrow .check-list>li>.check-note-btn{order:3}
 .checklist.narrow .check-list>li>.check-note-line,.checklist.narrow .check-list>li>.check-note-edit,.checklist.narrow .check-list>li>.check-ppl,.checklist.narrow .check-list>li>.check-ppl-edit{order:4}
 @media(max-width:640px){
  .check-list>li{flex-wrap:wrap;justify-content:flex-end}
  .check-list>li>.check-text,.check-list>li>.check-edit{flex:1 1 0;min-width:0}
  .check-list>li>.check-remove{order:1}
  .check-list>li>.check-br{display:block;order:2;flex:0 0 100%;height:0}
- .check-list>li>.ck-tag,.check-list>li>.check-who,.check-list>li>.check-by,.check-list>li>.check-date,.check-list>li>.check-pct,.check-list>li>.check-time,.check-list>li>.check-ppl-add,.check-list>li>.check-note-btn{order:3}
+ .check-list>li>.ck-tag,.check-list>li>.ck-round,.check-list>li>.check-who,.check-list>li>.check-by,.check-list>li>.check-date,.check-list>li>.check-pct,.check-list>li>.check-time,.check-list>li>.check-ppl-add,.check-list>li>.check-note-btn{order:3}
  .check-list>li>.check-note-line,.check-list>li>.check-note-edit,.check-list>li>.check-ppl,.check-list>li>.check-ppl-edit{order:4}
 }
 /* 업무보고 줄 맞춤(11-05, 사용자 '삐뚤빼뚤한 거 맞춰 줘'): 머리 줄 · 세부 업무 줄이 같은 칸 */
@@ -2725,6 +2725,52 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .tpk-grid button.on{background:#315df8;border-color:#315df8;color:#fff}
 .tpk-foot{display:flex;align-items:center;justify-content:space-between;padding-top:7px;border-top:1px dashed #e6e9f2}
 .tpk-foot>b{font-size:13.5px;color:#1f2a44;font-variant-numeric:tabular-nums}
+/* 업무 차수(11-17): 제목 옆 'n차' · 이현성 '차수 추가' · 상세 차수 줄(이력 + n차 시작) · 마감을 늦추는 이유 창 'n차로 올리기' · 세부 업무 'n차' */
+.tb-round-tag{flex:none;display:inline-flex;align-items:center;height:18px;margin-left:6px;padding:0 6px;border-radius:3px;background:#f3f0ff;border:1px solid #e2d9ff;color:#6941c6;font-size:11px;font-weight:800;line-height:1;white-space:nowrap;vertical-align:2px;font-variant-numeric:tabular-nums}
+.tb-roundchg{background:#f3f0ff!important;color:#6941c6!important;border-color:#e2d9ff!important}
+.ck-round{flex:none;display:inline-flex;align-items:center;height:16px;margin-left:6px;padding:0 5px;border-radius:3px;background:#f3f0ff;color:#6941c6;font-size:10px;font-weight:800;line-height:1;white-space:nowrap}
+.tbr{display:flex;flex-direction:column;gap:8px;min-width:0}
+.tbr-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.tbr-list>li{display:grid;grid-template-columns:32px auto minmax(0,1fr) auto auto auto;align-items:center;column-gap:8px;min-height:30px;padding:0 8px;border-radius:6px;font-size:13px;color:#2b3550;font-variant-numeric:tabular-nums}
+.tbr-list>li .n{font-size:12px;font-weight:800;color:#6b7591}
+.tbr-list>li .d{font-weight:600;white-space:nowrap}
+.tbr-list>li .why{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#4a5573}
+.tbr-list>li .due{font-size:12px;color:#8a92a8;white-space:nowrap}
+.tbr-list>li .h{font-size:12.5px;font-weight:700;color:#315df8;white-space:nowrap}
+.tbr-list>li .st{font-style:normal;font-size:11px;font-weight:700;padding:1px 6px;border-radius:3px;background:#e8edff;color:#315df8;white-space:nowrap}
+.tbr-list>li .st.done{background:#e7f6ee;color:#2f855a}
+.tbr-list>li .st.past{background:#f1f3f8;color:#8a92a8}
+.tbr-list>li.now{background:#f6f3ff}
+.tbr-list>li.now .n{color:#6941c6}
+.tbr-list>li:not(.now){color:#6b7591}
+.tbr-ref{margin:0;display:flex;align-items:center;gap:5px;font-size:12px;color:#8a92a8}
+.tbr-go{align-self:flex-start;display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 10px;border:1px dashed #cfc3fb;border-radius:6px;background:#fff;color:#6941c6;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer}
+.tbr-go:hover{background:#f6f3ff;border-style:solid}
+.tbr-form{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid #e2d9ff;border-radius:8px;background:#fbfaff}
+.tbr-ft{font-size:13px;color:#4b2fa6}
+.tbr-form input{height:32px;box-sizing:border-box;border:1px solid #e1e5f0;border-radius:6px;padding:0 8px;font-size:13px;font-family:inherit;color:#2b3550;background:#fff;min-width:0}
+.tbr-form input:focus{outline:none;border-color:#b9a8f5;box-shadow:0 0 0 3px #f1ecff}
+.tbr-sides{display:flex;flex-wrap:wrap;gap:6px}
+.tbr-sides button{height:28px;padding:0 10px;border:1px solid #e1e5f0;border-radius:5px;background:#fff;color:#4a5573;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer}
+.tbr-sides button[aria-pressed="true"]{background:#6941c6;border-color:#6941c6;color:#fff}
+.tbr-due{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#6b7591}
+.tbr-due>span{font-weight:700;color:#4a5573}
+.tbr-due input{width:150px}
+.tbr-hint{margin:0;display:flex;align-items:center;gap:5px;font-size:12px;color:#b07a12}
+.tbr-acts{display:flex;justify-content:flex-end;gap:6px}
+.tbr-row{align-items:start!important}
+.tbr-row>span{padding-top:6px}
+.tb-dw-round{display:flex;align-items:center;gap:10px;width:100%;margin:2px 0 10px;padding:10px 12px;border:1px solid #e1e5f0;border-radius:8px;background:#fff;text-align:left;font-family:inherit;cursor:pointer;color:#6b7591}
+.tb-dw-round>span{flex:1;display:flex;flex-direction:column;gap:2px}
+.tb-dw-round b{font-size:13.5px;color:#2b3550}
+.tb-dw-round small{font-size:12px;color:#8a92a8}
+.tb-dw-round .tb-dw-sw{flex:none;width:32px;height:18px;border-radius:9px;background:#d9dde8;position:relative;transition:background .15s}
+.tb-dw-round .tb-dw-sw::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s}
+.tb-dw-round.on{border-color:#cfc3fb;background:#fbfaff;color:#6941c6}
+.tb-dw-round.on b{color:#4b2fa6}
+.tb-dw-round.on .tb-dw-sw{background:#6941c6}
+.tb-dw-round.on .tb-dw-sw::after{left:16px}
+@media(max-width:640px){.tbr-list>li{grid-template-columns:30px auto minmax(0,1fr) auto;row-gap:2px;padding:4px 8px}.tbr-list>li .due{display:none}.tbr-list>li .st{grid-column:4}.tbr-list>li .h{grid-column:4;grid-row:1}.tbr-list>li .st{grid-row:2}}
 /* 비용 메모(11-11) */
 .tb-cost-memo{flex-basis:100%;display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:1px solid #e6eaf2;border-radius:6px;background:#fafbfe;color:#a0abc0;box-sizing:border-box;max-width:420px}
 .tb-cost-memo.focus{border-color:#9fb3f7;background:#fff;box-shadow:0 0 0 3px #eef2ff;color:#315df8}
