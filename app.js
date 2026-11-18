@@ -3889,26 +3889,32 @@ async function reportPng(d) {
   const section = (label, total = 0) => { y += 6; rect(P, y - 12, 3, 15, C.blue, 1); text(label, P + 10, y, font(14, 800), C.navy); if (total > 0) { ctx.font = font(13, 800); const s = `합계 ${fmtH(total)}`, tw = ctx.measureText(s).width; text(s, W - P, y, font(13, 800), C.navy, 'right'); clock(W - P - tw - 10, y - 5, C.gray); } y += 10; };
   section('오늘 한 일', d.total || 0);
   if (!d.groups.length) { text('적은 내용이 없어요.', P, y + 18, font(15), C.gray); y += 30; }
-  for (const g of d.groups) {
+  // 칸(11-18, 사용자 '표기가 이상해 · 보기 어렵고 · 전체 100% 중 17%?'): 모든 줄이 같은 시간 칸 · 막대 칸을 쓴다.
+  // 업무 머리 % = 그 업무 전체 진행률이라 막대 자리에 '전체'. 세부 업무가 한 줄뿐이면 머리 합계 시간은 생략(같은 숫자 두 번). 업무 없는 줄은 '업무 없이 적은 일' 머리 아래.
+  const pctCol = d.groups.some(g => !g.free && g.pct !== null), TR = pctCol ? W - P - 122 : W - P, BX = W - P - 116, BW = 44;
+  d.groups.forEach((g, gi) => {
+   if (gi > 0) { y += 8; rect(P, y, W - P * 2, 1, C.line); }
    y += 8;
-   if (g.title) {
-    ctx.font = font(16, 800); const tl = wrapT(ctx, g.title, W - P * 2 - (g.pct !== null ? 116 : 0) - (g.h > 0 ? HW : 0));
-    tl.forEach((l, i) => text(l, P, y + 16 + i * 23, font(16, 800), C.navy));
-    if (g.pct !== null) { bar(W - P - 104, y + 7, 60, g.pct); text(`${g.pct}%`, W - P, y + 15, font(14, 800), C.navy, 'right'); }
-    if (g.h > 0) hrs(g.h, W - P - (g.pct !== null ? 116 : 0) - 6, y + 15, C.navy, 800);
+   const showH = g.h > 0 && (g.free ? g.subs.length > 1 : g.subs.length !== 1);
+   if (g.title || g.free) {
+    const head = g.free ? '업무 없이 적은 일' : g.title, fz = g.free ? 14 : 16;
+    ctx.font = font(fz, 800); const tl = wrapT(ctx, head, W - P * 2 - (pctCol ? 122 : 0) - (showH ? HW : 0));
+    tl.forEach((l, k) => text(l, P, y + 16 + k * 23, font(fz, 800), g.free ? C.gray : C.navy));
+    if (!g.free && g.pct !== null) { text('전체', BX + BW, y + 15, font(11, 700), C.gray, 'right'); text(`${g.pct}%`, W - P, y + 15, font(14, 800), g.pct >= 100 ? C.green : '#4a5a80', 'right'); }
+    if (showH) hrs(g.h, TR, y + 15, '#5b6b8f', 700);
     y += 16 + (tl.length - 1) * 23 + 10;
    }
    for (const s of g.subs) {
-    const hasP = s.pct !== null && s.pct !== undefined, maxW = W - P * 2 - 22 - (hasP ? 116 : 0) - (s.h > 0 ? HW : 0);
+    const hasP = s.pct !== null && s.pct !== undefined, maxW = TR - (P + 22) - (s.h > 0 ? HW : 8);
     ctx.font = font(15, 500); const sl = wrapT(ctx, s.text, maxW);
-    rect(P + 7, y + 6, 5, 5, g.title ? '#7c9cf9' : C.gray, 2.5);
-    sl.forEach((l, i) => text(l, P + 22, y + 14 + i * 22, font(15, 500), C.ink));
+    rect(P + 7, y + 6, 5, 5, g.free ? '#a3adbf' : '#7c9cf9', 2.5);
+    sl.forEach((l, k) => text(l, P + 22, y + 14 + k * 22, font(15, 500), C.ink));
     if (s.tag) { ctx.font = font(15, 500); const lw = ctx.measureText(sl[sl.length - 1]).width, lab = s.tag === 'new' ? 'New' : '조정됨'; ctx.font = font(11, 800); const pw = ctx.measureText(lab).width + 12, px = P + 22 + lw + 8; if (px + pw <= P + 22 + maxW + 4) pill(px, y + 13 + (sl.length - 1) * 22, lab, s.tag === 'new' ? '#3865e8' : '#fff1dc', s.tag === 'new' ? '#ffffff' : '#b45f06'); }
-    if (hasP) { bar(W - P - 104, y + 6, 60, s.pct); text(`${s.pct}%`, W - P, y + 14, font(14, 700), s.pct >= 100 ? C.green : C.ink, 'right'); }
-    if (s.h > 0) hrs(s.h, W - P - (hasP ? 116 : 0) - 6, y + 14, '#3f4f6b');
+    if (hasP) { bar(BX, y + 6, BW, s.pct); text(`${s.pct}%`, W - P, y + 14, font(14, 700), s.pct >= 100 ? C.green : C.ink, 'right'); }
+    if (s.h > 0) hrs(s.h, TR, y + 14, '#3f4f6b');
     y += 14 + (sl.length - 1) * 22 + 12;
    }
-  }
+  });
   if (d.links.length) { y += 10; section('링크'); for (const l of d.links) { ctx.font = font(14, 600); const ll = wrapT(ctx, l.label ? `${l.label} · ${l.url}` : l.url, W - P * 2 - 10); ll.forEach((s, i) => text(s, P, y + 16 + i * 20, font(14, 600), C.blue)); y += 16 + (ll.length - 1) * 20 + 8; } }
   for (const [k, label] of [['note', '오늘 업무 메모'], ['next', '내일 할 일 메모']]) { const v = String(d[k] || '').trim(); if (!v) continue; y += 12; section(label); ctx.font = font(15, 500); const ml = wrapT(ctx, v, W - P * 2 - 28); rect(P, y + 6, W - P * 2, ml.length * 22 + 18, C.soft, 6); ml.forEach((s, i) => text(s, P + 14, y + 28 + i * 22, font(15, 500), C.ink)); y += ml.length * 22 + 18 + 10; }
   y += 14; rect(P, y, W - P * 2, 1, C.line); y += 22; text('pocket sync · 디자인팀 보드', W - P, y, font(12, 600), C.gray, 'right'); y += 16;
@@ -4013,7 +4019,7 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
  async function copyReport(card) {
   const memo = k => { const el = card && card.querySelector(`[data-memo="${k}"] textarea`); return el ? String(el.value || '') : null; };
   // 시간(11-09): 줄마다 이날 내 시간, 업무 머리 = 이날 그 업무 합계, 맨 위 = 이날 합계.
-  const groups = groupsOf(my).map(g => { const t = g.k ? taskOf(g.k) : null; if (!g.k) return {title: '', pct: null, h: 0, subs: g.lines.map(l => ({text: l.text, pct: l.pct, tag: '', h: Number(l.h) || 0}))}; const subs = g.lines.filter(l => !projLine(l)).map(l => { const c = t && l.check_id ? t.checklist.find(x => x.id === l.check_id) : null; return {text: c ? c.text : l.text, pct: c && isToday ? c.pct : l.pct, tag: c ? checkTag(c) : '', h: c ? tlDay(c.time_log, me.name, day) : 0}; }); return {title: t ? t.title : (g.lines[0].task_title || '지워진 업무'), pct: t ? (t.progress || 0) : null, h: subs.reduce((a, x) => a + x.h, t && g.lines.some(projLine) ? tlDay(t.time_log, me.name, day) : 0), subs}; });
+  const groups = groupsOf(my).map(g => { const t = g.k ? taskOf(g.k) : null; if (!g.k) return {title: '', free: true, pct: null, h: 0, subs: g.lines.map(l => ({text: l.text, pct: null, tag: '', h: Number(l.h) || 0}))}; const subs = g.lines.filter(l => !projLine(l)).map(l => { const c = t && l.check_id ? t.checklist.find(x => x.id === l.check_id) : null; return {text: c ? c.text : l.text, pct: c && isToday ? c.pct : l.pct, tag: c ? checkTag(c) : '', h: c ? tlDay(c.time_log, me.name, day) : 0}; }); return {title: t ? t.title : (g.lines[0].task_title || '지워진 업무'), pct: t ? (t.progress || 0) : null, h: subs.reduce((a, x) => a + x.h, t && g.lines.some(projLine) ? tlDay(t.time_log, me.name, day) : 0), subs}; });
   const d = {total: dayTotal(my, me.name), name: me.name, role: TEAM_ROLES[me.name] || '', dayLabel: `${Number(day.slice(5, 7))}월 ${Number(day.slice(8))}일 (${'일월화수목금토'[new Date(day + 'T12:00:00Z').getUTCDay()]})`, savedAt: my.updated_at ? teamClock(my.updated_at) : '', groups, links: my.links || [], note: memo('note') ?? my.note, next: memo('next') ?? my.next};
   const how = await copyImage(() => reportPng(d), `업무보고-${me.name}-${day}.png`);
   if (how === 'copied') toast.success('업무보고를 이미지로 복사했어요. 카톡 대화창에 붙여넣기(Ctrl+V · ⌘V) 하면 돼요.'); else toast.info('이 브라우저는 이미지 복사가 안 돼서 파일로 저장했어요. 카톡에 파일로 보내 주세요.');
@@ -4043,6 +4049,8 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
  const xBtn = (label, fn) => html`<button type="button" class="link-chip-x" aria-label=${label} title=${label} disabled=${busy} onClick=${fn}>${I('X', 12)}</button>`;
  const pctPick = (v, set, label, cls = '') => html`<${PctPop} cls=${cls} value=${v} label=${label} head=${label.replace(/^[^:]*: /, '')} disabled=${busy} onChange=${n => set(Number(n))} />`;
  const pctView = (v, set, label) => set ? html`<span class=${cx('tb-rep-pct', v >= 100 && 'full')}><span class="tb-rep-pct-bar"><i style=${`width:${v}%`}></i></span>${pctPick(v, set, label)}</span>` : html`<span class=${cx('tb-rep-pct ro', v >= 100 && 'full')}><span class="tb-rep-pct-bar"><i style=${`width:${v}%`}></i></span><b>${v}%</b></span>`;
+ // 업무 머리 줄 %(11-18, 사용자 '전체 100% 중 17%를 했다는 거야? · 직관적으로'): 그 업무 전체 진행률(세부 업무 평균)이라 막대 자리에 '전체'를 붙여 세부 업무 %와 구분한다.
+ const wholePct = v => html`<span class=${cx('tb-rep-pct ro whole', v >= 100 && 'full')} title="업무 전체 진행률 (세부 업무 평균)"><span class="tb-rep-whole">전체</span><b>${v}%</b></span>`;
  // 줄 맞춤(11-05, 사용자 '삐뚤빼뚤한 거 맞춰 줘'): 머리 줄 · 세부 업무 줄이 같은 칸(앞 16px · 이름 · [시간 · 특이사항] · % · 버튼)을 쓴다.
  // 칸 너비는 사람 카드마다 같다(me = 내 카드, tn = 시간 · 특이사항 칸이 있음).
  const subLine = (l, t, isMe, show, who) => {
@@ -4057,15 +4065,16 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
   // 머리 줄 시간(11-09): 세부 업무 줄이 없고 업무만 고른 줄이면 그 업무에 바로 적는 칸(고르기), 아니면 이 사람이 이날 이 업무에 쓴 시간 합계.
   const own = !subs.length && !!projL && !!t, dayT = t ? subs.reduce((a, l) => { const c = l.check_id ? t.checklist.find(x => x.id === l.check_id) : null; return a + (c ? tlDay(c.time_log, who, day) : 0); }, projL ? tlDay(t.time_log, who, day) : 0) : 0;
   return html`<section class="tb-rep-proj" key=${g.k}>
-   <div class="tb-rep-proj-head tb-rep-row"><span class="tb-rep-lead tb-rep-proj-ico">${I('Layers3', 13)}</span><button type="button" class="tb-rep-proj-title" disabled=${!t} title=${t ? '업무 열기' : '지워진 업무예요'} onClick=${() => t && onOpenTask(t.id)}>${title}</button><span class="tb-rep-ctl">${show.t || show.n ? html`<span class="tb-rep-tn">${show.t ? (own ? html`<${RepHours} value=${dayT} edit=${isMe && !!onCheck} busy=${busy} who=${who} day=${day} label=${`이날 시간: ${title}`} onChange=${h => setTaskDayHours(t, who, h)} />` : html`<span class=${cx('check-time ro sum', dayT > 0 && 'set')} title=${dayT ? `이날 이 업무에 쓴 시간 합계 ${dayT}시간` : ''}>${dayT ? html`${I('Clock', 12)}<b>${fmtH(dayT)}</b>` : ''}</span>`) : ''}${show.n ? html`<span class="check-note-btn ro"></span>` : ''}</span>` : ''}${prog !== null ? pctView(prog, canProg ? v => onProgress(t, v) : null, `업무 진행률: ${title}`) : html`<span class="tb-rep-pct none"></span>`}</span>${isMe ? html`<span class="tb-rep-acts">${t && onCheck ? html`<button type="button" class="tb-rep-proj-more" aria-label=${`세부 업무 더 고르기: ${title}`} title="이 업무에서 세부 업무 더 고르기 · 새로 적기" disabled=${busy} onClick=${() => setWp({focus: t.id, draft: ''})}>${I('ListTree', 14)}</button>` : ''}${xBtn('이 프로젝트 줄 모두 빼기', () => removeLines(g.lines, t, who))}</span>` : ''}</div>
+   <div class="tb-rep-proj-head tb-rep-row"><span class="tb-rep-lead tb-rep-proj-ico">${I('Layers3', 13)}</span><button type="button" class="tb-rep-proj-title" disabled=${!t} title=${t ? '업무 열기' : '지워진 업무예요'} onClick=${() => t && onOpenTask(t.id)}>${title}</button><span class="tb-rep-ctl">${show.t || show.n ? html`<span class="tb-rep-tn">${show.t ? (own ? html`<${RepHours} value=${dayT} edit=${isMe && !!onCheck} busy=${busy} who=${who} day=${day} label=${`이날 시간: ${title}`} onChange=${h => setTaskDayHours(t, who, h)} />` : html`<span class=${cx('check-time ro sum', dayT > 0 && subs.length > 1 && 'set')} title=${dayT && subs.length > 1 ? `이날 이 업무에 쓴 시간 합계 ${dayT}시간` : ''}>${dayT && subs.length > 1 ? html`${I('Clock', 12)}<b>${fmtH(dayT)}</b>` : ''}</span>`) : ''}${show.n ? html`<span class="check-note-btn ro"></span>` : ''}</span>` : ''}${prog !== null ? (canProg ? pctView(prog, v => onProgress(t, v), `업무 진행률: ${title}`) : wholePct(prog)) : html`<span class="tb-rep-pct none"></span>`}</span>${isMe ? html`<span class="tb-rep-acts">${t && onCheck ? html`<button type="button" class="tb-rep-proj-more" aria-label=${`세부 업무 더 고르기: ${title}`} title="이 업무에서 세부 업무 더 고르기 · 새로 적기" disabled=${busy} onClick=${() => setWp({focus: t.id, draft: ''})}>${I('ListTree', 14)}</button>` : ''}${xBtn('이 프로젝트 줄 모두 빼기', () => removeLines(g.lines, t, who))}</span>` : ''}</div>
    ${subs.length > 0 && html`<ul class="tb-rep-subs">${subs.map(l => subLine(l, t, isMe, show, who))}</ul>`}
   </section>`;
  };
  // 시간 · 특이사항 칸: 내 카드에서 세부 업무 줄이 있으면 늘, 남의 카드는 적힌 게 있을 때만.
  const showOf = (gs, isMe, who) => {
   let linked = false, subs = false, ht = false, hn = false;
-  for (const g of gs) { const t = g.k ? taskOf(g.k) : null; if (!t) continue; if (g.lines.some(projLine)) { linked = true; if (tlDay(t.time_log, who, day) > 0) ht = true; } for (const l of g.lines) { const c = !projLine(l) && l.check_id ? t.checklist.find(x => x.id === l.check_id) : null; if (!c) continue; linked = true; subs = true; if (tlDay(c.time_log, who, day) > 0) ht = true; if (c.note) hn = true; } }
-  return {t: ht || (isMe && linked && !!onCheck), n: hn || (isMe && subs && !!onCheck)};
+  let free = false;
+  for (const g of gs) { if (!g.k) { free = true; if (g.lines.some(l => Number(l.h) > 0)) ht = true; continue; } const t = taskOf(g.k); if (!t) continue; if (g.lines.some(projLine)) { linked = true; if (tlDay(t.time_log, who, day) > 0) ht = true; } for (const l of g.lines) { const c = !projLine(l) && l.check_id ? t.checklist.find(x => x.id === l.check_id) : null; if (!c) continue; linked = true; subs = true; if (tlDay(c.time_log, who, day) > 0) ht = true; if (c.note) hn = true; } }
+  return {t: ht || (isMe && (linked || free) && !!onCheck), n: hn || (isMe && subs && !!onCheck)};
  };
  // 이 사람이 이날 쓴 시간 합계(세부 업무 · 업무에 바로 · 업무 없는 줄).
  const dayTotal = (r, who) => groupsOf(r).reduce((a, g) => { const t = g.k ? taskOf(g.k) : null; return a + g.lines.reduce((b, l) => { if (!g.k) return b + (Number(l.h) || 0); if (!t) return b; if (projLine(l)) return b + tlDay(t.time_log, who, day); const c = l.check_id ? t.checklist.find(x => x.id === l.check_id) : null; return b + (c ? tlDay(c.time_log, who, day) : 0); }, 0); }, 0);
@@ -4081,11 +4090,24 @@ function TeamReport({reports, tasks, comments, me, busy, onAct, onCheck, onProgr
    <div class="tb-rep-link-actions"><button type="button" class="text-button" onClick=${() => setLinking(null)}>취소</button><button type="button" class="primary-button" disabled=${busy || !t} onClick=${() => doLink(l)}>${I('Link2', 14)}잇기</button></div>
   </div>`;
  };
- const freeLine = (l, isMe, who = '') => {
-  const can = isMe && !!onCheck, open = can && linking && linking.lineId === l.id, sug = can && !open ? similar(l.text)[0] : null;
-  return html`<li key=${l.id} class=${cx(open && 'linking')}><span class="tb-rep-dot"></span><div class="tb-rep-free"><${TeamText} text=${l.text} />${sug ? html`<button type="button" class="tb-rep-sug" disabled=${busy} title="이 업무에 이어서 세부 업무 · %로 남기기" onClick=${() => startLink(l, sug.id)}>${I('Sparkles', 11)}<span>${sug.title}</span><em>에 잇기</em></button>` : ''}</div>${isMe ? html`<span class="tb-rep-free-tools">${can && !open ? html`<button type="button" class="text-button tb-rep-linkbtn" disabled=${busy} onClick=${() => startLink(l, sug ? sug.id : '')}>${I('Link2', 12)}업무에 잇기</button>` : ''}<${RepHours} value=${Number(l.h) || 0} edit=${true} busy=${busy} who=${who} day=${day} label=${`이날 시간: ${l.text}`} onChange=${h => onAct(day, cur => ({lines: cur.lines.map(x => (x.id === l.id ? {...x, h} : x))}), '')} />${xBtn('빼기', () => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), ''))}</span>` : Number(l.h) > 0 ? html`<span class="tb-rep-free-tools"><${RepHours} value=${Number(l.h)} edit=${false} who=${who} day=${day} /></span>` : ''}${open ? linkPanel(l) : ''}</li>`;
+ // 업무 없는 줄(11-18, 사용자 '레이아웃이 어떻게 되는 거야 · 표기가 이상해 · 보기 어렵고'): 예전에는 바로 위 업무의 세부 업무처럼 보이고 시간이 % 칸 자리(맨 오른쪽)에 있었다.
+ // → 업무 묶음과 같은 상자에 '업무 없이 적은 일' 머리를 달고, 줄은 같은 칸(앞 점 · 이름 · 시간 칸 · 빈 % 칸 · 버튼)을 쓴다. 업무에 잇기는 버튼 칸의 아이콘(추천이 있으면 이름 아래 칩).
+ const freeRow = (l, isMe, show, who) => {
+  const can = isMe && !!onCheck, open = can && linking && linking.lineId === l.id, sug = can && !open ? similar(l.text)[0] : null, h = Number(l.h) || 0;
+  return html`<li key=${l.id} class=${cx('tb-rep-row tb-rep-freerow', open && 'linking')}><span class="tb-rep-lead"><span class="tb-rep-dot"></span></span>
+   <div class="tb-rep-free"><${TeamText} text=${l.text} />${sug ? html`<button type="button" class="tb-rep-sug" disabled=${busy} title="이 업무에 이어서 세부 업무 · %로 남기기" onClick=${() => startLink(l, sug.id)}>${I('Sparkles', 11)}<span>${sug.title}</span><em>에 잇기</em></button>` : ''}</div>
+   <span class="tb-rep-ctl">${show.t || show.n ? html`<span class="tb-rep-tn">${show.t ? (isMe ? html`<${RepHours} value=${h} edit=${true} busy=${busy} who=${who} day=${day} label=${`이날 시간: ${l.text}`} onChange=${hh => onAct(day, cur => ({lines: cur.lines.map(x => (x.id === l.id ? {...x, h: hh} : x))}), '')} />` : html`<span class=${cx('check-time ro', h > 0 && 'set')}>${h > 0 ? html`${I('Clock', 12)}<b>${fmtH(h)}</b>` : ''}</span>`) : ''}${show.n ? html`<span class="check-note-btn ro"></span>` : ''}</span>` : ''}<span class="tb-rep-pct none"></span></span>
+   ${isMe ? html`<span class="tb-rep-acts">${can && !open ? html`<button type="button" class="tb-rep-proj-more" aria-label=${`업무에 잇기: ${l.text}`} title="업무에 잇기 · 세부 업무 · %로 남기기" disabled=${busy} onClick=${() => startLink(l, sug ? sug.id : '')}>${I('Link2', 14)}</button>` : ''}${xBtn('빼기', () => onAct(day, cur => ({lines: cur.lines.filter(x => x.id !== l.id)}), ''))}</span>` : ''}
+   ${open ? linkPanel(l) : ''}</li>`;
  };
- const workView = (r, isMe, who) => { const gs = groupsOf(r), show = showOf(gs, isMe, who); return gs.length ? html`<${RepWork} cls=${cx('tb-rep-work', isMe && 'me', (show.t || show.n) && 'tn')}>${gs.map(g => g.k ? projView(g, isMe, show, who) : html`<ul class="tb-rep-lines" key="free">${g.lines.map(l => freeLine(l, isMe, who))}</ul>`)}<//>` : ''; };
+ const freeView = (g, isMe, show, who) => {
+  const sum = g.lines.reduce((a, l) => a + (Number(l.h) || 0), 0), many = g.lines.length > 1;
+  return html`<section class="tb-rep-proj tb-rep-freebox" key="free">
+   <div class="tb-rep-proj-head tb-rep-row"><span class="tb-rep-lead tb-rep-proj-ico">${I('NotebookPen', 13)}</span><span class="tb-rep-proj-title plain">업무 없이 적은 일</span>${show.t && sum > 0 && many ? html`<span class="tb-rep-ctl"><span class="tb-rep-tn"><span class="check-time ro sum set" title=${`업무 없이 적은 일 합계 ${sum}시간`}>${I('Clock', 12)}<b>${fmtH(sum)}</b></span>${show.n ? html`<span class="check-note-btn ro"></span>` : ''}</span><span class="tb-rep-pct none"></span></span>` : html`<span></span>`}${isMe ? html`<span class="tb-rep-acts"></span>` : ''}</div>
+   <ul class="tb-rep-subs">${g.lines.map(l => freeRow(l, isMe, show, who))}</ul>
+  </section>`;
+ };
+ const workView = (r, isMe, who) => { const gs = groupsOf(r), show = showOf(gs, isMe, who); return gs.length ? html`<${RepWork} cls=${cx('tb-rep-work', isMe && 'me', (show.t || show.n) && 'tn')}>${gs.map(g => (g.k ? projView(g, isMe, show, who) : freeView(g, isMe, show, who)))}<//>` : ''; };
  const projMeta = (x, who) => [statuses[x.status], x.due ? dDay(x.due).label : '', who ? teamWho(x.assignee) : ''].filter(Boolean).join(' · ');
  // 오늘 한 일 적기(11-05): 큰 버튼 = 고르기 창(업무 → 세부 업무를 한눈에, 여러 개 한 번에), 아래 칸 = 업무에 없는 일 한 줄.
  const nSubs = mineT.reduce((a, x) => a + x.checklist.length, 0);

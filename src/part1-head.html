@@ -2771,6 +2771,18 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .tb-dw-round.on .tb-dw-sw{background:#6941c6}
 .tb-dw-round.on .tb-dw-sw::after{left:16px}
 @media(max-width:640px){.tbr-list>li{grid-template-columns:30px auto minmax(0,1fr) auto;row-gap:2px;padding:4px 8px}.tbr-list>li .due{display:none}.tbr-list>li .st{grid-column:4}.tbr-list>li .h{grid-column:4;grid-row:1}.tbr-list>li .st{grid-row:2}}
+/* 업무보고 오늘 한 일(11-18, 사용자 '레이아웃 · 표기가 이상해 · 보기 어렵고 · 전체 100% 중 17%?'): 업무 머리 % = '전체 n%', 업무 없는 줄 = 같은 상자 · 같은 칸 */
+.tb-rep-pct.whole .tb-rep-whole{display:inline-block;width:48px;text-align:right;font-size:11px;font-weight:700;color:#8a96ad;flex:none}
+.tb-rep-proj .tb-rep-pct.whole b{color:#4a5a80}
+.tb-rep-proj .tb-rep-pct.whole.full b{color:#3f8c66}
+.tb-rep-freebox{background:#fff;border-style:dashed}
+.tb-rep-proj-title.plain{cursor:default;color:#6b7591;font-size:13.5px}
+.tb-rep-proj-title.plain:hover{color:#6b7591;text-decoration:none}
+.tb-rep-freebox .tb-rep-subs .tb-rep-dot{background:#a3adbf}
+.tb-rep-freerow>.tb-rep-free{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}
+.tb-rep-freerow>.tb-rep-free .tb-text{font-size:14px}
+.tb-rep-freerow>.tb-rep-link{grid-column:1/-1}
+@media(max-width:640px){.tb-rep-pct.whole .tb-rep-whole{width:auto}}
 /* 비용 메모(11-11) */
 .tb-cost-memo{flex-basis:100%;display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:1px solid #e6eaf2;border-radius:6px;background:#fafbfe;color:#a0abc0;box-sizing:border-box;max-width:420px}
 .tb-cost-memo.focus{border-color:#9fb3f7;background:#fff;box-shadow:0 0 0 3px #eef2ff;color:#315df8}
