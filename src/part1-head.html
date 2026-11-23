@@ -2783,6 +2783,12 @@ button.check-note-line:hover>span{text-decoration:underline;text-underline-offse
 .tb-rep-freerow>.tb-rep-free .tb-text{font-size:14px}
 .tb-rep-freerow>.tb-rep-link{grid-column:1/-1}
 @media(max-width:640px){.tb-rep-pct.whole .tb-rep-whole{width:auto}}
+/* 세부 업무 차수 표시(11-23, 끝낸 시점 기준): 끝낸 차수 = 채움(1차 회색 · 2차부터 보라), 아직인 일의 'n차 추가' = 점선 */
+.ck-round.r1{background:#eef0f5;color:#6b7591}
+.ck-round.add{background:#fff;box-sizing:border-box;border:1px dashed #cbbdf8;padding:0 4px}
+/* 좁은 줄 · 모바일(11-23): New · 조정됨 · 차수 표시는 첫 줄 이름 옆에 둔다(둘째 줄 맨 앞에 오면 실무자 칸 시작선이 밀리고 버튼이 셋째 줄로 넘어감) */
+.checklist.narrow .check-list>li>.ck-tag,.checklist.narrow .check-list>li>.ck-round{order:0}
+@media(max-width:640px){.check-list>li>.ck-tag,.check-list>li>.ck-round{order:0}}
 /* 비용 메모(11-11) */
 .tb-cost-memo{flex-basis:100%;display:flex;flex-direction:row;align-items:center;gap:6px;font-weight:400;height:32px;padding:0 10px;border:1px solid #e6eaf2;border-radius:6px;background:#fafbfe;color:#a0abc0;box-sizing:border-box;max-width:420px}
 .tb-cost-memo.focus{border-color:#9fb3f7;background:#fff;box-shadow:0 0 0 3px #eef2ff;color:#315df8}

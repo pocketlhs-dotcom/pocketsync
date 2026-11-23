@@ -269,7 +269,7 @@
     drop.push(t); hist.push({at: now, by: '이현성', kind: 'sync', text: `${v.join('·')} 보드에 같은 업무가 두 번 보여서 나중에 보낸 것(${boardName(t)})을 정리`});
    }
    const keep = live.filter(t => !drop.includes(t));
-   let cs = stateOf(c), src = null;
+   let cs = stateOf(c), src = null, ckMoved = false;
    // 2) A·B → C: 지난번 맞춘 값(c_sync)에서 A·B만 바뀐 항목을 C로.
    for (const t of keep) {
     const a = tDocs.get(t.id), as = stateOf(a), base = a.c_sync && typeof a.c_sync === 'object' ? a.c_sync : null;
@@ -288,6 +288,7 @@
     for (const f of moved) {
      if (!(f === 'progress' && moved.includes('checklist'))) hist.push({at: now, by: `${a.updated_by_name || '이현성'} · ${boardName(t)}`, kind: KIND[f], text: `${NAME[f]} ${label(f, as[f])}`, from: label(f, cs[f]), to: label(f, as[f])});
      cs = {...cs, [f]: as[f]}; cPatch[f] = as[f];
+     if (f === 'checklist') ckMoved = true;
     }
     if (moved.length) src = {t, a};
    }
@@ -297,6 +298,14 @@
    const outRm = [...gone, ...drop].map(t => t.id);
    if (outRm.length) cPatch.out_links = (Array.isArray(c.out_links) ? c.out_links : []).filter(o => o && !outRm.includes(String(o.id)));
    if (JSON.stringify(Array.isArray(c.link_vis) ? c.link_vis : null) !== JSON.stringify(vis)) cPatch.link_vis = vis;
+   // 세부 업무를 끝낸 때(ck_done, 11-23 · 세부 업무 차수 표시용, 앱 ckDoneNext와 같은 규칙): A·B 쪽에서 끝낸 세부 업무가 C로 넘어올 때도 지금 시각을 남긴다.
+   // 완료가 풀리거나 없어진 것은 빼고, 원래 완료였던 것은 그대로. 처음 맞추는 연결에서 합쳐진 완료분은 언제 끝냈는지 몰라 남기지 않는다.
+   if (cPatch.checklist) {
+    const was = new Map(nChecks(c.checklist).map(x => [x.id, x])), m0 = c.ck_done && typeof c.ck_done === 'object' && !Array.isArray(c.ck_done) ? c.ck_done : {}, m = {};
+    for (const x of cPatch.checklist) { if (!x.done) continue; const p = was.get(x.id); if (p && p.done) { if (typeof m0[x.id] === 'string') m[x.id] = m0[x.id]; } else if (ckMoved) m[x.id] = now; }
+    const k0 = Object.keys(m0), k1 = Object.keys(m);
+    if (k0.length !== k1.length || k1.some(k => m0[k] !== m[k])) cPatch.ck_done = m;
+   }
    if (Object.keys(cPatch).length || hist.length) {
     const said = hist.filter(h => h.kind !== 'sync').map(h => h.text);
     const meta = src ? {updated_at: now, updated_by: src.a.updated_by || 'lhs', updated_by_name: src.a.updated_by_name || '이현성', last_change: `${boardName(src.t)}에서 ${said.join(', ')}`} : {};

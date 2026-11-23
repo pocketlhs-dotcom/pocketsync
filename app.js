@@ -142,9 +142,39 @@ const tDays = h => Math.max(0.5, Math.round((Number(h) || 0) / 8 * 2) / 2);
 // 세부 업무 표시(11-05): 새로 넣은 것(at) 'New', 이름 · %를 고친 것(ed) '조정됨' — 7시간 동안(업무 NEW와 같은 기준). 둘 다면 New.
 const CHECK_FRESH_MS = 7 * 36e5;
 const checkTag = c => { const now = Date.now(); if (!c) return ''; if (now - Date.parse(c.at || '') < CHECK_FRESH_MS) return 'new'; if (now - Date.parse(c.ed || '') < CHECK_FRESH_MS) return 'edit'; return ''; };
-// 세부 업무의 차수(11-17): 업무의 차수 시작일(rounds[].day)과 세부 업무를 만든 날을 비교해 2차부터 작은 표시. A·B 업무는 차수가 없어 안 보임.
+// 세부 업무의 차수(11-17 → 11-23 고침, 강승연 '2차 시점인데 완료로 누르면 1차에 완료한 것처럼 떠요 · 완료 시점으로 기준을 맞추면' → 선택: 끝낸 시점 기준):
+// 끝낸 일 = 끝낸 때의 차수('n차', 1차는 회색). 끝낸 때 = 업무 문서 ck_done[세부 업무 id](완료로 바뀐 시각, 11-23부터 남음)
+//  → 없으면(그 전에 끝낸 일 · 새로고침 안 한 화면에서 끝낸 일) 마지막으로 시간을 적은 날 → 만든 날. 이때는 말풍선에 '…로 봄'이라고 알린다.
+// 아직인 일 = 2차부터 새로 생긴 것만 'n차 추가'(점선). 차수가 없는 업무(1차뿐 · A·B 업무)는 표시 없음.
+// ck_done을 세부 업무 안이 아니라 업무 문서에 따로 두는 이유: 세부 업무 목록은 새로고침 안 한 예전 화면이 저장하면 모르는 칸이 지워지고, C ⇄ A·B 맞추기의 비교 값(목록 해시)도 흔들린다.
 const roundOfDay = (item, day) => { let n = 1; ((item && item.rounds) || []).forEach((r, i) => { if (day && r.day && day >= r.day) n = i + 2; }); return n; };
-const RoundMark = ({item, c}) => { if (!item || !(item.rounds || []).length || !c || !c.at) return null; const n = roundOfDay(item, inSeoul(c.at)); return n > 1 ? html`<span class="ck-round" title=${`${n}차에 추가된 세부 업무`}>${n}차</span>` : null; };
+// 시각으로 보는 차수: 차수를 올린 시각(rounds[].at)과 견준다(같은 날 차수를 올리기 전에 한 일은 앞 차수). at이 없는 차수는 날짜로.
+const roundOfTime = (item, iso) => { const t = Date.parse(iso || ''); if (isNaN(t)) return 1; let n = 1; ((item && item.rounds) || []).forEach((r, i) => { const rt = Date.parse(r.at || ''); if (isNaN(rt) ? (r.day && inSeoul(iso) >= r.day) : t >= rt) n = i + 2; }); return n; };
+const normCkDone = v => { const o = {}; if (v && typeof v === 'object' && !Array.isArray(v)) Object.entries(v).slice(0, 80).forEach(([k, t]) => { if (k && typeof t === 'string' && !isNaN(Date.parse(t))) o[String(k).slice(0, 40)] = t.slice(0, 30); }); return o; };
+// 세부 업무를 바꾼 뒤의 ck_done: 이번 변경으로 완료가 된 것에만 지금 시각, 완료를 풀거나 지운 것은 뺀다. 원래 완료였던 것은 그대로(기록 없던 예전 완료분은 기록 없이 둔다). 바뀐 게 없으면 null.
+function ckDoneNext(map0, before, after, now = nowIso()) {
+ const m0 = normCkDone(map0), was = new Map((before || []).map(c => [c.id, c])), m = {};
+ (after || []).forEach(c => { if (!c.done) return; const p = was.get(c.id); if (p && p.done) { if (m0[c.id]) m[c.id] = m0[c.id]; } else m[c.id] = now; });
+ const k0 = Object.keys(m0), k1 = Object.keys(m);
+ return k0.length === k1.length && k1.every(k => m0[k] === m[k]) ? null : m;
+}
+function checkRound(item, c) {
+ if (!item || !(item.rounds || []).length || !c) return null;
+ const made = c.at ? roundOfTime(item, c.at) : 1;
+ if (!c.done) return made > 1 ? {n: made, made, kind: 'add'} : null;
+ const stamp = (item.ck_done || {})[c.id];
+ if (stamp) return {n: Math.max(made, roundOfTime(item, stamp)), made, kind: 'done', how: 'stamp', day: inSeoul(stamp)};
+ const days = Object.keys(c.time_log || {}).map(k => tlParse(k).day).filter(Boolean).sort(), last = days[days.length - 1] || '';
+ if (last) return {n: Math.max(made, roundOfDay(item, last)), made, kind: 'done', how: 'time', day: last};
+ return {n: made, made, kind: 'done', how: 'made', day: c.at ? inSeoul(c.at) : ''};
+}
+const RoundMark = ({item, c}) => {
+ const r = checkRound(item, c); if (!r) return null;
+ if (r.kind === 'add') return html`<span class="ck-round add" title=${`${r.n}차에 새로 생긴 세부 업무 · 끝내면 끝낸 차수로 바뀌어요`}>${r.n}차 추가</span>`;
+ const fix = ' · 다르면 체크를 풀었다 다시 눌러 주세요';
+ const tip = r.how === 'stamp' ? `${r.n}차 때 끝냄 · ${shortDate(r.day)}${r.made < r.n ? ` · ${r.made}차 때 만든 일` : ''}` : r.how === 'time' ? `${r.n}차 때 끝낸 것으로 봄 · 끝낸 날 기록이 없어 마지막으로 시간을 적은 날 기준${fix}` : `${r.n}차 때 끝낸 것으로 봄 · 끝낸 날 기록이 없어 만든 날 기준${fix}`;
+ return html`<span class=${cx('ck-round', r.n === 1 && 'r1', r.how !== 'stamp' && 'guess')} title=${tip}>${r.n}차</span>`;
+};
 const CheckTag = ({c}) => { const k = checkTag(c); return k ? html`<span class=${'ck-tag ' + k} title=${k === 'new' ? `새로 추가 · ${fullTime(c.at)}` : `조정 · ${fullTime(c.ed)}`}>${k === 'new' ? 'New' : '조정됨'}</span>` : null; };
 // 이미지 복사(11-05): PNG를 클립보드에(카톡 대화창에 바로 붙여넣기). 클릭한 그 순간에 써야 해서 이미지는 Promise로 넘긴다. 안 되면 파일로 저장.
 async function copyImage(make, filename) {
@@ -2249,7 +2279,7 @@ function shrinkImage(file, size = 128) {
 }
 function normTeam(d) {
  const b = normItem(d);
- return {...b, assignee: String(d.assignee || ''), topic_label: String(d.topic_label || ''), src_board: String(d.src_board || ''), src_id: String(d.src_id || ''), src_title: String(d.src_title || ''), issue: TEAM_ISSUES[d.issue] ? d.issue : '', issue_note: String(d.issue_note || ''), issue_at: String(d.issue_at || ''), issue_by: String(d.issue_by || ''), src_body: String(d.src_body || ''), src_checks: normChecklist(d.src_checks), src_links: teamLinks(d.src_links), src_synced_at: String(d.src_synced_at || ''), start_on: DATE_RE.test(d.start_on || '') ? d.start_on : '', spec: normChecklist(d.spec).map(c => ({id: c.id, text: c.text, done: c.done})), issue_log: (Array.isArray(d.issue_log) ? d.issue_log : []).filter(h => h && h.resolved_at).map(h => ({issue: TEAM_ISSUES[h.issue] ? h.issue : 'check', note: String(h.note || ''), by: String(h.by || ''), at: String(h.at || ''), resolved_by: String(h.resolved_by || ''), resolved_at: String(h.resolved_at), how: String(h.how || '')})), history: (Array.isArray(d.history) ? d.history : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), text: String(h.text || ''), kind: String(h.kind || ''), from: h.from === undefined ? null : String(h.from), to: h.to === undefined ? null : String(h.to), note: String(h.note || '')})), handoffs: (Array.isArray(d.handoffs) ? d.handoffs : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), from: String(h.from || ''), to: String(h.to || ''), note: String(h.note || '')})), out_links: (Array.isArray(d.out_links) ? d.out_links : []).filter(o => o && ['A', 'B'].includes(o.board) && o.id).map(o => ({board: o.board, id: String(o.id), at: String(o.at || '')})), link_vis: Array.isArray(d.link_vis) ? d.link_vis.filter(b => b === 'A' || b === 'B') : null, lhs_seen: String(d.lhs_seen || ''), due0: DATE_RE.test(d.due0 || '') ? d.due0 : '', due_log: (Array.isArray(d.due_log) ? d.due_log : []).filter(h => h && h.at).slice(-30).map(h => ({from: DATE_RE.test(h.from || '') ? h.from : '', to: DATE_RE.test(h.to || '') ? h.to : '', at: String(h.at), by: String(h.by || ''), side: DUE_SIDES[h.side] ? h.side : '', tags: Array.isArray(h.tags) ? h.tags.map(String).slice(0, 6) : [], note: String(h.note || '').slice(0, 200)})), due_chg_by: String(d.due_chg_by || ''), due_chg_at: String(d.due_chg_at || ''), due_seen: String(d.due_seen || ''), meetings: normMeets(d.meetings), rounds: normRounds(d.rounds), round_by: String(d.round_by || ''), round_at: String(d.round_at || ''), round_seen: String(d.round_seen || ''), work_days: Number(d.work_days) > 0 ? Math.round(Number(d.work_days) * 2) / 2 : 0, work_note: String(d.work_note || ''), work_at: String(d.work_at || ''), work_by: String(d.work_by || ''), work_start: DATE_RE.test(d.work_start || '') ? d.work_start : '', work_end: DATE_RE.test(d.work_end || '') ? d.work_end : '', work_delay: String(d.work_delay || ''), work_delay_tags: Array.isArray(d.work_delay_tags) ? d.work_delay_tags.map(String).slice(0, 10) : [], time_log: normTimeLog(d.time_log)};
+ return {...b, assignee: String(d.assignee || ''), topic_label: String(d.topic_label || ''), src_board: String(d.src_board || ''), src_id: String(d.src_id || ''), src_title: String(d.src_title || ''), issue: TEAM_ISSUES[d.issue] ? d.issue : '', issue_note: String(d.issue_note || ''), issue_at: String(d.issue_at || ''), issue_by: String(d.issue_by || ''), src_body: String(d.src_body || ''), src_checks: normChecklist(d.src_checks), src_links: teamLinks(d.src_links), src_synced_at: String(d.src_synced_at || ''), start_on: DATE_RE.test(d.start_on || '') ? d.start_on : '', spec: normChecklist(d.spec).map(c => ({id: c.id, text: c.text, done: c.done})), issue_log: (Array.isArray(d.issue_log) ? d.issue_log : []).filter(h => h && h.resolved_at).map(h => ({issue: TEAM_ISSUES[h.issue] ? h.issue : 'check', note: String(h.note || ''), by: String(h.by || ''), at: String(h.at || ''), resolved_by: String(h.resolved_by || ''), resolved_at: String(h.resolved_at), how: String(h.how || '')})), history: (Array.isArray(d.history) ? d.history : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), text: String(h.text || ''), kind: String(h.kind || ''), from: h.from === undefined ? null : String(h.from), to: h.to === undefined ? null : String(h.to), note: String(h.note || '')})), handoffs: (Array.isArray(d.handoffs) ? d.handoffs : []).filter(h => h && h.at).map(h => ({at: String(h.at), by: String(h.by || ''), from: String(h.from || ''), to: String(h.to || ''), note: String(h.note || '')})), out_links: (Array.isArray(d.out_links) ? d.out_links : []).filter(o => o && ['A', 'B'].includes(o.board) && o.id).map(o => ({board: o.board, id: String(o.id), at: String(o.at || '')})), link_vis: Array.isArray(d.link_vis) ? d.link_vis.filter(b => b === 'A' || b === 'B') : null, lhs_seen: String(d.lhs_seen || ''), due0: DATE_RE.test(d.due0 || '') ? d.due0 : '', due_log: (Array.isArray(d.due_log) ? d.due_log : []).filter(h => h && h.at).slice(-30).map(h => ({from: DATE_RE.test(h.from || '') ? h.from : '', to: DATE_RE.test(h.to || '') ? h.to : '', at: String(h.at), by: String(h.by || ''), side: DUE_SIDES[h.side] ? h.side : '', tags: Array.isArray(h.tags) ? h.tags.map(String).slice(0, 6) : [], note: String(h.note || '').slice(0, 200)})), due_chg_by: String(d.due_chg_by || ''), due_chg_at: String(d.due_chg_at || ''), due_seen: String(d.due_seen || ''), meetings: normMeets(d.meetings), rounds: normRounds(d.rounds), ck_done: normCkDone(d.ck_done), round_by: String(d.round_by || ''), round_at: String(d.round_at || ''), round_seen: String(d.round_seen || ''), work_days: Number(d.work_days) > 0 ? Math.round(Number(d.work_days) * 2) / 2 : 0, work_note: String(d.work_note || ''), work_at: String(d.work_at || ''), work_by: String(d.work_by || ''), work_start: DATE_RE.test(d.work_start || '') ? d.work_start : '', work_end: DATE_RE.test(d.work_end || '') ? d.work_end : '', work_delay: String(d.work_delay || ''), work_delay_tags: Array.isArray(d.work_delay_tags) ? d.work_delay_tags.map(String).slice(0, 10) : [], time_log: normTimeLog(d.time_log)};
 }
 const teamByDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || ({critical: 0, urgent: 1, share: 2}[a.priority] - {critical: 0, urgent: 1, share: 2}[b.priority]) || String(a.created_at || '').localeCompare(String(b.created_at || ''));
 // 팀 현황 순서: 손으로 정한 순서(prio_no) 먼저, 나머지는 미배정 먼저 · 마감순.
@@ -2416,6 +2446,7 @@ function TeamBoard() {
    await patch(x, {time_log: log}, `업무 시간 · ${act.name} ${fmtH(act.type === 'ttotal' ? act.total : act.h)}`); return;
   }
   let list = normChecklist((snap.data() || {}).checklist);
+  const before = list;
   if (act.type === 'toggle') list = list.map(c => c.id === act.cid ? {...c, done: !!act.done, pct: act.done ? 100 : 0} : c);
   else if (act.type === 'pct') list = list.map(c => c.id === act.cid ? {...c, pct: act.pct, done: act.pct >= 100} : c);
   // 세부 업무 시간(11-09): 사람 · 날짜별(checkTimeAct).
@@ -2437,6 +2468,9 @@ function TeamBoard() {
   list = normChecklist(list); const st = checkStat({checklist: list});
   const fields = {checklist: list, ...(act.body !== undefined ? {body: act.body} : {})};
   if (list.length) fields.progress = st.pct;
+  // 끝낸 때(11-23, 세부 업무 차수 = 끝낸 시점 기준): 이번에 완료가 된 세부 업무에만 지금 시각을 남긴다(ckDoneNext).
+  const dn = ckDoneNext((snap.data() || {}).ck_done, before, list);
+  if (dn) fields.ck_done = dn;
   const one = act.cid ? list.find(c => c.id === act.cid) : null;
   await patch(x, fields, act.type === 'tdel' && one ? `세부 업무 사람 빼기 · ${one.text} · ${act.name}` : act.type === 'tlogs' ? `세부 업무 시간 · ${act.name} ${Object.keys(act.map).length}개` : one && (act.type === 'tlog' || act.type === 'ttotal') ? `세부 업무 시간 · ${one.text} · ${act.name} ${fmtH(act.type === 'ttotal' ? act.total : act.h)}${act.type === 'tlog' && act.day ? ` (${shortDate(act.day)})` : ''}` : one && act.type === 'note' ? `세부 업무 특이사항 · ${one.text}` : list.length ? `세부 업무 ${st.done}/${st.total}` : '세부 업무 정리');
  }
@@ -2609,7 +2643,7 @@ function TeamDuePick({x, busy, onPatch}) {
 // rounds [{n, day, at, by, side, note, due_from, due_to, prev_done, prev_end, prev_days}] — 2차부터 쌓는다(1차 = 처음 범위, 따로 기록 없음). 지금 차수 = rounds.length + 1.
 // 올리면: 새 마감을 바꿨으면 마감 이력에도 같은 사정 · 메모로 남김. 완료된 업무면 진행 중으로 되돌리고 그때 완료일 · 종료일 · 작업일은 차수 기록(prev_*)으로 옮겨
 // 다시 완료할 때 전체 기간 · 시간 기준으로 새로 적게 한다. 늦음(제때)은 지금 마감(= 마지막 차수 마감) 기준 그대로, 처음 마감(due0)은 참고로 보여 준다.
-// 차수별 시간 = 그 차수 시작일부터 다음 차수 시작 전날까지 적힌 시간(날짜 없는 시간은 빼고, 보이는 사람 시간만). 세부 업무에도 만든 날로 차수를 붙인다(RoundMark).
+// 차수별 시간 = 그 차수 시작일부터 다음 차수 시작 전날까지 적힌 시간(날짜 없는 시간은 빼고, 보이는 사람 시간만). 세부 업무에는 끝낸 때의 차수를 붙인다(part2 RoundMark · ck_done, 11-23 끝낸 시점 기준으로 바꿈).
 const roundNow = x => ((x && x.rounds) || []).length + 1;
 function normRounds(v) {
  return (Array.isArray(v) ? v : []).filter(r => r && DATE_RE.test(r.day || '')).slice(-30).map((r, i) => ({n: i + 2, day: r.day, at: String(r.at || ''), by: String(r.by || ''), side: DUE_SIDES[r.side] ? r.side : '', note: String(r.note || '').slice(0, 120),

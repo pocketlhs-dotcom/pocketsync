@@ -141,9 +141,39 @@ const tDays = h => Math.max(0.5, Math.round((Number(h) || 0) / 8 * 2) / 2);
 // 세부 업무 표시(11-05): 새로 넣은 것(at) 'New', 이름 · %를 고친 것(ed) '조정됨' — 7시간 동안(업무 NEW와 같은 기준). 둘 다면 New.
 const CHECK_FRESH_MS = 7 * 36e5;
 const checkTag = c => { const now = Date.now(); if (!c) return ''; if (now - Date.parse(c.at || '') < CHECK_FRESH_MS) return 'new'; if (now - Date.parse(c.ed || '') < CHECK_FRESH_MS) return 'edit'; return ''; };
-// 세부 업무의 차수(11-17): 업무의 차수 시작일(rounds[].day)과 세부 업무를 만든 날을 비교해 2차부터 작은 표시. A·B 업무는 차수가 없어 안 보임.
+// 세부 업무의 차수(11-17 → 11-23 고침, 강승연 '2차 시점인데 완료로 누르면 1차에 완료한 것처럼 떠요 · 완료 시점으로 기준을 맞추면' → 선택: 끝낸 시점 기준):
+// 끝낸 일 = 끝낸 때의 차수('n차', 1차는 회색). 끝낸 때 = 업무 문서 ck_done[세부 업무 id](완료로 바뀐 시각, 11-23부터 남음)
+//  → 없으면(그 전에 끝낸 일 · 새로고침 안 한 화면에서 끝낸 일) 마지막으로 시간을 적은 날 → 만든 날. 이때는 말풍선에 '…로 봄'이라고 알린다.
+// 아직인 일 = 2차부터 새로 생긴 것만 'n차 추가'(점선). 차수가 없는 업무(1차뿐 · A·B 업무)는 표시 없음.
+// ck_done을 세부 업무 안이 아니라 업무 문서에 따로 두는 이유: 세부 업무 목록은 새로고침 안 한 예전 화면이 저장하면 모르는 칸이 지워지고, C ⇄ A·B 맞추기의 비교 값(목록 해시)도 흔들린다.
 const roundOfDay = (item, day) => { let n = 1; ((item && item.rounds) || []).forEach((r, i) => { if (day && r.day && day >= r.day) n = i + 2; }); return n; };
-const RoundMark = ({item, c}) => { if (!item || !(item.rounds || []).length || !c || !c.at) return null; const n = roundOfDay(item, inSeoul(c.at)); return n > 1 ? html`<span class="ck-round" title=${`${n}차에 추가된 세부 업무`}>${n}차</span>` : null; };
+// 시각으로 보는 차수: 차수를 올린 시각(rounds[].at)과 견준다(같은 날 차수를 올리기 전에 한 일은 앞 차수). at이 없는 차수는 날짜로.
+const roundOfTime = (item, iso) => { const t = Date.parse(iso || ''); if (isNaN(t)) return 1; let n = 1; ((item && item.rounds) || []).forEach((r, i) => { const rt = Date.parse(r.at || ''); if (isNaN(rt) ? (r.day && inSeoul(iso) >= r.day) : t >= rt) n = i + 2; }); return n; };
+const normCkDone = v => { const o = {}; if (v && typeof v === 'object' && !Array.isArray(v)) Object.entries(v).slice(0, 80).forEach(([k, t]) => { if (k && typeof t === 'string' && !isNaN(Date.parse(t))) o[String(k).slice(0, 40)] = t.slice(0, 30); }); return o; };
+// 세부 업무를 바꾼 뒤의 ck_done: 이번 변경으로 완료가 된 것에만 지금 시각, 완료를 풀거나 지운 것은 뺀다. 원래 완료였던 것은 그대로(기록 없던 예전 완료분은 기록 없이 둔다). 바뀐 게 없으면 null.
+function ckDoneNext(map0, before, after, now = nowIso()) {
+ const m0 = normCkDone(map0), was = new Map((before || []).map(c => [c.id, c])), m = {};
+ (after || []).forEach(c => { if (!c.done) return; const p = was.get(c.id); if (p && p.done) { if (m0[c.id]) m[c.id] = m0[c.id]; } else m[c.id] = now; });
+ const k0 = Object.keys(m0), k1 = Object.keys(m);
+ return k0.length === k1.length && k1.every(k => m0[k] === m[k]) ? null : m;
+}
+function checkRound(item, c) {
+ if (!item || !(item.rounds || []).length || !c) return null;
+ const made = c.at ? roundOfTime(item, c.at) : 1;
+ if (!c.done) return made > 1 ? {n: made, made, kind: 'add'} : null;
+ const stamp = (item.ck_done || {})[c.id];
+ if (stamp) return {n: Math.max(made, roundOfTime(item, stamp)), made, kind: 'done', how: 'stamp', day: inSeoul(stamp)};
+ const days = Object.keys(c.time_log || {}).map(k => tlParse(k).day).filter(Boolean).sort(), last = days[days.length - 1] || '';
+ if (last) return {n: Math.max(made, roundOfDay(item, last)), made, kind: 'done', how: 'time', day: last};
+ return {n: made, made, kind: 'done', how: 'made', day: c.at ? inSeoul(c.at) : ''};
+}
+const RoundMark = ({item, c}) => {
+ const r = checkRound(item, c); if (!r) return null;
+ if (r.kind === 'add') return html`<span class="ck-round add" title=${`${r.n}차에 새로 생긴 세부 업무 · 끝내면 끝낸 차수로 바뀌어요`}>${r.n}차 추가</span>`;
+ const fix = ' · 다르면 체크를 풀었다 다시 눌러 주세요';
+ const tip = r.how === 'stamp' ? `${r.n}차 때 끝냄 · ${shortDate(r.day)}${r.made < r.n ? ` · ${r.made}차 때 만든 일` : ''}` : r.how === 'time' ? `${r.n}차 때 끝낸 것으로 봄 · 끝낸 날 기록이 없어 마지막으로 시간을 적은 날 기준${fix}` : `${r.n}차 때 끝낸 것으로 봄 · 끝낸 날 기록이 없어 만든 날 기준${fix}`;
+ return html`<span class=${cx('ck-round', r.n === 1 && 'r1', r.how !== 'stamp' && 'guess')} title=${tip}>${r.n}차</span>`;
+};
 const CheckTag = ({c}) => { const k = checkTag(c); return k ? html`<span class=${'ck-tag ' + k} title=${k === 'new' ? `새로 추가 · ${fullTime(c.at)}` : `조정 · ${fullTime(c.ed)}`}>${k === 'new' ? 'New' : '조정됨'}</span>` : null; };
 // 이미지 복사(11-05): PNG를 클립보드에(카톡 대화창에 바로 붙여넣기). 클릭한 그 순간에 써야 해서 이미지는 Promise로 넘긴다. 안 되면 파일로 저장.
 async function copyImage(make, filename) {
